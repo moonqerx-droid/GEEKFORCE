@@ -1,0 +1,16 @@
+services:
+  api:
+    build:
+      context: ./apps/api
+    environment:
+      DATABASE_URL: sqlite:////data/helpflow.db
+      AI_PROVIDER: mock
+    ports:
+      - "8000:8000"
+    volumes:
+      - helpflow-data:/data
+    restart: unless-stopped
+
+volumes:
+  helpflow-data:
+
