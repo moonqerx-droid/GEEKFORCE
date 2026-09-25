@@ -5,12 +5,14 @@ from fastapi import FastAPI
 from fastapi.requests import Request
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
+from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.routes.conversations import router as conversations_router
 from app.api.routes.health import router as health_router
 from app.api.routes.operator import router as operator_router
 from app.db.base import Base
 from app.db.session import engine
+from app.core.config import get_settings
 from app import models  # noqa: F401 -- registers SQLAlchemy tables
 
 
@@ -21,6 +23,14 @@ async def lifespan(_: FastAPI):
 
 
 app = FastAPI(title="GEEKFORCE HelpFlow API", version="0.1.0", lifespan=lifespan)
+settings = get_settings()
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=settings.cors_origins,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 base_dir = Path(__file__).resolve().parent
 templates = Jinja2Templates(directory=base_dir / "templates")
 app.mount("/static", StaticFiles(directory=base_dir / "static"), name="static")
@@ -32,3 +42,8 @@ app.include_router(operator_router)
 @app.get("/debug", include_in_schema=False)
 def debug_page(request: Request):
     return templates.TemplateResponse(request=request, name="debug.html")
+
+
+@app.get("/debug/operator", include_in_schema=False)
+def operator_debug_page(request: Request):
+    return templates.TemplateResponse(request=request, name="operator-debug.html")

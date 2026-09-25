@@ -39,6 +39,7 @@ button:disabled { cursor: not-allowed; opacity: .45; }
 button.primary { background: var(--signal); border-color: var(--signal); color: white; }
 button.primary:hover:not(:disabled) { background: var(--signal-dark); }
 button.danger { color: var(--danger); border-color: #e5aaa5; }
+.text-link { color: var(--signal-dark); font-weight: 700; text-underline-offset: 3px; }
 
 .workspace {
   display: grid;
@@ -69,6 +70,22 @@ textarea { flex: 1; resize: vertical; min-height: 54px; border: 1px solid var(--
 .footer-actions { display: flex; align-items: center; flex-wrap: wrap; gap: 10px; padding-top: 0; }
 #error { color: var(--danger); font-size: 13px; }
 
+.operator-shell { max-width: 1120px; margin: 0 auto; padding: 32px 24px 64px; }
+.operator-header { display: flex; justify-content: space-between; gap: 24px; align-items: flex-end; margin-bottom: 32px; }
+.operator-lead { max-width: 62ch; margin: 10px 0 0; color: var(--muted); line-height: 1.5; }
+.operator-actions { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; }
+.queue-status { color: var(--muted); font-weight: 700; }
+.ticket-list { display: grid; gap: 14px; }
+.ticket-card { padding: 20px; background: var(--surface); border: 1px solid var(--line); border-left: 5px solid var(--signal); border-radius: 10px; }
+.ticket-card header { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; margin-bottom: 16px; }
+.ticket-card h2 { margin: 0; font-size: 20px; }
+.ticket-field { display: grid; grid-template-columns: minmax(150px, 1fr) minmax(0, 3fr); gap: 16px; padding: 9px 0; border-top: 1px solid #e6ece8; line-height: 1.45; }
+.ticket-field strong { font-size: 13px; }
+.urgency { padding: 5px 8px; border-radius: 5px; font-size: 12px; font-weight: 800; }
+.urgency-high, .urgency-critical { background: #fee4e2; color: #9b1c13; }
+.urgency-normal { background: #e1efe9; color: var(--signal-dark); }
+.urgency-low { background: #e9eceb; color: var(--muted); }
+
 .debug { min-width: 0; padding: 26px; background: var(--debug); color: var(--debug-ink); }
 .debug header { display: flex; justify-content: space-between; align-items: baseline; gap: 16px; border-bottom: 1px solid #2b3d34; padding-bottom: 16px; }
 .debug h2 { margin: 0; color: white; font-size: 18px; }
@@ -79,9 +96,10 @@ textarea { flex: 1; resize: vertical; min-height: 54px; border: 1px solid var(--
   .workspace { grid-template-columns: 1fr; }
   .debug { min-height: 360px; }
   .composer-row { align-items: stretch; flex-direction: column; }
+  .operator-header { align-items: flex-start; flex-direction: column; }
+  .ticket-field { grid-template-columns: 1fr; gap: 4px; }
 }
 
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { scroll-behavior: auto !important; }
 }
-

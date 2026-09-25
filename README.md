@@ -6,6 +6,7 @@ MVP виртуального помощника технической подд�
 
 - FastAPI и интерактивная документация OpenAPI;
 - SQLite-хранилище обращений, сообщений и выполненных шагов;
+- Alembic-миграции для обновления постоянной базы;
 - контролируемая backend state machine;
 - детерминированный mock-AI, работающий без внешних ключей;
 - сценарий срочного обращения по CRM;
@@ -25,6 +26,7 @@ docker compose up --build
 После запуска:
 
 - debug-интерфейс: <http://localhost:8000/debug>;
+- debug-очередь специалиста: <http://localhost:8000/debug/operator>;
 - Swagger: <http://localhost:8000/docs>;
 - health check: <http://localhost:8000/health>;
 - OpenAPI JSON: <http://localhost:8000/openapi.json>.
@@ -91,6 +93,20 @@ Set-Location apps/api
 pytest -v
 ```
 
+## Миграции базы данных
+
+В Docker миграции применяются автоматически перед запуском API. При локальной разработке из `apps/api`:
+
+```bash
+alembic upgrade head
+```
+
+Откатить последнюю миграцию:
+
+```bash
+alembic downgrade -1
+```
+
 ## Основной API
 
 ```text
@@ -103,6 +119,8 @@ GET  /api/operator/tickets
 ```
 
 Полные схемы запросов и ответов всегда доступны в `/docs` и `/openapi.json`.
+
+Для локального React/Next.js/Vite-фронтенда разрешены origin-порты `3000` и `5173`. Список настраивается переменной `CORS_ORIGINS` в JSON-формате.
 
 ## Интеграция настоящего AI
 

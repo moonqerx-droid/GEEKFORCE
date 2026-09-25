@@ -1,7 +1,7 @@
 from app.models.conversation import Conversation
 from app.repositories.conversations import ConversationRepository
 from app.schemas.conversation import ConversationStatus, StepOutcome
-from app.services.ai import AIService
+from app.services.ai import AIAnalysis, AIService
 
 
 class DialogueConflict(RuntimeError):
@@ -38,10 +38,14 @@ class DialogueService:
         if conversation.status not in allowed_states:
             raise DialogueConflict(f"messages are not accepted while status is {conversation.status}")
 
+        analysis = None
+        if conversation.status == ConversationStatus.NEW:
+            analysis = self.ai_service.analyze(content)
+
         self.repository.add_message(conversation_id, role="user", content=content.strip())
 
         if conversation.status == ConversationStatus.NEW:
-            return self._analyze_initial_message(conversation, content)
+            return self._analyze_initial_message(conversation, analysis)
         if conversation.status == ConversationStatus.CLARIFYING:
             return self._start_troubleshooting(conversation, content)
         if conversation.status == ConversationStatus.VERIFYING:
@@ -109,9 +113,12 @@ class DialogueService:
         )
         return self.get_conversation(conversation_id)
 
-    def _analyze_initial_message(self, conversation: Conversation, content: str) -> Conversation:
+    def _analyze_initial_message(
+        self,
+        conversation: Conversation,
+        analysis: AIAnalysis,
+    ) -> Conversation:
         conversation.status = ConversationStatus.ANALYZING
-        analysis = self.ai_service.analyze(content)
         conversation.summary = analysis.summary
         conversation.service = analysis.service
         conversation.symptoms = analysis.symptoms

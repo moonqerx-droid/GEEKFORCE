@@ -131,3 +131,21 @@ def test_generic_problem_does_not_receive_crm_instructions(dialogue):
 
     assert updated.status == "ESCALATED"
     assert all("CRM" not in message.content for message in updated.messages)
+
+
+def test_ai_failure_does_not_persist_partial_message(db_session):
+    class FailingAI:
+        def analyze(self, message):
+            raise RuntimeError("provider unavailable")
+
+    repository = ConversationRepository(db_session)
+    service = DialogueService(repository, FailingAI())
+    conversation = service.create_conversation()
+
+    with pytest.raises(RuntimeError, match="provider unavailable"):
+        service.handle_message(conversation.id, "Не работает CRM")
+
+    db_session.expire_all()
+    loaded = repository.get(conversation.id)
+    assert loaded.status == "NEW"
+    assert loaded.messages == []

@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>HelpFlow — очередь специалиста</title>
+    <link rel="stylesheet" href="/static/debug.css">
+  </head>
+  <body data-endpoint="/api/operator/tickets">
+    <main class="operator-shell">
+      <header class="operator-header">
+        <div>
+          <p class="product">GEEKFORCE / HelpFlow</p>
+          <h1>Очередь специалиста</h1>
+          <p class="operator-lead">Эскалированные обращения уже содержат историю и выполненные шаги.</p>
+        </div>
+        <div class="operator-actions">
+          <a class="text-link" href="/debug">Вернуться к диалогу</a>
+          <button id="refresh" class="primary" type="button">Обновить очередь</button>
+        </div>
+      </header>
+
+      <section aria-live="polite">
+        <p id="queue-status" class="queue-status">Загружаю обращения…</p>
+        <div id="tickets" class="ticket-list"></div>
+      </section>
+    </main>
+    <script src="/static/operator-debug.js" defer></script>
+  </body>
+</html>
+
