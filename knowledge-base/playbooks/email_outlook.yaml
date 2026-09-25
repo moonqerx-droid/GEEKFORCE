@@ -1,0 +1,43 @@
+id: email_outlook
+title: Проблема с корпоративной почтой
+service: Почта
+default_urgency: medium
+escalation_team: Администраторы почты
+keywords: [почт, outlook, аутлук, письм, email, e-mail, mail, ящик, входящ, вложени, exchange]
+symptoms_hints:
+  письма не отправляются: [не отправляется, не уходит, не уходят, не отправляются, застряло в исходящих, застряли в исходящих, висят в исходящих]
+  письма не приходят: [не приходят, не получаю, нет новых писем]
+  Outlook не запускается: [не запускается, outlook не открывается, вылетает, зависает]
+  ящик переполнен: [переполнен, закончилось место, превышен размер, квота]
+  запрашивает пароль: [запрашивает пароль, просит пароль, постоянно спрашивает пароль]
+questions:
+  - fact: mail_client
+    text: Где вы работаете с почтой — в программе Outlook или в браузере?
+    kind: choice
+    options:
+      outlook: [outlook, аутлук, программ, приложени]
+      web: [браузер, веб, owa, сайт]
+  - fact: error_text
+    text: Есть ли сообщение об ошибке? Если да — что в нём написано?
+    kind: text
+steps:
+  - id: check_web_mail
+    title: Проверьте почту в браузере
+    instruction: Откройте веб-версию почты (Outlook Web) в браузере и войдите. Если там всё работает — проблема в программе на компьютере, а не в почтовом ящике.
+    when: {mail_client: ["outlook"]}
+  - id: restart_outlook
+    title: Перезапустите Outlook
+    instruction: Закройте Outlook, откройте Диспетчер задач (Ctrl+Shift+Esc), завершите все процессы OUTLOOK.EXE и запустите Outlook заново.
+    when: {mail_client: ["outlook"]}
+  - id: check_mailbox_size
+    title: Освободите место в ящике
+    instruction: Очистите папки «Удалённые» и «Нежелательная почта», удалите старые письма с большими вложениями. Размер ящика видно внизу окна почты.
+  - id: outlook_safe_mode
+    title: Запустите Outlook в безопасном режиме
+    instruction: "Нажмите Win+R, введите outlook.exe /safe и нажмите Enter. Если в этом режиме почта работает, мешает одна из надстроек."
+    when: {mail_client: ["outlook"]}
+  - id: clear_browser_cache_mail
+    title: Очистите кэш браузера
+    instruction: Нажмите Ctrl+Shift+Delete, удалите cookies и кэш, затем снова войдите в веб-почту.
+    when: {mail_client: ["web"]}
+verify_question: Почта работает — письма отправляются и приходят?

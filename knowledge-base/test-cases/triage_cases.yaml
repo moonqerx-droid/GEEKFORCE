@@ -1,0 +1,90 @@
+# Контрольные обращения для AI triage. Прогоняются тестом
+# services/ai/tests/test_triage_cases.py в режиме без LLM (rules).
+# expect.facts — только факты, которые обязаны быть извлечены
+# (значение проверяется на вхождение, без учёта регистра).
+cases:
+  - name: демо — срочный вход в CRM
+    message: Не могу войти в CRM с ноутбука, но с телефона работает. Через 20 минут встреча.
+    expect:
+      playbook: crm_login_device_specific
+      service: CRM
+      urgency: high
+      urgency_reason_contains: через 20 минут
+      symptoms: [не удаётся войти, работает на другом устройстве]
+      facts: {other_device_works: "yes", device: laptop}
+      questions_before_step: 1
+
+  - name: простая проблема — пароль
+    message: Забыл пароль от учётки, не срочно
+    expect:
+      playbook: password_login
+      urgency: low
+
+  - name: неоднозначное описание
+    message: Ничего не работает, помогите пожалуйста
+    expect:
+      playbook: unknown
+      urgency: medium
+      questions_before_step: 3
+
+  - name: несколько симптомов — почта
+    message: Outlook постоянно просит пароль и письма не отправляются, застряли в исходящих
+    expect:
+      playbook: email_outlook
+      service: Почта
+      symptoms: [письма не отправляются, запрашивает пароль]
+      facts: {mail_client: outlook}
+
+  - name: VPN из дома
+    message: Из дома не подключается VPN, пишет "authentication failed"
+    expect:
+      playbook: vpn_connection
+      facts: {location: remote, error_text: authentication failed}
+
+  - name: видеозвонок перед презентацией
+    message: Меня не слышат в Zoom, через 5 минут презентация у клиента!
+    expect:
+      playbook: video_calls
+      urgency: high
+      facts: {call_app: zoom}
+
+  - name: нет прав на папку
+    message: Нет доступа к папке отдела на общем диске, пишет доступ запрещён
+    expect:
+      playbook: access_rights
+
+  - name: ошибка 502 в CRM (Incident Radar)
+    message: Ошибка 502 в CRM
+    expect:
+      playbook: service_unavailable
+      service: CRM
+      urgency: high
+      facts: {error_text: "502"}
+
+  - name: не открывается портал (Incident Radar)
+    message: Не открывается корпоративный портал
+    expect:
+      playbook: service_unavailable
+      service: Корпоративный портал
+
+  - name: массовый сбой
+    message: Не могу зайти в рабочую систему, у коллег тоже не работает
+    expect:
+      playbook: mass_incident
+      urgency: critical
+      should_escalate: true
+      facts: {colleagues_affected: "yes"}
+
+  - name: фишинг
+    message: Перешёл по ссылке из странного письма и ввёл пароль на сайте
+    expect:
+      playbook: security_incident
+      urgency: critical
+      should_escalate: true
+      facts: {entered_credentials: "yes"}
+
+  - name: Wi-Fi в офисе
+    message: В офисе нет интернета на ноутбуке, вай-фай подключен но без доступа к интернету
+    expect:
+      playbook: network_wifi
+      facts: {location: office}
