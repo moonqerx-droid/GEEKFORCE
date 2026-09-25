@@ -48,9 +48,10 @@ function render(conversation) {
   }
 
   const terminal = ["RESOLVED", "ESCALATED"].includes(conversation.status);
+  const acceptsMessage = ["NEW", "CLARIFYING", "VERIFYING"].includes(conversation.status);
   const troubleshooting = conversation.status === "TROUBLESHOOTING";
-  elements.message.disabled = terminal;
-  elements.submit.disabled = terminal;
+  elements.message.disabled = !acceptsMessage;
+  elements.submit.disabled = !acceptsMessage;
   elements.escalate.disabled = terminal;
   elements.outcomes.forEach((button) => { button.disabled = !troubleshooting; });
   elements.messages.scrollTop = elements.messages.scrollHeight;
@@ -95,4 +96,3 @@ elements.escalate.addEventListener("click", () => run(() => request(
   `/api/conversations/${state.conversation.id}/escalate`,
   { method: "POST" },
 )));
-

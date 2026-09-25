@@ -17,7 +17,7 @@ def db_session() -> Session:
         poolclass=StaticPool,
     )
     Base.metadata.create_all(engine)
-    with Session(engine) as session:
+    with Session(engine, expire_on_commit=False) as session:
         yield session
     Base.metadata.drop_all(engine)
 

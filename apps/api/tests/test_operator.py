@@ -28,6 +28,8 @@ def test_operator_queue_returns_escalated_ticket_with_context(client):
     assert ticket["messages"]
     assert ticket["completed_steps"]
     assert ticket["escalation_summary"]
+    assert "Важная встреча в ближайшие 20 минут" in ticket["escalation_summary"]
+    assert "Ошибка соединения" in ticket["escalation_summary"]
 
 
 def test_operator_queue_sorts_high_urgency_first(client):

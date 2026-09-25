@@ -64,6 +64,30 @@ def test_helped_step_requires_confirmation_before_resolution(dialogue):
     assert resolved.status == "RESOLVED"
 
 
+def test_uncertain_verification_reply_keeps_verifying(dialogue):
+    conversation = dialogue.create_conversation()
+    dialogue.handle_message(conversation.id, "Не работает CRM")
+    dialogue.handle_message(conversation.id, "Ошибка соединения")
+    dialogue.record_step_result(conversation.id, "helped")
+
+    updated = dialogue.handle_message(conversation.id, "Не знаю, сейчас проверю")
+
+    assert updated.status == "VERIFYING"
+    assert "да или нет" in updated.messages[-1].content.casefold()
+
+
+def test_negative_verification_reply_continues_troubleshooting(dialogue):
+    conversation = dialogue.create_conversation()
+    dialogue.handle_message(conversation.id, "Не работает CRM")
+    dialogue.handle_message(conversation.id, "Ошибка соединения")
+    dialogue.record_step_result(conversation.id, "helped")
+
+    updated = dialogue.handle_message(conversation.id, "Ошибка осталась")
+
+    assert updated.status == "TROUBLESHOOTING"
+    assert updated.current_step_code == "clear_site_data"
+
+
 def test_step_result_in_wrong_state_raises_conflict(dialogue):
     conversation = dialogue.create_conversation()
 
@@ -81,3 +105,29 @@ def test_escalation_is_idempotent(dialogue):
     assert first.status == "ESCALATED"
     assert second.status == "ESCALATED"
     assert first.escalation_summary == second.escalation_summary
+
+
+def test_repeated_failures_advance_then_escalate(dialogue):
+    conversation = dialogue.create_conversation()
+    dialogue.handle_message(conversation.id, "Не работает CRM")
+    dialogue.handle_message(conversation.id, "Ошибка соединения")
+
+    second_step = dialogue.record_step_result(conversation.id, "not_helped")
+    assert second_step.current_step_code == "try_private_window"
+
+    third_step = dialogue.record_step_result(conversation.id, "not_helped")
+    assert third_step.current_step_code == "clear_site_data"
+
+    escalated = dialogue.record_step_result(conversation.id, "not_helped")
+
+    assert escalated.status == "ESCALATED"
+
+
+def test_generic_problem_does_not_receive_crm_instructions(dialogue):
+    conversation = dialogue.create_conversation()
+    dialogue.handle_message(conversation.id, "У меня всё сломалось")
+
+    updated = dialogue.handle_message(conversation.id, "Не печатает офисный принтер")
+
+    assert updated.status == "ESCALATED"
+    assert all("CRM" not in message.content for message in updated.messages)

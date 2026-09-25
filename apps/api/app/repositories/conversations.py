@@ -18,6 +18,7 @@ class ConversationRepository:
         statement = (
             select(Conversation)
             .where(Conversation.id == conversation_id)
+            .execution_options(populate_existing=True)
             .options(
                 selectinload(Conversation.messages),
                 selectinload(Conversation.steps),

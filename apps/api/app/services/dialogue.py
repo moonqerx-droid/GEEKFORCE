@@ -30,6 +30,13 @@ class DialogueService:
         conversation = self.get_conversation(conversation_id)
         if conversation.status in {ConversationStatus.RESOLVED, ConversationStatus.ESCALATED}:
             raise DialogueConflict("terminal conversation cannot accept messages")
+        allowed_states = {
+            ConversationStatus.NEW,
+            ConversationStatus.CLARIFYING,
+            ConversationStatus.VERIFYING,
+        }
+        if conversation.status not in allowed_states:
+            raise DialogueConflict(f"messages are not accepted while status is {conversation.status}")
 
         self.repository.add_message(conversation_id, role="user", content=content.strip())
 
@@ -40,7 +47,7 @@ class DialogueService:
         if conversation.status == ConversationStatus.VERIFYING:
             return self._verify_resolution(conversation, content)
 
-        raise DialogueConflict(f"messages are not accepted while status is {conversation.status}")
+        raise DialogueConflict(f"unsupported conversation state {conversation.status}")
 
     def record_step_result(self, conversation_id: str, outcome: str) -> Conversation:
         conversation = self.get_conversation(conversation_id)
@@ -62,13 +69,21 @@ class DialogueService:
             conversation.current_step_code = None
             conversation.current_step_instruction = None
             assistant_text = "Проверьте ещё раз: нужная функция теперь работает?"
-        elif parsed_outcome == StepOutcome.NOT_HELPED:
-            conversation.current_step_code = "try_private_window"
-            conversation.current_step_instruction = "Откройте CRM в приватном окне браузера и попробуйте войти снова."
-            assistant_text = conversation.current_step_instruction
         else:
-            conversation.current_step_code = "check_network"
-            conversation.current_step_instruction = "Проверьте подключение к корпоративной сети или VPN."
+            next_steps = {
+                "check_vpn": (
+                    "try_private_window",
+                    "Откройте CRM в приватном окне браузера и попробуйте войти снова.",
+                ),
+                "try_private_window": (
+                    "clear_site_data",
+                    "Очистите данные сайта CRM и повторите вход.",
+                ),
+            }
+            next_step = next_steps.get(conversation.current_step_code)
+            if next_step is None:
+                return self.escalate(conversation_id)
+            conversation.current_step_code, conversation.current_step_instruction = next_step
             assistant_text = conversation.current_step_instruction
 
         saved = self.repository.save(conversation)
@@ -120,6 +135,9 @@ class DialogueService:
         facts["error_description"] = content.strip()
         conversation.known_facts = facts
         conversation.missing_facts = []
+        if conversation.playbook_id != "crm_login_device_specific":
+            self.repository.save(conversation)
+            return self.escalate(conversation.id)
         conversation.status = ConversationStatus.TROUBLESHOOTING
         conversation.current_step_code = "check_vpn"
         conversation.current_step_instruction = "Проверьте, что корпоративный VPN подключён, затем повторите вход в CRM."
@@ -132,15 +150,20 @@ class DialogueService:
         return self.get_conversation(conversation.id)
 
     def _verify_resolution(self, conversation: Conversation, content: str) -> Conversation:
-        negative_markers = ("нет", "не работает", "не помог")
+        lowered = content.casefold()
+        negative_markers = ("нет", "не работает", "не помог", "ошибка осталась", "не восстанов")
+        affirmative_markers = ("да", "работает", "восстанов", "получилось", "помогло")
         if any(marker in content.casefold() for marker in negative_markers):
             conversation.status = ConversationStatus.TROUBLESHOOTING
             conversation.current_step_code = "clear_site_data"
             conversation.current_step_instruction = "Очистите данные сайта CRM и повторите вход."
             assistant_text = conversation.current_step_instruction
-        else:
+        elif any(marker in lowered for marker in affirmative_markers):
             conversation.status = ConversationStatus.RESOLVED
             assistant_text = "Отлично, проблема решена. Обращение закрыто."
+        else:
+            conversation.status = ConversationStatus.VERIFYING
+            assistant_text = "Подтвердите, пожалуйста, явно: проблема решена — да или нет?"
         self.repository.save(conversation)
         self.repository.add_message(conversation.id, role="assistant", content=assistant_text)
         return self.get_conversation(conversation.id)
@@ -148,10 +171,20 @@ class DialogueService:
     @staticmethod
     def _build_escalation_summary(conversation: Conversation) -> str:
         steps = "; ".join(f"{step.instruction} — {step.outcome}" for step in conversation.steps)
+        original_request = next(
+            (message.content for message in conversation.messages if message.role == "user"),
+            "не сохранено",
+        )
+        dialogue = " | ".join(
+            f"{message.role}: {message.content}" for message in conversation.messages
+        )
         return (
             f"Сервис: {conversation.service or 'не определён'}. "
             f"Срочность: {conversation.urgency}. "
+            f"Причина срочности: {conversation.urgency_reason or 'не указана'}. "
             f"Проблема: {conversation.summary or 'не определена'}. "
+            f"Исходное обращение: {original_request}. "
             f"Факты: {conversation.known_facts}. "
+            f"Диалог: {dialogue or 'нет'}. "
             f"Выполненные шаги: {steps or 'нет'}."
         )

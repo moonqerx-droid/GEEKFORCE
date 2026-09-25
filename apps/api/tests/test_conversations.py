@@ -11,6 +11,10 @@ def test_create_and_send_message(client):
     assert response.status_code == 200
     assert response.json()["status"] == "CLARIFYING"
     assert response.json()["urgency"] == "high"
+    assert [message["role"] for message in response.json()["messages"]] == [
+        "user",
+        "assistant",
+    ]
 
 
 def test_unknown_conversation_returns_404(client):
@@ -53,3 +57,24 @@ def test_escalation_endpoint_is_idempotent(client):
     assert first.status_code == 200
     assert second.status_code == 200
     assert first.json()["escalation_summary"] == second.json()["escalation_summary"]
+
+
+def test_rejected_message_does_not_mutate_history(client):
+    conversation_id = client.post("/api/conversations").json()["id"]
+    client.post(
+        f"/api/conversations/{conversation_id}/messages",
+        json={"content": "Не работает CRM"},
+    )
+    before = client.post(
+        f"/api/conversations/{conversation_id}/messages",
+        json={"content": "Ошибка соединения"},
+    ).json()
+
+    rejected = client.post(
+        f"/api/conversations/{conversation_id}/messages",
+        json={"content": "Лишнее сообщение во время шага"},
+    )
+    after = client.get(f"/api/conversations/{conversation_id}").json()
+
+    assert rejected.status_code == 409
+    assert after["messages"] == before["messages"]
