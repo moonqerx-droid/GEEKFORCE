@@ -47,6 +47,21 @@ class TriageDialogueService(DialogueService):
         try:
             previous_status = conversation.status
             self._message(conversation, "user", content.strip())
+            # Recheck new information locally, without an extra LLM request.
+            # The original playbook must not hide a later security/mass incident.
+            if previous_status != "NEW":
+                update = TriageEngine(self.engine.kb).analyze(content)
+                if update.should_escalate:
+                    conversation.playbook_id = update.recommended_playbook
+                    conversation.urgency = "critical"
+                    conversation.urgency_reason = update.urgency_reason
+                    conversation.summary = update.summary
+                    conversation.known_facts = {
+                        **conversation.known_facts, **update.known_facts,
+                        "critical_update": content.strip(),
+                    }
+                    self._escalate(conversation, "в ходе диалога выявлен критический инцидент")
+                    return self._commit(conversation)
             if previous_status == "NEW":
                 analysis = self.engine.analyze(content)
                 for field in ("summary", "service", "symptoms", "urgency_reason", "known_facts", "missing_facts", "confidence"):
@@ -60,6 +75,18 @@ class TriageDialogueService(DialogueService):
             elif previous_status == "CLARIFYING":
                 facts = self.engine.absorb_answer(content, self._context(conversation))
                 conversation.known_facts = {**conversation.known_facts, **facts}
+                if conversation.playbook_id == "unknown" and update.recommended_playbook != "unknown":
+                    conversation.playbook_id = update.recommended_playbook
+                    conversation.summary = update.summary
+                    conversation.service = update.service
+                    conversation.symptoms = update.symptoms
+                    conversation.confidence = update.confidence
+                    conversation.known_facts = {**conversation.known_facts, **update.known_facts}
+                    levels = ["low", "normal", "high", "critical"]
+                    urgency = "normal" if update.urgency.value == "medium" else update.urgency.value
+                    if levels.index(urgency) >= levels.index(conversation.urgency):
+                        conversation.urgency = urgency
+                        conversation.urgency_reason = update.urgency_reason
                 self._advance(conversation)
             else:
                 solved = self.engine.interpret_confirmation(content)

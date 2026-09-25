@@ -111,3 +111,28 @@ def test_unknown_confirmation_containing_works_does_not_resolve(client):
     send(client, cid, "Ошибка 403")
     client.post(f"/api/conversations/{cid}/step-result", json={"outcome": "helped"})
     assert send(client, cid, "Не знаю, работает ли сейчас")["status"] == "VERIFYING"
+
+
+@pytest.mark.parametrize("followup,playbook", [
+    ("Теперь выяснил: CRM не работает у всех коллег", "mass_incident"),
+    ("Перед этим перешел по фишинговой ссылке", "security_incident"),
+])
+def test_critical_information_in_clarification_escalates(client, followup, playbook):
+    cid = client.post("/api/conversations").json()["id"]
+    original = "Не работает CRM"
+    send(client, cid, original)
+    result = send(client, cid, followup)
+    assert result["status"] == "ESCALATED"
+    assert result["playbook_id"] == playbook
+    assert result["urgency"] == "critical"
+    assert result["escalation_card"]["original_request"] == original
+    assert result["escalation_card"]["known_facts"]["critical_update"] == followup
+
+
+def test_greeting_then_specific_issue_selects_real_playbook(client):
+    cid = client.post("/api/conversations").json()["id"]
+    assert send(client, cid, "Привет")["playbook_id"] == "unknown"
+    result = send(client, cid, "Не могу войти в CRM, через 20 минут встреча")
+    assert result["playbook_id"] == "crm_login_device_specific"
+    assert result["service"] == "CRM"
+    assert result["urgency"] == "high"
