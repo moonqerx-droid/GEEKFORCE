@@ -1,3 +1,4 @@
+import os
 from logging.config import fileConfig
 
 from alembic import context
@@ -9,6 +10,12 @@ from app import models  # noqa: F401 -- registers metadata
 config = context.config
 if config.config_file_name is not None:
     fileConfig(config.config_file_name)
+
+# Runtime configuration must win over the development default from
+# alembic.ini. Docker stores the application database in /data, so using the
+# ini value here would migrate a different, throw-away SQLite file.
+if database_url := os.getenv("DATABASE_URL"):
+    config.set_main_option("sqlalchemy.url", database_url)
 
 target_metadata = Base.metadata
 
@@ -40,4 +47,3 @@ if context.is_offline_mode():
     run_migrations_offline()
 else:
     run_migrations_online()
-

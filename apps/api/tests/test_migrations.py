@@ -1,6 +1,10 @@
+from io import StringIO
+
+import pytest
 from alembic import command
 from alembic.config import Config
-from sqlalchemy import create_engine, inspect
+from sqlalchemy import create_engine, inspect, text
+from sqlalchemy.orm import Session
 
 from app.db.base import Base
 from app import models  # noqa: F401 -- registers metadata
@@ -21,9 +25,48 @@ def test_initial_migration_adopts_pre_alembic_database(tmp_path):
     database_url = f"sqlite:///{tmp_path / 'legacy.db'}"
     engine = create_engine(database_url)
     Base.metadata.create_all(engine)
+    with Session(engine) as session:
+        session.add(models.Conversation(id="preserved", status="NEW"))
+        session.commit()
     config = Config("alembic.ini")
     config.set_main_option("sqlalchemy.url", database_url)
 
     command.upgrade(config, "head")
 
     assert inspect(engine).has_table("alembic_version")
+    with engine.connect() as connection:
+        assert connection.scalar(text("SELECT version_num FROM alembic_version")) == "20260925_0001"
+        assert connection.scalar(text("SELECT id FROM conversations WHERE id='preserved'")) == "preserved"
+
+
+def test_initial_migration_rejects_incomplete_legacy_schema(tmp_path):
+    database_url = f"sqlite:///{tmp_path / 'broken.db'}"
+    engine = create_engine(database_url)
+    with engine.begin() as connection:
+        connection.execute(text("CREATE TABLE conversations (id VARCHAR(36) PRIMARY KEY)"))
+    config = Config("alembic.ini")
+    config.set_main_option("sqlalchemy.url", database_url)
+
+    with pytest.raises(RuntimeError, match="incompatible pre-Alembic schema"):
+        command.upgrade(config, "head")
+
+
+def test_environment_database_url_is_migration_target(tmp_path, monkeypatch):
+    target_url = f"sqlite:///{tmp_path / 'configured.db'}"
+    monkeypatch.setenv("DATABASE_URL", target_url)
+    config = Config("alembic.ini")
+
+    command.upgrade(config, "head")
+
+    engine = create_engine(target_url)
+    assert inspect(engine).has_table("alembic_version")
+    assert inspect(engine).has_table("conversations")
+
+
+def test_offline_migration_emits_fresh_schema_sql():
+    output = StringIO()
+    config = Config("alembic.ini", output_buffer=output)
+
+    command.upgrade(config, "head", sql=True)
+
+    assert "CREATE TABLE conversations" in output.getvalue()
