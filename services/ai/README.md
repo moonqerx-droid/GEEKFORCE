@@ -13,7 +13,7 @@
 ```bash
 cd services/ai
 pip install -e ".[dev]"
-pytest -q                 # 35 тестов, без сети
+pytest -q                 # 37 тестов, без сети
 python -m helpflow_ai     # интерактивное демо в консоли
 ```
 
@@ -83,7 +83,7 @@ solved = engine.interpret_confirmation(text)  # True / False / None (непон�
 
 `original_request`, `summary`, `service`, `urgency`, `urgency_reason`, `known_facts`,
 `questions_and_answers[{question, answer}]`, `performed_steps[{step_id, step, result}]`,
-`escalation_reason`, `recommended_team`, `ai_summary`, `source` (`llm` или `rules`).
+`current_result` (текущий результат), `escalation_reason`, `recommended_team`, `ai_summary`, `source` (`llm` или `rules`).
 
 ## Для Incident Radar (участник 4)
 

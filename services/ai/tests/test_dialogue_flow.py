@@ -26,6 +26,29 @@ def test_demo_vertical_slice(simulate):
     assert sim.verify("Да, доступ восстановился") is True
 
 
+CASE_EXAMPLE = ("У меня опять всё сломалось. Вчера всё работало, сегодня не могу зайти в рабочую систему. "
+                "Через телефон открывается, с ноутбука нет. Мне через 20 минут на встречу")
+
+
+def test_case_example_full_path_to_specialist(simulate, engine):
+    sim = simulate(CASE_EXAMPLE)
+    assert sim.decision.action == DecisionAction.ASK  # one question: urgent
+    sim.answer("просто крутится загрузка и ничего")
+    assert sim.decision.action == DecisionAction.STEP
+    while sim.decision.action == DecisionAction.STEP:
+        sim.step_result(StepOutcome.NOT_HELPED)
+    assert sim.decision.action == DecisionAction.ESCALATE
+
+    card = engine.build_escalation_card(sim.ctx, sim.decision.reason)
+    assert card.original_request == CASE_EXAMPLE
+    assert card.urgency.value == "high" and "20 минут" in card.urgency_reason
+    assert card.known_facts["other_device_works"] == "yes"
+    assert card.known_facts["error_text"] == "просто крутится загрузка и ничего"
+    assert card.questions_and_answers[0]["answer"] == "просто крутится загрузка и ничего"
+    assert len(card.performed_steps) >= 3
+    assert "не решена" in card.current_result
+
+
 def test_simple_problem_starts_solving_quickly(simulate):
     sim = simulate("Забыл пароль, пишет «неверный пароль», пароль не менял")
     asked = 0
@@ -76,6 +99,7 @@ def test_unsolvable_problem_escalates_with_full_context(simulate, engine):
     assert {s["result"] for s in card.performed_steps} == {"не помогло", "не удалось выполнить"}
     assert card.questions_and_answers and card.questions_and_answers[0]["answer"]
     assert card.recommended_team
+    assert card.current_result.startswith(f"Проблема не решена после {steps}")
     assert "Выполнено" in card.ai_summary and card.source == "rules"
 
 

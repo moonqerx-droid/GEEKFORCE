@@ -102,7 +102,7 @@ def test_escalation_summary_uses_llm_with_fallback(kb):
     assert good.build_escalation_card(ctx).ai_summary == "Резюме от модели."
     broken = TriageEngine(kb, fake_llm([500, 500]))
     card = broken.build_escalation_card(ctx)
-    assert card.source == "rules" and "Очистите cookies CRM — не помогло" in card.ai_summary
+    assert card.source == "rules" and "Очистите cookies и кэш браузера — не помогло" in card.ai_summary
 
 
 def test_parse_json_object_strips_code_fences():

@@ -3,6 +3,18 @@
 # expect.facts — только факты, которые обязаны быть извлечены
 # (значение проверяется на вхождение, без учёта регистра).
 cases:
+  - name: пример из условия кейса (дословно)
+    message: У меня опять всё сломалось. Вчера всё работало, сегодня не могу зайти в рабочую систему. Через телефон открывается, с ноутбука нет. Мне через 20 минут на встречу
+    expect:
+      playbook: crm_login_device_specific
+      service: Рабочая система
+      urgency: high
+      urgency_reason_contains: встреча через 20 минут
+      symptoms: [не удаётся войти, работает на другом устройстве]
+      facts: {other_device_works: "yes", device: laptop, since_when: вчера работало, recurring: "yes"}
+      not_missing: [other_device_works]
+      questions_before_step: 1
+
   - name: демо — срочный вход в CRM
     message: Не могу войти в CRM с ноутбука, но с телефона работает. Через 20 минут встреча.
     expect:

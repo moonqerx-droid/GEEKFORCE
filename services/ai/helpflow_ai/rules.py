@@ -11,7 +11,10 @@ URGENCY_ORDER = [Urgency.LOW, Urgency.MEDIUM, Urgency.HIGH, Urgency.CRITICAL]
 MAX_FREE_TEXT_FACT = 300
 # Playbooks that must win whenever they match: safety before convenience.
 PRIORITY_PLAYBOOKS = ("security_incident", "mass_incident")
-GENERIC_SERVICE_PLAYBOOKS = {"service_unavailable", "mass_incident", "access_rights", "unknown"}
+# Playbooks whose service name is refined from the text (e.g. CRM vs "рабочая система").
+GENERIC_SERVICE_PLAYBOOKS = {
+    "service_unavailable", "mass_incident", "access_rights", "unknown", "crm_login_device_specific",
+}
 
 SERVICE_ALIASES: dict[str, list[str]] = {
     "CRM": ["crm", "црм", "срм", "битрикс", "bitrix", "amocrm", "salesforce"],
@@ -151,8 +154,11 @@ def detect_urgency(text: str, playbook: Playbook) -> tuple[Urgency, str]:
 _FACT_PATTERNS: list[tuple[str, str, str]] = [
     # (fact, value, regex over normalized text); first match per fact wins
     ("other_device_works", "yes",
-     r"(с|на) (телефон|смартфон|мобильн|друг\w* (компьютер|ноутбук|устройств))\w*,? "
+     r"(с|на|через) (телефон|смартфон|мобильн|друг\w* (компьютер|ноутбук|устройств))\w*,? "
      r"(все |всё )?(работает|норм|открывается|заходит|пускает|ок)"),
+    ("since_when", "вчера работало, сегодня нет", r"вчера (все |всё )?работал\w*"),
+    ("since_when", "с сегодняшнего дня", r"с утра|сегодня"),
+    ("recurring", "yes", r"\b(опять|снова|в который раз|уже не первый раз)\b"),
     ("vpn", "no", r"без (vpn|впн)|(vpn|впн) (не |от|вы)\w*|не подключ\w* (к )?(vpn|впн)"),
     ("vpn", "yes", r"(через|по|подключен\w* к|включен\w*) (vpn|впн)|(vpn|впн) (подключен|включен|работает)"),
     ("location", "remote", r"из дома|\bдома\b|удаленк|удаленно"),

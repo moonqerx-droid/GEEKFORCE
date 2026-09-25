@@ -142,6 +142,7 @@ class TriageEngine:
             known_facts=dict(context.known_facts),
             questions_and_answers=self._questions_and_answers(playbook, context),
             performed_steps=self._performed_steps(playbook, context),
+            current_result=self._current_result(playbook, context),
             escalation_reason=reason or "автоматическое решение не помогло",
             recommended_team=playbook.escalation_team,
             ai_summary="",
@@ -244,6 +245,16 @@ class TriageEngine:
             for r in ctx.completed_steps
         ]
 
+    @staticmethod
+    def _current_result(playbook: Playbook, ctx: ConversationContext) -> str:
+        if not ctx.completed_steps:
+            return "Проблема не решена, шаги самостоятельного решения не выполнялись"
+        last = ctx.completed_steps[-1]
+        title = next((s.title for s in playbook.steps if s.id == last.step_id), last.step_id)
+        verdict = "не подтверждено пользователем" if ctx.verification_failed else OUTCOME_LABELS[last.outcome]
+        return (f"Проблема не решена после {len(ctx.completed_steps)} шаг(ов); "
+                f"последний шаг «{title}» — {verdict}")
+
     def _ai_summary(self, card: EscalationCard) -> tuple[str, str]:
         if self.llm is not None:
             try:
@@ -291,7 +302,6 @@ def _template_summary(card: EscalationCard) -> str:
         parts.append("Известно: " + "; ".join(f"{k}: {v}" for k, v in card.known_facts.items()) + ".")
     if card.performed_steps:
         parts.append("Выполнено: " + "; ".join(f"{s['step']} — {s['result']}" for s in card.performed_steps) + ".")
-    else:
-        parts.append("Шаги самостоятельного решения не выполнялись.")
+    parts.append(f"Текущий результат: {card.current_result}.")
     parts.append(f"Причина передачи: {card.escalation_reason}.")
     return " ".join(parts)

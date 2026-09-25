@@ -154,6 +154,7 @@ class EscalationCard(BaseModel):
     known_facts: dict[str, str]
     questions_and_answers: list[dict[str, str]]
     performed_steps: list[dict[str, str]]
+    current_result: str
     escalation_reason: str
     recommended_team: str
     ai_summary: str
