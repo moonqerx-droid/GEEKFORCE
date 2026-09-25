@@ -95,6 +95,7 @@ class ConversationRead(BaseModel):
     current_step: CurrentStep | None = None
     escalation_summary: str | None
     incident_id: str | None
+    escalation_card: dict | None = None
 
     @classmethod
     def from_model(cls, model) -> "ConversationRead":

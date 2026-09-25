@@ -35,7 +35,7 @@ def test_initial_migration_adopts_pre_alembic_database(tmp_path):
 
     assert inspect(engine).has_table("alembic_version")
     with engine.connect() as connection:
-        assert connection.scalar(text("SELECT version_num FROM alembic_version")) == "20260925_0001"
+        assert connection.scalar(text("SELECT version_num FROM alembic_version")) == "20260926_0002"
         assert connection.scalar(text("SELECT id FROM conversations WHERE id='preserved'")) == "preserved"
 
 
@@ -70,3 +70,23 @@ def test_offline_migration_emits_fresh_schema_sql():
     command.upgrade(config, "head", sql=True)
 
     assert "CREATE TABLE conversations" in output.getvalue()
+
+
+def test_triage_migration_upgrades_original_schema_without_losing_data(tmp_path):
+    database_url = f"sqlite:///{tmp_path / 'upgrade.db'}"
+    config = Config("alembic.ini")
+    config.set_main_option("sqlalchemy.url", database_url)
+    command.upgrade(config, "20260925_0001")
+    engine = create_engine(database_url)
+    with engine.begin() as connection:
+        connection.execute(text("""
+            INSERT INTO conversations
+            (id,status,created_at,updated_at,symptoms,urgency,known_facts,missing_facts)
+            VALUES ('old','NEW',CURRENT_TIMESTAMP,CURRENT_TIMESTAMP,'[]','normal','{}','[]')
+        """))
+    command.upgrade(config, "head")
+    with engine.connect() as connection:
+        row = connection.execute(text(
+            "SELECT id,workflow_version,asked_facts,verification_failed FROM conversations"
+        )).one()
+        assert tuple(row) == ("old", "legacy", "[]", 0)

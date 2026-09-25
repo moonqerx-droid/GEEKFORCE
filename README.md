@@ -8,8 +8,10 @@ MVP виртуального помощника технической подд�
 - SQLite-хранилище обращений, сообщений и выполненных шагов;
 - Alembic-миграции для обновления постоянной базы;
 - контролируемая backend state machine;
-- детерминированный mock-AI, работающий без внешних ключей;
-- сценарий срочного обращения по CRM;
+- интегрированный AI-модуль команды и 11 сценариев базы знаний;
+- режим правил без внешних ключей и опциональный OpenAI-совместимый провайдер;
+- срочный CRM-сценарий, немедленная эскалация ИБ и массового сбоя;
+- атомарное сохранение хода диалога и восстановление контекста после перезапуска;
 - карточка эскалации и операторская очередь;
 - минимальный браузерный debug-интерфейс;
 - pytest и GitHub Actions;
@@ -47,7 +49,9 @@ docker compose down
 python3.12 -m venv .venv
 source .venv/bin/activate
 pip install -r apps/api/requirements.txt
+pip install -e services/ai
 cd apps/api
+alembic upgrade head
 uvicorn app.main:app --reload
 ```
 
@@ -57,7 +61,9 @@ uvicorn app.main:app --reload
 py -3.12 -m venv .venv
 .\.venv\Scripts\Activate.ps1
 pip install -r apps/api/requirements.txt
+pip install -e services/ai
 Set-Location apps/api
+alembic upgrade head
 uvicorn app.main:app --reload
 ```
 
@@ -73,7 +79,9 @@ Set-ExecutionPolicy -Scope CurrentUser RemoteSigned
 py -3.12 -m venv .venv
 .venv\Scripts\activate.bat
 pip install -r apps\api\requirements.txt
+pip install -e services/ai
 cd apps\api
+alembic upgrade head
 uvicorn app.main:app --reload
 ```
 
@@ -122,9 +130,17 @@ GET  /api/operator/tickets
 
 Для локального React/Next.js/Vite-фронтенда разрешены origin-порты `3000` и `5173`. Список настраивается переменной `CORS_ORIGINS` в JSON-формате.
 
-## Интеграция настоящего AI
+## AI и совместимость
 
-Сейчас используется `MockAIService`, чтобы разработка и демонстрация не зависели от интернета и API-ключа. Настоящий провайдер должен реализовать протокол `AIService` из `apps/api/app/services/ai.py` и возвращать типизированный `AIAnalysis`.
+Новые обращения используют `services/ai/helpflow_ai`: вопросы, шаги и карточки берутся из `knowledge-base`. По умолчанию `AI_PROVIDER=mock` включает правила без сетевых запросов. Для LLM в Docker задайте `AI_PROVIDER=openai`, `AI_API_KEY`, при необходимости `AI_BASE_URL`, `AI_MODEL`, `AI_TIMEOUT_SECONDS` в корневом `.env`, затем пересоздайте сервис. Не добавляйте файл с ключами в Git.
+
+Существующие обращения сохраняют прежнюю логику через `workflow_version=legacy`. Новые получают `triage-v1`. HTTP-контракт сохраняет значения `normal` и `cannot_perform`; адаптер переводит их в AI-значения `medium` и `cannot_do`. В ответ добавлена `escalation_card` с причиной передачи, командой, вопросами, шагами и текущим результатом.
+
+В standalone-запуске AI читает настройки из переменных окружения процесса; `.env` автоматически подставляет Docker Compose. Подробности модуля — в [services/ai/README.md](services/ai/README.md). Проверка AI: `pytest services/ai/tests` из корня после `pip install -e services/ai`.
+
+Debug UI и операторская очередь предназначены для локального демо команды. Аутентификация и ограничение доступа оператора пока не реализованы.
+
+Результаты изучения веток команды и точки интеграции — в [docs/integration-status.md](docs/integration-status.md).
 
 ## Командная работа
 

@@ -14,7 +14,7 @@ def test_urgent_crm_problem_reaches_resolution(client):
         json={"content": "Пишет: ошибка соединения"},
     ).json()
     assert troubleshooting["status"] == "TROUBLESHOOTING"
-    assert troubleshooting["current_step"]["code"] == "check_vpn"
+    assert troubleshooting["current_step"]["code"] == "clear_crm_cookies"
 
     retry = client.post(
         f"/api/conversations/{conversation_id}/step-result",

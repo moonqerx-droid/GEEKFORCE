@@ -63,12 +63,14 @@ def test_rejected_message_does_not_mutate_history(client):
     conversation_id = client.post("/api/conversations").json()["id"]
     client.post(
         f"/api/conversations/{conversation_id}/messages",
-        json={"content": "Не работает CRM"},
+        json={"content": "Не работает CRM, срочно"},
     )
     before = client.post(
         f"/api/conversations/{conversation_id}/messages",
         json={"content": "Ошибка соединения"},
     ).json()
+
+    assert before["status"] == "TROUBLESHOOTING"
 
     rejected = client.post(
         f"/api/conversations/{conversation_id}/messages",

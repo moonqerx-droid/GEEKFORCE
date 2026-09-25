@@ -245,6 +245,8 @@ def _parse_yes_no(norm: str, invert: bool) -> str:
 def parse_confirmation(text: str) -> bool | None:
     """Interpret the answer to 'is the problem solved?'. None = unclear."""
     norm = normalize(text)
+    if _UNKNOWN_RE.search(norm):
+        return None
     if re.search(r"не (помог|работает|решен|получ|восстанов|открыва|заработал)|все еще|по-прежнему|опять", norm):
         return False
     answer = _parse_yes_no(norm, invert=False)

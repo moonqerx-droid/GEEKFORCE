@@ -4,10 +4,16 @@ on:
   push:
     paths:
       - "apps/api/**"
+      - "services/ai/**"
+      - "knowledge-base/**"
+      - "docker-compose.yml"
       - ".github/workflows/backend.yml"
   pull_request:
     paths:
       - "apps/api/**"
+      - "services/ai/**"
+      - "knowledge-base/**"
+      - "docker-compose.yml"
       - ".github/workflows/backend.yml"
 
 jobs:
@@ -25,5 +31,5 @@ jobs:
           cache-dependency-path: apps/api/requirements.txt
       - run: pip install -r requirements.txt
       - run: pytest -v
+      - run: PYTHONPATH=../../services/ai pytest ../../services/ai/tests -v
       - run: python -m compileall app
-

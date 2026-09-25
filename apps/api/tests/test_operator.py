@@ -4,14 +4,22 @@ def create_escalated_conversation(client, initial_message="Не работает
         f"/api/conversations/{conversation_id}/messages",
         json={"content": initial_message},
     )
-    client.post(
+    current = client.post(
         f"/api/conversations/{conversation_id}/messages",
         json={"content": "Ошибка соединения"},
-    )
-    client.post(
+    ).json()
+    for _ in range(3):
+        if current["status"] != "CLARIFYING":
+            break
+        current = client.post(
+            f"/api/conversations/{conversation_id}/messages", json={"content": "Да"},
+        ).json()
+    assert current["status"] == "TROUBLESHOOTING"
+    result = client.post(
         f"/api/conversations/{conversation_id}/step-result",
         json={"outcome": "not_helped"},
     )
+    assert result.status_code == 200
     client.post(f"/api/conversations/{conversation_id}/escalate")
     return conversation_id
 
@@ -28,8 +36,8 @@ def test_operator_queue_returns_escalated_ticket_with_context(client):
     assert ticket["messages"]
     assert ticket["completed_steps"]
     assert ticket["escalation_summary"]
-    assert "Важная встреча в ближайшие 20 минут" in ticket["escalation_summary"]
-    assert "Ошибка соединения" in ticket["escalation_summary"]
+    assert "встреча через 20 минут" in ticket["escalation_summary"]
+    assert "соединения" in ticket["escalation_summary"]
 
 
 def test_operator_queue_sorts_high_urgency_first(client):

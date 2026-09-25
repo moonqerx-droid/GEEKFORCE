@@ -34,6 +34,11 @@ function renderTickets(tickets) {
     addField(card, "Сервис", ticket.service);
     addField(card, "Причина срочности", ticket.urgency_reason);
     addField(card, "Резюме для специалиста", ticket.escalation_summary);
+    if (ticket.escalation_card) {
+      addField(card, "Кому передать", ticket.escalation_card.recommended_team);
+      addField(card, "Причина передачи", ticket.escalation_card.escalation_reason);
+      addField(card, "Текущий результат", ticket.escalation_card.current_result);
+    }
     addField(card, "Выполнено шагов", String(ticket.completed_steps.length));
     ticketsRoot.append(card);
   }
@@ -55,4 +60,3 @@ async function loadTickets() {
 
 refreshButton.addEventListener("click", loadTickets);
 loadTickets();
-
