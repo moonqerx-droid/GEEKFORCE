@@ -1,0 +1,15 @@
+name: frontend
+
+# Заготовка. Активируется, когда команда зафиксирует стек apps/web и apps/operator.
+# Пока стек не выбран, workflow не запускается (нет путей с package.json).
+
+on:
+  workflow_dispatch:
+
+jobs:
+  placeholder:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Placeholder
+        run: echo "Frontend CI activates after stack decision."

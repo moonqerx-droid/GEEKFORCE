@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>GEEKFORCE HelpFlow — Operator</title>
+  <style>
+    :root {
+      --bg: #ffffff;
+      --fg: #0d0d0d;
+      --muted: #6b7280;
+      --border: #e5e5e5;
+      --accent: #4d6bfe;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background: var(--bg);
+      color: var(--fg);
+      line-height: 1.5;
+    }
+    header {
+      border-bottom: 1px solid var(--border);
+      padding: 20px 32px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    header h1 { font-size: 18px; margin: 0; font-weight: 600; }
+    .badge {
+      font-size: 12px;
+      color: var(--accent);
+      border: 1px solid var(--accent);
+      border-radius: 999px;
+      padding: 2px 10px;
+    }
+    main { max-width: 880px; margin: 0 auto; padding: 48px 32px; }
+    .card {
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 24px;
+      margin-bottom: 16px;
+    }
+    .card h2 { margin: 0 0 8px; font-size: 16px; font-weight: 600; }
+    .card p { margin: 0; color: var(--muted); font-size: 14px; }
+    ul { color: var(--muted); font-size: 14px; padding-left: 20px; }
+    code {
+      background: #f5f5f5;
+      padding: 2px 6px;
+      border-radius: 4px;
+      font-size: 13px;
+    }
+    footer {
+      text-align: center;
+      color: var(--muted);
+      font-size: 13px;
+      padding: 32px;
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>GEEKFORCE HelpFlow</h1>
+    <span class="badge">Operator</span>
+  </header>
+
+  <main>
+    <div class="card">
+      <h2>Заглушка операторской панели</h2>
+      <p>
+        Это временная точка входа. Финальный стек фиксируется командой.
+        План экранов — в <code>docs/operator-panel-plan.md</code>.
+      </p>
+    </div>
+
+    <div class="card">
+      <h2>Планируемые экраны</h2>
+      <ul>
+        <li>Очередь обращений, сортировка по срочности</li>
+        <li>Карточка эскалации с полным контекстом</li>
+        <li>Экран массового инцидента (Incident Radar)</li>
+        <li>Рассылка статуса связанным пользователям</li>
+      </ul>
+    </div>
+
+    <div class="card">
+      <h2>Эндпоинты</h2>
+      <ul>
+        <li><code>GET /api/operator/tickets</code></li>
+        <li><code>GET /api/operator/incidents</code></li>
+        <li><code>POST /api/operator/incidents/{id}/broadcast</code></li>
+      </ul>
+    </div>
+  </main>
+
+  <footer>Владелец зоны: Участник 4 — операторская панель и интеграция</footer>
+</body>
+</html>

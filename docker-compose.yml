@@ -1,0 +1,47 @@
+services:
+  api:
+    build:
+      context: ./apps/api
+      dockerfile: Dockerfile
+    container_name: geekforce-api
+    env_file:
+      - .env
+    environment:
+      DATABASE_URL: sqlite:////data/helpflow.db
+    ports:
+      - "8000:8000"
+    volumes:
+      - sqlite_data:/data
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 10s
+    restart: unless-stopped
+
+  # Заглушки интерфейсов. Реальный стек фиксируется командой.
+  web:
+    image: nginx:alpine
+    container_name: geekforce-web
+    ports:
+      - "3000:80"
+    volumes:
+      - ./apps/web:/usr/share/nginx/html:ro
+    depends_on:
+      - api
+    restart: unless-stopped
+
+  operator:
+    image: nginx:alpine
+    container_name: geekforce-operator
+    ports:
+      - "3100:80"
+    volumes:
+      - ./apps/operator:/usr/share/nginx/html:ro
+    depends_on:
+      - api
+    restart: unless-stopped
+
+volumes:
+  sqlite_data:
