@@ -1,0 +1,28 @@
+id: service_unavailable
+title: Рабочий сервис недоступен
+service: Корпоративный сервис
+default_urgency: high
+escalation_team: Дежурный инженер
+keywords: ["502", "503", "504", "500", bad gateway, service unavailable, сервис недоступ, сайт недоступ, портал, сервер не отвечает, упал, лежит, 1с, 1c, jira, джира, confluence, конфлюенс]
+symptoms_hints:
+  ошибка сервера 5xx: ["502", "503", "504", "500", bad gateway, service unavailable, internal server error]
+  сервис не отвечает: [не отвечает, не открывается, недоступ, упал, лежит]
+questions:
+  - fact: colleagues_affected
+    text: У коллег этот сервис тоже не открывается?
+    kind: yes_no
+  - fact: error_text
+    text: Что показывается на экране вместо сервиса? Например, «502 Bad Gateway».
+    kind: text
+steps:
+  - id: hard_refresh
+    title: Обновите страницу без кэша
+    instruction: Нажмите Ctrl+F5, чтобы перезагрузить страницу без сохранённых данных. Подождите полминуты и попробуйте ещё раз.
+  - id: check_other_services
+    title: Проверьте другие сайты
+    instruction: Откройте любой другой рабочий ресурс, например почту в браузере. Если не работает ничего — проблема в сети, а не в конкретном сервисе.
+  - id: try_private_window_service
+    title: Откройте сервис в режиме инкогнито
+    instruction: Нажмите Ctrl+Shift+N и откройте адрес сервиса. Если так работает — очистите cookies для этого сайта.
+    unless: {colleagues_affected: ["yes"]}
+verify_question: Сервис снова открывается и работает?
