@@ -131,8 +131,24 @@ def test_critical_information_in_clarification_escalates(client, followup, playb
 
 def test_greeting_then_specific_issue_selects_real_playbook(client):
     cid = client.post("/api/conversations").json()["id"]
-    assert send(client, cid, "Привет")["playbook_id"] == "unknown"
+    greeting = send(client, cid, "Привет")
+    assert greeting["status"] == "NEW"
+    assert greeting["playbook_id"] is None
+    assert greeting["messages"][-1]["content"] == (
+        "Привет! Я помогу разобраться с технической проблемой. "
+        "Опишите, пожалуйста, что не работает или какое сообщение об ошибке вы видите."
+    )
     result = send(client, cid, "Не могу войти в CRM, через 20 минут встреча")
     assert result["playbook_id"] == "crm_login_device_specific"
     assert result["service"] == "CRM"
     assert result["urgency"] == "high"
+    assert result["escalation_card"] is None
+
+
+def test_greeting_with_an_issue_starts_diagnostics_immediately(client):
+    cid = client.post("/api/conversations").json()["id"]
+
+    result = send(client, cid, "Привет, не работает VPN")
+
+    assert result["status"] == "CLARIFYING"
+    assert result["playbook_id"] == "vpn_connection"

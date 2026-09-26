@@ -80,6 +80,10 @@ class TriageEngine:
         """For VERIFYING: True = solved, False = not solved, None = unclear."""
         return rules.parse_confirmation(message)
 
+    @staticmethod
+    def is_greeting(message: str) -> bool:
+        return rules.is_greeting_only(message)
+
     # --- flow ---------------------------------------------------------------
 
     def decide(self, context: ConversationContext) -> Decision:

@@ -46,10 +46,20 @@ _TIME_RE = re.compile(r"через\s+(\d+|пару|несколько|полча
 _YES_RE = re.compile(r"^(да|ага|угу|есть|конечно|yes|ok|ок|так точно|верно|подключ|работает|включ)")
 _NO_RE = re.compile(r"^(нет|неа|no\b|не\b|ни\b|отключ|выключ)")
 _UNKNOWN_RE = re.compile(r"(не знаю|не уверен|без понятия|\bхз\b|не помню)")
+_GREETING_RE = re.compile(
+    r"^(?:привет|здравствуйте|здравствуй|добрый день|доброе утро|добрый вечер|"
+    r"хай|hello|hi)(?:\s+(?:бот|helpflow))?$"
+)
 
 
 def normalize(text: str) -> str:
     return re.sub(r"\s+", " ", text.lower().replace("ё", "е")).strip()
+
+
+def is_greeting_only(text: str) -> bool:
+    """True only for a standalone greeting, never for a greeting plus an issue."""
+    cleaned = re.sub(r"[^\w\s-]", " ", normalize(text))
+    return bool(_GREETING_RE.fullmatch(normalize(cleaned)))
 
 
 def contains(norm_text: str, keyword: str) -> bool:

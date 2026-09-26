@@ -20,7 +20,10 @@ class TriageDialogueService(DialogueService):
 
     def _context(self, conversation):
         return ConversationContext(
-            original_request=next((m.content for m in conversation.messages if m.role == "user"), ""),
+            original_request=next((
+                m.content for m in conversation.messages
+                if m.role == "user" and not self.engine.is_greeting(m.content)
+            ), ""),
             messages=[{"role": m.role, "content": m.content} for m in conversation.messages],
             known_facts=conversation.known_facts,
             asked_facts=conversation.asked_facts,
@@ -56,6 +59,14 @@ class TriageDialogueService(DialogueService):
         try:
             previous_status = conversation.status
             self._message(conversation, "user", content.strip())
+            if previous_status == "NEW" and self.engine.is_greeting(content):
+                self._message(
+                    conversation,
+                    "assistant",
+                    "Привет! Я помогу разобраться с технической проблемой. "
+                    "Опишите, пожалуйста, что не работает или какое сообщение об ошибке вы видите.",
+                )
+                return self._commit(conversation)
             # Recheck new information locally, without an extra LLM request.
             # The original playbook must not hide a later security/mass incident.
             if previous_status != "NEW":
