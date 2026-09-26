@@ -118,6 +118,8 @@ class TriageEngine:
                 prompts.RESPONSE_SYSTEM,
                 prompts.build_response_user(decision, playbook),
             )
+            if set(raw) != {"message"}:
+                return decision
             candidate = raw.get("message")
             if not isinstance(candidate, str):
                 return decision
@@ -127,6 +129,8 @@ class TriageEngine:
             notice = playbook.safety_notice
             if notice and notice in decision.message and notice not in message:
                 message = f"{notice} {message}"
+            if len(message) > MAX_RENDERED_MESSAGE_LENGTH:
+                return decision
             return decision.model_copy(update={"message": message, "message_source": "llm"})
         except (LLMError, ValueError, TypeError) as error:
             logger.warning("LLM response rendering failed, using rules: %s", error)

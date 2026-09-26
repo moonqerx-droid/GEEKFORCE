@@ -141,7 +141,12 @@ def test_llm_rewrites_only_the_visible_decision_message(kb):
     assert rendered.reason == rules_decision.reason
 
 
-@pytest.mark.parametrize("reply", [{"message": ""}, {"message": "x" * 1201}, {"wrong": "shape"}])
+@pytest.mark.parametrize("reply", [
+    {"message": ""},
+    {"message": "x" * 1201},
+    {"wrong": "shape"},
+    {"message": "Допустимый текст", "action": "resolved"},
+])
 def test_invalid_llm_rewrite_falls_back_to_rules(kb, reply):
     ctx = ConversationContext(original_request="Не работает VPN", playbook_id="vpn_connection")
     expected = TriageEngine(kb).decide(ctx)
@@ -175,6 +180,20 @@ def test_llm_cannot_remove_security_notice(kb):
     assert rendered.action == DecisionAction.ESCALATE
     assert rendered.message_source == "llm"
     assert rendered.message.startswith(notice)
+
+
+def test_security_notice_cannot_make_rendered_message_oversized(kb):
+    ctx = ConversationContext(
+        original_request="Перешёл по фишинговой ссылке",
+        known_facts={"entered_credentials": "no"},
+        playbook_id="security_incident",
+    )
+    expected = TriageEngine(kb).decide(ctx)
+
+    rendered = TriageEngine(kb, fake_llm([{"message": "x" * 1150}])).decide(ctx)
+
+    assert rendered.message == expected.message
+    assert rendered.message_source == "rules"
 
 
 def test_response_prompt_does_not_resend_user_content(kb):

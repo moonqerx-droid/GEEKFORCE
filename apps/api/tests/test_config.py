@@ -39,3 +39,12 @@ def test_compose_runs_migrations_before_the_api_server():
 
     assert "alembic upgrade head" in command
     assert command.index("alembic upgrade head") < command.index("uvicorn")
+
+
+def test_ci_runs_a_real_postgres_smoke_test():
+    workflow_path = Path(__file__).parents[3] / ".github" / "workflows" / "backend.yml"
+    workflow = workflow_path.read_text(encoding="utf-8")
+
+    assert "postgres:16-alpine" in workflow
+    assert "POSTGRES_TEST_DATABASE_URL" in workflow
+    assert "test_postgres_smoke.py" in workflow
