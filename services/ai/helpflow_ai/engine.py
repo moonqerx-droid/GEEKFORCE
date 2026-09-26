@@ -32,6 +32,7 @@ logger = logging.getLogger(__name__)
 
 MAX_QUESTIONS = 3
 MAX_QUESTIONS_URGENT = 1
+MAX_RENDERED_MESSAGE_LENGTH = 1200
 URGENT_LEVELS = (Urgency.HIGH, Urgency.CRITICAL)
 OUTCOME_LABELS = {
     StepOutcome.HELPED: "помогло",
@@ -82,6 +83,13 @@ class TriageEngine:
     # --- flow ---------------------------------------------------------------
 
     def decide(self, context: ConversationContext) -> Decision:
+        """Choose the flow with rules, then optionally improve only its wording."""
+        decision = self._decide_rules(context)
+        if self.llm is None:
+            return decision
+        return self._render_decision(decision, context)
+
+    def _decide_rules(self, context: ConversationContext) -> Decision:
         playbook = self.kb.get(context.playbook_id)
         last = context.completed_steps[-1] if context.completed_steps else None
         if last and last.outcome == StepOutcome.HELPED and not context.verification_failed:
@@ -102,6 +110,27 @@ class TriageEngine:
                             step=step, reason="следующий подходящий шаг сценария")
         tried = len(context.completed_steps)
         return self._escalate(playbook, f"выполнено шагов: {tried}, проблема не решена")
+
+    def _render_decision(self, decision: Decision, context: ConversationContext) -> Decision:
+        playbook = self.kb.get(context.playbook_id)
+        try:
+            raw = self.llm.chat_json(
+                prompts.RESPONSE_SYSTEM,
+                prompts.build_response_user(decision, playbook),
+            )
+            candidate = raw.get("message")
+            if not isinstance(candidate, str):
+                return decision
+            message = candidate.strip()
+            if not message or len(message) > MAX_RENDERED_MESSAGE_LENGTH:
+                return decision
+            notice = playbook.safety_notice
+            if notice and notice in decision.message and notice not in message:
+                message = f"{notice} {message}"
+            return decision.model_copy(update={"message": message, "message_source": "llm"})
+        except (LLMError, ValueError, TypeError) as error:
+            logger.warning("LLM response rendering failed, using rules: %s", error)
+            return decision
 
     def next_question(self, playbook: Playbook, context: ConversationContext) -> Question | None:
         limit = MAX_QUESTIONS_URGENT if context.urgency in URGENT_LEVELS else MAX_QUESTIONS

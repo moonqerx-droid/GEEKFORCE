@@ -7,7 +7,7 @@ onto the Conversation model without renaming.
 from __future__ import annotations
 
 from enum import Enum
-from typing import Any
+from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
@@ -141,6 +141,7 @@ class Decision(BaseModel):
     step: Step | None = None
     reason: str = ""
     escalation_team: str | None = None
+    message_source: Literal["rules", "llm"] = "rules"
 
 
 class EscalationCard(BaseModel):

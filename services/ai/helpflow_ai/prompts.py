@@ -5,7 +5,7 @@ from __future__ import annotations
 
 import json
 
-from .schemas import ConversationContext, Playbook
+from .schemas import ConversationContext, Decision, Playbook
 
 ANALYSIS_SYSTEM = """Ты — модуль triage службы технической поддержки компании.
 Твоя задача — понять обращение сотрудника и вернуть ТОЛЬКО JSON-объект.
@@ -44,6 +44,17 @@ SUMMARY_SYSTEM = """Ты готовишь краткое резюме обращ
 что пробовали и чем закончилось, с чего специалисту стоит начать"}.
 Пиши по-русски, конкретно, без воды и без выдуманных фактов."""
 
+RESPONSE_SYSTEM = """Ты — внимательный помощник корпоративной технической поддержки.
+Переформулируй подготовленный системой ответ естественно и по-человечески.
+Не меняй выбранное системой действие.
+
+Правила:
+- верни ТОЛЬКО JSON-объект {"message": "текст ответа"};
+- пиши кратко, спокойно и конкретно на русском языке;
+- сохрани смысл вопроса или инструкции и не добавляй новые технические шаги;
+- не выдумывай факты и не утверждай, что проблема уже решена;
+- обязательное предупреждение безопасности нельзя убирать."""
+
 
 def build_analysis_system(playbooks: list[Playbook]) -> str:
     catalog = "\n".join(f"- {pb.id}: {pb.title} (сервис: {pb.service})" for pb in playbooks)
@@ -64,3 +75,13 @@ def build_analysis_user(message: str, context: ConversationContext) -> str:
 
 def build_summary_user(ticket: dict) -> str:
     return f"<ticket>\n{json.dumps(ticket, ensure_ascii=False, indent=2)}\n</ticket>"
+
+
+def build_response_user(decision: Decision, playbook: Playbook) -> str:
+    payload = {
+        "prepared_action": decision.action.value,
+        "prepared_message": decision.message,
+        "service": playbook.service,
+        "safety_notice": playbook.safety_notice,
+    }
+    return f"<response_task>\n{json.dumps(payload, ensure_ascii=False, indent=2)}\n</response_task>"
