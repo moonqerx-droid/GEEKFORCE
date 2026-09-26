@@ -84,6 +84,10 @@ class TriageEngine:
     def is_greeting(message: str) -> bool:
         return rules.is_greeting_only(message)
 
+    @staticmethod
+    def conversation_intent(message: str) -> str | None:
+        return rules.conversation_intent(message)
+
     # --- flow ---------------------------------------------------------------
 
     def decide(self, context: ConversationContext) -> Decision:

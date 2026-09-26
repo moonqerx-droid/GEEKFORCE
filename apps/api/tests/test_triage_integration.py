@@ -152,3 +152,40 @@ def test_greeting_with_an_issue_starts_diagnostics_immediately(client):
 
     assert result["status"] == "CLARIFYING"
     assert result["playbook_id"] == "vpn_connection"
+
+
+def test_capability_question_does_not_start_fake_diagnostics(client):
+    cid = client.post("/api/conversations").json()["id"]
+
+    result = send(client, cid, "Что ты умеешь?")
+
+    assert result["status"] == "NEW"
+    assert result["playbook_id"] is None
+    assert "опишите проблему" in result["messages"][-1]["content"].lower()
+    assert "специалист" in result["messages"][-1]["content"].lower()
+
+
+def test_thanks_does_not_consume_pending_technical_answer(client):
+    cid = client.post("/api/conversations").json()["id"]
+    pending = send(client, cid, "Не работает VPN")
+    asked_before = list(pending["messages"])
+
+    thanked = send(client, cid, "Спасибо")
+
+    assert thanked["status"] == "CLARIFYING"
+    assert thanked["known_facts"] == pending["known_facts"]
+    assert "пожалуйста" in thanked["messages"][-1]["content"].lower()
+    assert len(thanked["messages"]) == len(asked_before) + 2
+    answered = send(client, cid, "Пишет ошибка соединения")
+    assert "соединения" in answered["known_facts"]["error_text"]
+
+
+def test_natural_operator_request_escalates_from_active_dialogue(client):
+    cid = client.post("/api/conversations").json()["id"]
+    send(client, cid, "Не работает VPN")
+
+    result = send(client, cid, "Позовите, пожалуйста, живого специалиста")
+
+    assert result["status"] == "ESCALATED"
+    assert result["escalation_card"]["escalation_reason"] == "пользователь запросил специалиста"
+    assert "передано специалисту" in result["messages"][-1]["content"].lower()

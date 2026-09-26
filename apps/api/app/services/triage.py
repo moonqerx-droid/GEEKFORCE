@@ -10,6 +10,18 @@ from app.services.dialogue import DialogueConflict, DialogueService
 
 
 class TriageDialogueService(DialogueService):
+    SMALLTALK_REPLIES = {
+        "greeting": (
+            "Привет! Я помогу разобраться с технической проблемой. "
+            "Опишите, пожалуйста, что не работает или какое сообщение об ошибке вы видите."
+        ),
+        "help": (
+            "Я могу уточнить симптомы, предложить безопасные шаги проверки и, если они не помогут, "
+            "передать обращение специалисту вместе с собранным контекстом. Просто опишите проблему своими словами."
+        ),
+        "thanks": "Пожалуйста! Если проблема ещё не решена, продолжим с предыдущего вопроса.",
+    }
+
     def __init__(self, repository: ConversationRepository, engine: TriageEngine):
         self.repository = repository
         self.engine = engine
@@ -20,10 +32,11 @@ class TriageDialogueService(DialogueService):
 
     def _context(self, conversation):
         return ConversationContext(
-            original_request=next((
-                m.content for m in conversation.messages
-                if m.role == "user" and not self.engine.is_greeting(m.content)
-            ), ""),
+            original_request=next((m.content for m in conversation.messages if (
+                m.role == "user" and self.engine.conversation_intent(m.content) not in {
+                    "greeting", "help", "thanks",
+                }
+            )), ""),
             messages=[{"role": m.role, "content": m.content} for m in conversation.messages],
             known_facts=conversation.known_facts,
             asked_facts=conversation.asked_facts,
@@ -54,18 +67,26 @@ class TriageDialogueService(DialogueService):
     def handle_message(self, conversation_id, content, *, expected_revision=None):
         conversation = self.get_conversation(conversation_id)
         self._check_revision(conversation, expected_revision)
+        intent = self.engine.conversation_intent(content)
+        if intent == "operator":
+            if conversation.status == "RESOLVED":
+                raise DialogueConflict("resolved conversation cannot be escalated")
+            if conversation.status == "ESCALATED":
+                return conversation
+            try:
+                self._message(conversation, "user", content.strip())
+                self._escalate(conversation, "пользователь запросил специалиста")
+                return self._commit(conversation)
+            except Exception:
+                self.repository.session.rollback()
+                raise
         if conversation.status not in {"NEW", "CLARIFYING", "VERIFYING"}:
             raise DialogueConflict(f"messages are not accepted while status is {conversation.status}")
         try:
             previous_status = conversation.status
             self._message(conversation, "user", content.strip())
-            if previous_status == "NEW" and self.engine.is_greeting(content):
-                self._message(
-                    conversation,
-                    "assistant",
-                    "Привет! Я помогу разобраться с технической проблемой. "
-                    "Опишите, пожалуйста, что не работает или какое сообщение об ошибке вы видите.",
-                )
+            if intent in self.SMALLTALK_REPLIES:
+                self._message(conversation, "assistant", self.SMALLTALK_REPLIES[intent])
                 return self._commit(conversation)
             # Recheck new information locally, without an extra LLM request.
             # The original playbook must not hide a later security/mass incident.

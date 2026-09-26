@@ -50,6 +50,14 @@ _GREETING_RE = re.compile(
     r"^(?:привет|здравствуйте|здравствуй|добрый день|доброе утро|добрый вечер|"
     r"хай|hello|hi)(?:\s+(?:бот|helpflow))?$"
 )
+_THANKS_RE = re.compile(r"^(?:спасибо|благодарю|спс|thanks|thank you)(?:\s+большое)?$")
+_HELP_RE = re.compile(
+    r"^(?:помощь|помоги|что ты умеешь|как ты можешь помочь|чем ты можешь помочь|help)$"
+)
+_OPERATOR_REQUEST_RE = re.compile(
+    r"(?:позов|приглас|соедин|переключ|дайте|хочу|нужен|нужна).*"
+    r"(?:оператор|специалист|поддержк|жив\w* человек|человек)"
+)
 
 
 def normalize(text: str) -> str:
@@ -60,6 +68,20 @@ def is_greeting_only(text: str) -> bool:
     """True only for a standalone greeting, never for a greeting plus an issue."""
     cleaned = re.sub(r"[^\w\s-]", " ", normalize(text))
     return bool(_GREETING_RE.fullmatch(normalize(cleaned)))
+
+
+def conversation_intent(text: str) -> str | None:
+    """Recognize short dialogue-control phrases without consuming triage facts."""
+    cleaned = normalize(re.sub(r"[^\w\s-]", " ", text))
+    if is_greeting_only(cleaned):
+        return "greeting"
+    if _THANKS_RE.fullmatch(cleaned):
+        return "thanks"
+    if _HELP_RE.fullmatch(cleaned):
+        return "help"
+    if _OPERATOR_REQUEST_RE.search(cleaned):
+        return "operator"
+    return None
 
 
 def contains(norm_text: str, keyword: str) -> bool:
