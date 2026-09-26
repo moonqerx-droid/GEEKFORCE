@@ -123,6 +123,79 @@ def test_settings_from_env(monkeypatch):
     assert settings.model == "some-model" and settings.api_key == "k"
 
 
+def test_ollama_settings_need_no_api_key(monkeypatch):
+    monkeypatch.setenv("AI_PROVIDER", "ollama")
+    monkeypatch.delenv("AI_API_KEY", raising=False)
+    monkeypatch.setenv("OLLAMA_BASE_URL", "http://ollama.test:11434")
+    monkeypatch.setenv("OLLAMA_MODEL", "qwen3.5:9b")
+    monkeypatch.delenv("AI_TIMEOUT_SECONDS", raising=False)
+
+    settings = LLMSettings.from_env()
+
+    assert settings is not None
+    assert settings.api_key == "ollama"
+    assert settings.provider == "ollama"
+    assert settings.base_url == "http://ollama.test:11434"
+    assert settings.model == "qwen3.5:9b"
+    assert settings.timeout == 90
+    assert settings.max_retries == 0
+
+
+def test_ollama_uses_native_chat_with_thinking_disabled():
+    calls: list = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        calls.append({"path": request.url.path, "body": json.loads(request.content)})
+        return httpx.Response(200, json={"message": {"content": '{"ok": true}'}})
+
+    settings = LLMSettings(
+        provider="ollama",
+        api_key="ollama",
+        base_url="http://ollama.test:11434",
+        model="qwen3.5:9b",
+    )
+    client = LLMClient(settings, transport=httpx.MockTransport(handler))
+
+    result = client.chat_json("Верни JSON", "Проверка")
+
+    assert result == {"ok": True}
+    assert calls[0]["path"] == "/api/chat"
+    assert calls[0]["body"]["think"] is False
+    assert calls[0]["body"]["format"] == "json"
+
+
+def test_ollama_keeps_analysis_local_and_uses_one_call_for_visible_reply(kb):
+    calls: list = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        calls.append(json.loads(request.content))
+        return httpx.Response(200, json={
+            "message": {"content": '{"message":"Уточните, пожалуйста, текст ошибки VPN."}'},
+        })
+
+    client = LLMClient(
+        LLMSettings(
+            provider="ollama",
+            api_key="ollama",
+            base_url="http://ollama.test:11434",
+            model="qwen3.5:9b",
+        ),
+        transport=httpx.MockTransport(handler),
+    )
+    engine = TriageEngine(kb, client)
+
+    analysis = engine.analyze("Не работает VPN")
+    decision = engine.decide(ConversationContext(
+        original_request="Не работает VPN",
+        playbook_id=analysis.recommended_playbook,
+        urgency=analysis.urgency,
+    ))
+
+    assert analysis.source == "rules"
+    assert decision.message_source == "llm"
+    assert len(calls) == 1
+
+
 def test_llm_rewrites_only_the_visible_decision_message(kb):
     ctx = ConversationContext(
         original_request="Не работает CRM",

@@ -59,7 +59,7 @@ class TriageEngine:
             raise ValueError("message must not be empty")
         ctx = context or ConversationContext(original_request=message)
         analysis = self._rules_analysis(message, ctx)
-        if self.llm is not None:
+        if self.llm is not None and self.llm.supports_analysis:
             analysis = self._merge_llm(analysis, message, ctx)
         return self._finalize(analysis, ctx)
 

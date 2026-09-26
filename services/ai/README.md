@@ -10,6 +10,10 @@
 упавший, медленный или «галлюцинирующий» LLM не ломает диалог. Без ключа всё работает
 на правилах (`AI_PROVIDER=mock`, это значение по умолчанию).
 
+Для `AI_PROVIDER=ollama` классификация остаётся на быстрых локальных правилах, а модель
+одним нативным запросом с `think=false` улучшает видимый ответ. Внешний `openai`-режим
+может дополнительно улучшать классификацию.
+
 ## Быстрый старт
 
 ```bash
@@ -23,11 +27,13 @@ python -m helpflow_ai     # интерактивное демо в консол�
 
 | Переменная | По умолчанию | Назначение |
 |---|---|---|
-| `AI_PROVIDER` | `mock` | `mock` — только правила; `openai` — любой OpenAI-совместимый API |
-| `AI_API_KEY` | — | ключ; без него LLM отключается |
+| `AI_PROVIDER` | `mock` | `mock` — правила; `ollama` — локальная модель без ключа; `openai` — внешний OpenAI-совместимый API |
+| `AI_API_KEY` | — | нужен для `openai`; для `ollama` не требуется |
 | `AI_BASE_URL` | `https://api.openai.com/v1` | можно указать OpenRouter, YandexGPT-прокси, локальный vLLM/Ollama |
 | `AI_MODEL` | `gpt-4o-mini` | имя модели |
 | `AI_TIMEOUT_SECONDS` | `15` | таймаут запроса; при ошибке 1 повтор, затем fallback на правила |
+| `OLLAMA_BASE_URL` | `http://localhost:11434` | нативный endpoint Ollama; в Docker используйте `http://host.docker.internal:11434` |
+| `OLLAMA_MODEL` | `qwen3.5:9b` | имя установленной локальной модели |
 | `HELPFLOW_KB_DIR` | `<repo>/knowledge-base` | путь к базе знаний (нужен в Docker) |
 
 ## Интеграция с backend (apps/api)

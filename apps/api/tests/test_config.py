@@ -18,6 +18,12 @@ def test_configuration_rejects_unknown_ai_provider():
         Settings(_env_file=None, ai_provider="mystery")
 
 
+def test_configuration_accepts_ollama_without_an_external_api_key():
+    settings = Settings(_env_file=None, ai_provider="ollama")
+
+    assert settings.ai_provider == "ollama"
+
+
 def test_compose_uses_healthy_postgres_before_starting_api():
     compose_path = Path(__file__).parents[3] / "docker-compose.yml"
     compose = yaml.safe_load(compose_path.read_text(encoding="utf-8"))
@@ -29,6 +35,8 @@ def test_compose_uses_healthy_postgres_before_starting_api():
     assert database["healthcheck"]["test"]
     assert api["depends_on"]["db"]["condition"] == "service_healthy"
     assert "postgresql+psycopg://" in api["environment"]["DATABASE_URL"]
+    assert "host.docker.internal:11434" in api["environment"]["OLLAMA_BASE_URL"]
+    assert "OLLAMA_MODEL" in api["environment"]
 
 
 def test_compose_runs_migrations_before_the_api_server():
