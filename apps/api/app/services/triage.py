@@ -1,8 +1,9 @@
 """Transactional adapter between the stable HTTP contract and helpflow_ai."""
 
 from helpflow_ai import ConversationContext, DecisionAction, StepRecord, TriageEngine
+from sqlalchemy.orm.exc import StaleDataError
 
-from app.models.conversation import Conversation, Message, TroubleshootingStep
+from app.models.conversation import Conversation, Message, TroubleshootingStep, utc_now
 from app.repositories.conversations import ConversationRepository
 from app.schemas.conversation import StepOutcome
 from app.services.dialogue import DialogueConflict, DialogueService
@@ -37,11 +38,19 @@ class TriageDialogueService(DialogueService):
         conversation.messages.append(Message(role=role, content=content))
 
     def _commit(self, conversation):
-        self.repository.session.commit()
+        # Touch the parent even when only a message/step changed, so the ORM
+        # checks the version before committing this entire turn.
+        conversation.updated_at = utc_now()
+        try:
+            self.repository.session.commit()
+        except StaleDataError as exc:
+            self.repository.session.rollback()
+            raise DialogueConflict("conversation changed; reload it before retrying") from exc
         return self.get_conversation(conversation.id)
 
-    def handle_message(self, conversation_id, content):
+    def handle_message(self, conversation_id, content, *, expected_revision=None):
         conversation = self.get_conversation(conversation_id)
+        self._check_revision(conversation, expected_revision)
         if conversation.status not in {"NEW", "CLARIFYING", "VERIFYING"}:
             raise DialogueConflict(f"messages are not accepted while status is {conversation.status}")
         try:
@@ -103,8 +112,11 @@ class TriageDialogueService(DialogueService):
             self.repository.session.rollback()
             raise
 
-    def record_step_result(self, conversation_id, outcome):
+    def record_step_result(self, conversation_id, outcome, *, expected_revision=None, step_code=None):
         conversation = self.get_conversation(conversation_id)
+        self._check_revision(conversation, expected_revision)
+        if step_code is not None and step_code != conversation.current_step_code:
+            raise DialogueConflict("active step changed; reload the conversation")
         if conversation.status != "TROUBLESHOOTING" or not conversation.current_step_code:
             raise DialogueConflict("step result requires an active TROUBLESHOOTING step")
         parsed = StepOutcome(outcome)

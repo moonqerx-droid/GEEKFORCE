@@ -4,7 +4,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>HelpFlow — очередь специалиста</title>
-    <link rel="stylesheet" href="/static/debug.css">
+    <link rel="stylesheet" href="/static/debug.css?v={{ assets['debug.css'] }}">
   </head>
   <body data-endpoint="/api/operator/tickets">
     <main class="operator-shell">
@@ -25,7 +25,6 @@
         <div id="tickets" class="ticket-list"></div>
       </section>
     </main>
-    <script src="/static/operator-debug.js" defer></script>
+    <script src="/static/operator-debug.js?v={{ assets['operator-debug.js'] }}" defer></script>
   </body>
 </html>
-

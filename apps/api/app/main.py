@@ -1,4 +1,5 @@
 from contextlib import asynccontextmanager
+from hashlib import sha256
 from pathlib import Path
 
 from fastapi import FastAPI
@@ -39,11 +40,26 @@ app.include_router(conversations_router)
 app.include_router(operator_router)
 
 
+def asset_versions(*names: str) -> dict[str, str]:
+    return {
+        name: sha256((base_dir / "static" / name).read_bytes()).hexdigest()[:12]
+        for name in names
+    }
+
+
 @app.get("/debug", include_in_schema=False)
 def debug_page(request: Request):
-    return templates.TemplateResponse(request=request, name="debug.html")
+    return templates.TemplateResponse(
+        request=request,
+        name="debug.html",
+        context={"assets": asset_versions("debug.css", "debug.js")},
+    )
 
 
 @app.get("/debug/operator", include_in_schema=False)
 def operator_debug_page(request: Request):
-    return templates.TemplateResponse(request=request, name="operator-debug.html")
+    return templates.TemplateResponse(
+        request=request,
+        name="operator-debug.html",
+        context={"assets": asset_versions("debug.css", "operator-debug.js")},
+    )

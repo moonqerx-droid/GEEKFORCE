@@ -35,6 +35,7 @@ class StepOutcome(StrEnum):
 
 class MessageCreate(BaseModel):
     content: str = Field(min_length=1, max_length=4000)
+    expected_revision: int | None = Field(default=None, ge=1)
 
     @field_validator("content")
     @classmethod
@@ -47,6 +48,8 @@ class MessageCreate(BaseModel):
 
 class StepResultCreate(BaseModel):
     outcome: StepOutcome
+    expected_revision: int | None = Field(default=None, ge=1)
+    step_code: str | None = Field(default=None, min_length=1, max_length=120)
 
 
 class MessageRead(BaseModel):
@@ -78,6 +81,7 @@ class ConversationRead(BaseModel):
     model_config = ConfigDict(from_attributes=True, populate_by_name=True)
 
     id: str
+    revision: int
     status: ConversationStatus
     created_at: datetime
     updated_at: datetime

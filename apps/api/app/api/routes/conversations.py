@@ -61,7 +61,8 @@ def send_message(
     service: DialogueDependency,
 ) -> ConversationRead:
     try:
-        return serialize(service.handle_message(conversation_id, payload.content))
+        return serialize(service.handle_message(conversation_id, payload.content,
+                                               expected_revision=payload.expected_revision))
     except ConversationNotFound as exc:
         raise not_found() from exc
     except DialogueConflict as exc:
@@ -75,7 +76,9 @@ def record_step_result(
     service: DialogueDependency,
 ) -> ConversationRead:
     try:
-        return serialize(service.record_step_result(conversation_id, payload.outcome.value))
+        return serialize(service.record_step_result(conversation_id, payload.outcome.value,
+                                                    expected_revision=payload.expected_revision,
+                                                    step_code=payload.step_code))
     except ConversationNotFound as exc:
         raise not_found() from exc
     except DialogueConflict as exc:

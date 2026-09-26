@@ -4,7 +4,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>HelpFlow — проверка диалога</title>
-    <link rel="stylesheet" href="/static/debug.css">
+    <link rel="stylesheet" href="/static/debug.css?v={{ assets['debug.css'] }}">
   </head>
   <body>
     <main class="workspace">
@@ -54,7 +54,6 @@
         <pre id="json">{}</pre>
       </aside>
     </main>
-    <script src="/static/debug.js" defer></script>
+    <script src="/static/debug.js?v={{ assets['debug.js'] }}" defer></script>
   </body>
 </html>
-

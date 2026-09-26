@@ -1,4 +1,4 @@
-const state = { conversation: null };
+const state = { conversation: null, busy: false };
 
 const elements = {
   create: document.querySelector("#create"),
@@ -23,7 +23,9 @@ async function request(path, options = {}) {
   const body = await response.json();
   if (!response.ok) {
     const detail = Array.isArray(body.detail) ? body.detail[0]?.msg : body.detail;
-    throw new Error(detail || `HTTP ${response.status}`);
+    const error = new Error(detail || `HTTP ${response.status}`);
+    error.status = response.status;
+    throw error;
   }
   return body;
 }
@@ -58,10 +60,26 @@ function render(conversation) {
 }
 
 async function run(action) {
+  if (state.busy) return;
+  state.busy = true;
+  [elements.create, elements.escalate, elements.submit, elements.message, ...elements.outcomes]
+    .forEach((element) => { element.disabled = true; });
   try {
     render(await action());
   } catch (error) {
+    if (error.status === 409 && state.conversation) {
+      try {
+        render(await request(`/api/conversations/${state.conversation.id}`));
+        error.message = "Диалог уже изменился. Загружено актуальное состояние; проверьте его перед повтором действия.";
+      } catch {
+        // Keep the original failure and the user's draft if refresh also fails.
+      }
+    }
     elements.error.textContent = error.message;
+  } finally {
+    state.busy = false;
+    elements.create.disabled = false;
+    if (state.conversation) render(state.conversation);
   }
 }
 
@@ -77,18 +95,25 @@ elements.create.addEventListener("click", () => run(async () => {
 elements.form.addEventListener("submit", (event) => {
   event.preventDefault();
   const content = elements.message.value.trim();
-  if (!state.conversation || !content) return;
-  elements.message.value = "";
-  run(() => request(`/api/conversations/${state.conversation.id}/messages`, {
-    method: "POST",
-    body: JSON.stringify({ content }),
-  }));
+  if (!state.conversation || !content || state.busy) return;
+  run(async () => {
+    const conversation = await request(`/api/conversations/${state.conversation.id}/messages`, {
+      method: "POST",
+      body: JSON.stringify({ content, expected_revision: state.conversation.revision }),
+    });
+    elements.message.value = "";
+    return conversation;
+  });
 });
 
 elements.outcomes.forEach((button) => {
   button.addEventListener("click", () => run(() => request(
     `/api/conversations/${state.conversation.id}/step-result`,
-    { method: "POST", body: JSON.stringify({ outcome: button.dataset.outcome }) },
+    { method: "POST", body: JSON.stringify({
+      outcome: button.dataset.outcome,
+      expected_revision: state.conversation.revision,
+      step_code: state.conversation.current_step?.code,
+    }) },
   )));
 });
 

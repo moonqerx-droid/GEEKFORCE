@@ -26,8 +26,14 @@ class DialogueService:
             raise ConversationNotFound(conversation_id)
         return conversation
 
-    def handle_message(self, conversation_id: str, content: str) -> Conversation:
+    @staticmethod
+    def _check_revision(conversation, expected_revision):
+        if expected_revision is not None and conversation.revision != expected_revision:
+            raise DialogueConflict("conversation changed; reload it before retrying")
+
+    def handle_message(self, conversation_id: str, content: str, *, expected_revision=None) -> Conversation:
         conversation = self.get_conversation(conversation_id)
+        self._check_revision(conversation, expected_revision)
         if conversation.status in {ConversationStatus.RESOLVED, ConversationStatus.ESCALATED}:
             raise DialogueConflict("terminal conversation cannot accept messages")
         allowed_states = {
@@ -53,8 +59,11 @@ class DialogueService:
 
         raise DialogueConflict(f"unsupported conversation state {conversation.status}")
 
-    def record_step_result(self, conversation_id: str, outcome: str) -> Conversation:
+    def record_step_result(self, conversation_id: str, outcome: str, *, expected_revision=None, step_code=None) -> Conversation:
         conversation = self.get_conversation(conversation_id)
+        self._check_revision(conversation, expected_revision)
+        if step_code is not None and step_code != conversation.current_step_code:
+            raise DialogueConflict("active step changed; reload the conversation")
         if conversation.status != ConversationStatus.TROUBLESHOOTING:
             raise DialogueConflict("step result requires TROUBLESHOOTING state")
         if not conversation.current_step_code or not conversation.current_step_instruction:

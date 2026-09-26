@@ -1,3 +1,6 @@
+import re
+
+
 def test_debug_page_contains_workflow_controls(client):
     response = client.get("/debug")
 
@@ -6,3 +9,5 @@ def test_debug_page_contains_workflow_controls(client):
     assert "Не помогло" in response.text
     assert "Передать специалисту" in response.text
     assert "Debug JSON" in response.text
+    assert re.search(r'/static/debug\.js\?v=[0-9a-f]{12}', response.text)
+    assert re.search(r'/static/debug\.css\?v=[0-9a-f]{12}', response.text)

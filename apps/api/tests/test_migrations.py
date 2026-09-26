@@ -35,7 +35,7 @@ def test_initial_migration_adopts_pre_alembic_database(tmp_path):
 
     assert inspect(engine).has_table("alembic_version")
     with engine.connect() as connection:
-        assert connection.scalar(text("SELECT version_num FROM alembic_version")) == "20260926_0002"
+        assert connection.scalar(text("SELECT version_num FROM alembic_version")) == "20260926_0003"
         assert connection.scalar(text("SELECT id FROM conversations WHERE id='preserved'")) == "preserved"
 
 
@@ -87,6 +87,6 @@ def test_triage_migration_upgrades_original_schema_without_losing_data(tmp_path)
     command.upgrade(config, "head")
     with engine.connect() as connection:
         row = connection.execute(text(
-            "SELECT id,workflow_version,asked_facts,verification_failed FROM conversations"
+            "SELECT id,workflow_version,asked_facts,verification_failed,revision FROM conversations"
         )).one()
-        assert tuple(row) == ("old", "legacy", "[]", 0)
+        assert tuple(row) == ("old", "legacy", "[]", 0, 1)
