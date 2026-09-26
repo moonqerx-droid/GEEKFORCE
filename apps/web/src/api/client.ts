@@ -8,52 +8,60 @@ import type {
 } from "./types";
 
 const BASE_URL = import.meta.env.VITE_API_BASE_URL ?? "";
+export const REQUEST_TIMEOUT_MS = 12000;
 
 async function request<T>(
   path: string,
   init: RequestInit = {},
   signal?: AbortSignal,
 ): Promise<T> {
-  let response: Response;
+  const controller = new AbortController();
+  const cancel = () => controller.abort();
+  signal?.addEventListener("abort", cancel, { once: true });
+  if (signal?.aborted) cancel();
+  const timer = setTimeout(cancel, REQUEST_TIMEOUT_MS);
   try {
-    response = await fetch(`${BASE_URL}${path}`, {
+    const response = await fetch(`${BASE_URL}${path}`, {
       ...init,
-      signal,
+      signal: controller.signal,
       headers: {
         "Content-Type": "application/json",
         ...init.headers,
       },
     });
+    if (response.status === 204) {
+      return undefined as T;
+    }
+
+    const text = await response.text();
+    const body = text ? safeJsonParse(text) : undefined;
+
+    if (!response.ok) {
+      const detail = body && typeof body === "object" && "detail" in body ? body.detail : body;
+      if (response.status === 409) throw new ConflictError(detail);
+      if (response.status === 422) throw new ValidationError(detail);
+      if (response.status === 404) throw new NotFoundError(detail);
+      throw new ApiError(response.status, `http_${response.status}`, detail);
+    }
+
+    return body as T;
   } catch (cause) {
-    if (signal?.aborted) {
-      throw cause;
+    if (signal?.aborted || cause instanceof ApiError) throw cause;
+    if (controller.signal.aborted) {
+      throw new Error("Сервер не ответил за 12 секунд. Обновите обращение перед повторной отправкой: сообщение могло сохраниться.");
     }
     throw new NetworkError("network_error", cause);
+  } finally {
+    clearTimeout(timer);
+    signal?.removeEventListener("abort", cancel);
   }
-
-  if (response.status === 204) {
-    return undefined as T;
-  }
-
-  const text = await response.text();
-  const body = text ? safeJsonParse(text) : undefined;
-
-  if (!response.ok) {
-    const detail = body && typeof body === "object" && "detail" in body ? body.detail : body;
-    if (response.status === 409) throw new ConflictError(detail);
-    if (response.status === 422) throw new ValidationError(detail);
-    if (response.status === 404) throw new NotFoundError(detail);
-    throw new ApiError(response.status, `http_${response.status}`, detail);
-  }
-
-  return body as T;
 }
 
 function safeJsonParse(text: string): unknown {
   try {
     return JSON.parse(text);
   } catch {
-    return text;
+    throw new ApiError(502, "Сервер вернул некорректный ответ. Попробуйте обновить страницу.");
   }
 }
 

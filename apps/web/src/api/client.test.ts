@@ -1,11 +1,32 @@
 import { HttpResponse, http } from "msw";
-import { describe, expect, it } from "vitest";
-import { api } from "./client";
+import { describe, expect, it, vi } from "vitest";
+import { api, REQUEST_TIMEOUT_MS } from "./client";
 import { ConflictError, NotFoundError, ValidationError } from "./errors";
 import { server } from "../test/server";
 import { makeConversation } from "../test/fixtures";
 
 describe("api client", () => {
+  it("releases a stalled request with a useful timeout error", async () => {
+    vi.useFakeTimers();
+    const fetchMock = vi.spyOn(globalThis, "fetch").mockImplementation((_input, init) =>
+      new Promise((_resolve, reject) => {
+        init?.signal?.addEventListener("abort", () => reject(new DOMException("Aborted", "AbortError")));
+      }),
+    );
+    try {
+      const request = expect(api.health()).rejects.toThrow("12 секунд");
+      await vi.advanceTimersByTimeAsync(REQUEST_TIMEOUT_MS);
+      await request;
+    } finally {
+      fetchMock.mockRestore();
+      vi.useRealTimers();
+    }
+  });
+
+  it("rejects HTML returned by an incorrectly configured proxy", async () => {
+    server.use(http.get("*/health", () => new HttpResponse("<html>App</html>")));
+    await expect(api.health()).rejects.toThrow("некорректный ответ");
+  });
   it("sends expected_revision when creating a message", async () => {
     let receivedBody: unknown;
     server.use(

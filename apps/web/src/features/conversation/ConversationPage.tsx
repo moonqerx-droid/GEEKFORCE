@@ -28,9 +28,9 @@ export function ConversationPage() {
     return (
       <div className="conversation-page conversation-page-center">
         <ErrorState
-          title="Не удалось создать обращение"
+          title="Не удалось загрузить обращение"
           description={conv.error ?? undefined}
-          onRetry={conv.start}
+          onRetry={() => window.location.reload()}
         />
       </div>
     );
@@ -39,12 +39,11 @@ export function ConversationPage() {
   if (!conv.conversation) {
     return (
       <div className="conversation-page">
+        {conv.error ? <div role="alert" className="conversation-error">{conv.error}</div> : null}
+        {conv.sending ? <p role="status">Отправляем сообщение…</p> : null}
         <WelcomeScreen
           busy={conv.sending}
-          onSubmit={async (content) => {
-            await conv.start();
-            await conv.sendMessage(content);
-          }}
+          onSubmit={conv.startWithMessage}
         />
       </div>
     );
@@ -89,6 +88,7 @@ export function ConversationPage() {
         <UrgencyCard urgency={c.urgency} reason={c.urgency_reason} summary={c.summary} />
 
         <MessageThread messages={c.messages} />
+        {conv.sending ? <p role="status">Обрабатываем сообщение…</p> : null}
 
         {c.status === "TROUBLESHOOTING" && c.current_step ? (
           <StepCard step={c.current_step} busy={conv.sending} onResult={conv.sendStepResult} />
@@ -117,7 +117,7 @@ export function ConversationPage() {
         ) : null}
 
         {c.status !== "RESOLVED" && c.status !== "ESCALATED" ? (
-          <button type="button" className="conversation-restart-link" onClick={conv.restartFresh}>
+          <button type="button" disabled={conv.sending} className="conversation-restart-link" onClick={conv.restartFresh}>
             Начать заново
           </button>
         ) : null}

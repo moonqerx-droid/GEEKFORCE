@@ -297,7 +297,7 @@ class TriageEngine:
                 f"последний шаг «{title}» — {verdict}")
 
     def _ai_summary(self, card: EscalationCard) -> tuple[str, str]:
-        if self.llm is not None:
+        if self.llm is not None and self.llm.supports_response_rendering:
             try:
                 raw = self.llm.chat_json(prompts.SUMMARY_SYSTEM,
                                          prompts.build_summary_user(card.model_dump(mode="json")))

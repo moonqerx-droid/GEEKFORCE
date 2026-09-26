@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { api } from "../../api/client";
-import { ConflictError, NetworkError } from "../../api/errors";
+import { ApiError, ConflictError, NetworkError, NotFoundError, ValidationError } from "../../api/errors";
 import type { Conversation, StepOutcome } from "../../api/types";
 
 const STORAGE_KEY = "helpflow.conversationId";
@@ -14,6 +14,7 @@ export interface ConversationState {
   notice: string | null;
   sending: boolean;
   start: () => Promise<void>;
+  startWithMessage: (content: string) => Promise<void>;
   restartFresh: () => Promise<void>;
   sendMessage: (content: string) => Promise<void>;
   sendStepResult: (outcome: StepOutcome) => Promise<void>;
@@ -39,6 +40,10 @@ function storeId(id: string | null) {
 }
 
 function describeError(err: unknown): string {
+  if (err instanceof ConflictError) return "Обращение изменилось. Проверьте историю перед повторной отправкой.";
+  if (err instanceof ValidationError) return "Проверьте сообщение: от 1 до 4000 символов.";
+  if (err instanceof NotFoundError) return "Обращение не найдено. Начните новое обращение.";
+  if (err instanceof ApiError && err.status >= 500) return "Ошибка сервера. Текст сохранён, попробуйте ещё раз.";
   if (err instanceof NetworkError) {
     return "Не удаётся связаться с сервером. Проверьте подключение и попробуйте снова.";
   }
@@ -55,6 +60,8 @@ export function useConversation(): ConversationState {
   const [notice, setNotice] = useState<string | null>(null);
   const [sending, setSending] = useState(false);
   const abortRef = useRef<AbortController | null>(null);
+  const mutationRef = useRef(false);
+  const createdRef = useRef<Conversation | null>(null);
 
   const restore = useCallback(async () => {
     const storedId = readStoredId();
@@ -63,19 +70,54 @@ export function useConversation(): ConversationState {
       return;
     }
     setPhase("loading");
+    const controller = new AbortController();
+    abortRef.current = controller;
     try {
-      const controller = new AbortController();
-      abortRef.current = controller;
       const data = await api.getConversation(storedId, controller.signal);
+      if (controller.signal.aborted) return;
       setConversation(data);
       setPhase("ready");
     } catch (err) {
-      // A stored id that the backend no longer knows about shouldn't block
-      // the welcome screen — just drop it and start fresh.
-      storeId(null);
-      setConversation(null);
+      if (controller.signal.aborted) return;
+      if (err instanceof NotFoundError) {
+        storeId(null);
+        setConversation(null);
+        setPhase("ready");
+      } else {
+        setError(describeError(err));
+        setPhase("error");
+      }
+    }
+  }, []);
+
+  const startWithMessage = useCallback(async (content: string) => {
+    if (mutationRef.current) return;
+    mutationRef.current = true;
+    setSending(true);
+    setError(null);
+    try {
+      const created = createdRef.current ?? await api.createConversation();
+      createdRef.current = created;
+      storeId(created.id);
+      const updated = await api.sendMessage(created.id, {
+        content, expected_revision: created.revision,
+      });
+      setConversation(updated);
+      createdRef.current = null;
       setPhase("ready");
-      void err;
+    } catch (err) {
+      if (err instanceof ConflictError && createdRef.current) {
+        // The previous request may have committed before its response was lost.
+        const fresh = await api.getConversation(createdRef.current.id).catch(() => null);
+        if (fresh) {
+          setConversation(fresh);
+          createdRef.current = null;
+        }
+      }
+      setError(describeError(err));
+    } finally {
+      mutationRef.current = false;
+      setSending(false);
     }
   }, []);
 
@@ -99,7 +141,9 @@ export function useConversation(): ConversationState {
   }, []);
 
   const restartFresh = useCallback(async () => {
+    if (mutationRef.current) return;
     storeId(null);
+    createdRef.current = null;
     setConversation(null);
     await start();
   }, [start]);
@@ -116,7 +160,8 @@ export function useConversation(): ConversationState {
 
   const sendMessage = useCallback(
     async (content: string) => {
-      if (!conversation || sending) return;
+      if (!conversation || mutationRef.current) return;
+      mutationRef.current = true;
       setSending(true);
       setError(null);
       try {
@@ -133,15 +178,17 @@ export function useConversation(): ConversationState {
         }
         throw err;
       } finally {
+        mutationRef.current = false;
         setSending(false);
       }
     },
-    [conversation, sending, reloadAfterConflict],
+    [conversation, reloadAfterConflict],
   );
 
   const sendStepResult = useCallback(
     async (outcome: StepOutcome) => {
-      if (!conversation || sending) return;
+      if (!conversation || mutationRef.current) return;
+      mutationRef.current = true;
       setSending(true);
       setError(null);
       try {
@@ -158,14 +205,16 @@ export function useConversation(): ConversationState {
           setError(describeError(err));
         }
       } finally {
+        mutationRef.current = false;
         setSending(false);
       }
     },
-    [conversation, sending, reloadAfterConflict],
+    [conversation, reloadAfterConflict],
   );
 
   const escalateNow = useCallback(async () => {
-    if (!conversation || sending) return;
+    if (!conversation || mutationRef.current) return;
+    mutationRef.current = true;
     setSending(true);
     setError(null);
     try {
@@ -178,9 +227,10 @@ export function useConversation(): ConversationState {
         setError(describeError(err));
       }
     } finally {
+      mutationRef.current = false;
       setSending(false);
     }
-  }, [conversation, sending, reloadAfterConflict]);
+  }, [conversation, reloadAfterConflict]);
 
   const dismissNotice = useCallback(() => setNotice(null), []);
 
@@ -191,6 +241,7 @@ export function useConversation(): ConversationState {
     notice,
     sending,
     start,
+    startWithMessage,
     restartFresh,
     sendMessage,
     sendStepResult,

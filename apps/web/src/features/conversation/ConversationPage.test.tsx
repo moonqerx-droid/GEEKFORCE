@@ -1,8 +1,9 @@
 import { render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { HttpResponse, http } from "msw";
 import { describe, expect, it } from "vitest";
 import { server } from "../../test/server";
-import { makeConversation } from "../../test/fixtures";
+import { makeConversation, makeMessage } from "../../test/fixtures";
 import { ConversationPage } from "./ConversationPage";
 
 function withStoredConversation(conversation: ReturnType<typeof makeConversation>) {
@@ -11,6 +12,36 @@ function withStoredConversation(conversation: ReturnType<typeof makeConversation
 }
 
 describe("ConversationPage status gating", () => {
+  it("sends the welcome draft and preserves it after a failed send", async () => {
+    let creates = 0;
+    let sends = 0;
+    server.use(
+      http.post("*/api/conversations", () => {
+        creates++;
+        return HttpResponse.json(makeConversation({ id: "new-ticket" }));
+      }),
+      http.post("*/api/conversations/new-ticket/messages", async ({ request }) => {
+        sends++;
+        const payload = await request.json() as { content: string };
+        if (sends === 1) return HttpResponse.error();
+        return HttpResponse.json(makeConversation({
+          id: "new-ticket", revision: 2, status: "CLARIFYING",
+          messages: [makeMessage("user", payload.content), makeMessage("assistant", "Какая ошибка?")],
+        }));
+      }),
+    );
+    const user = userEvent.setup();
+    render(<ConversationPage />);
+    await user.type(await screen.findByLabelText("Описание проблемы"), "Не работает VPN");
+    await user.click(screen.getByRole("button", { name: "Отправить обращение" }));
+    expect(await screen.findByRole("alert")).toHaveTextContent("сервер");
+    expect(screen.getByLabelText("Описание проблемы")).toHaveValue("Не работает VPN");
+    await user.click(screen.getByRole("button", { name: "Отправить обращение" }));
+    expect(await screen.findByText("Какая ошибка?")).toBeInTheDocument();
+    expect(screen.getByText("Не работает VPN")).toBeInTheDocument();
+    expect(creates).toBe(1);
+    expect(sends).toBe(2);
+  });
   it("shows outcome buttons only during TROUBLESHOOTING", async () => {
     withStoredConversation(
       makeConversation({

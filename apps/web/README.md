@@ -34,9 +34,13 @@ npm install
 npm run dev
 ```
 
-Frontend поднимется на `http://localhost:5173`. По умолчанию `VITE_API_BASE_URL`
-указывает на `http://localhost:8000` — это уже разрешённый CORS origin в backend
-(`http://localhost:5173`).
+Frontend поднимется на `http://localhost:5173`. Оставьте `VITE_API_BASE_URL`
+пустым: Vite перенаправит `/api` и `/health` на backend на порту 8000.
+Это работает и при занятом порте 5173. Для production нужен такой же reverse proxy
+либо явный URL API с разрешённым CORS origin.
+
+Отправка ограничена 12 секундами, ошибки показываются над формой, черновик
+сохраняется при неудаче. Enter отправляет сообщение, Shift+Enter добавляет строку.
 
 ### Docker backend + Vite frontend одновременно
 

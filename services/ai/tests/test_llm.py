@@ -196,6 +196,24 @@ def test_ollama_keeps_normal_dialogue_off_the_slow_model_path(kb):
     assert len(calls) == 0
 
 
+def test_ollama_escalation_does_not_wait_for_summary(kb):
+    calls = []
+    def handler(request):
+        calls.append(request)
+        return httpx.Response(503)
+    client = LLMClient(
+        LLMSettings(provider="ollama", api_key="ollama", base_url="http://ollama.test", max_retries=0),
+        transport=httpx.MockTransport(handler),
+    )
+    card = TriageEngine(kb, client).build_escalation_card(ConversationContext(
+        original_request="Не работает VPN", playbook_id="vpn_connection",
+    ))
+    assert card.original_request == "Не работает VPN"
+    assert card.ai_summary
+    assert card.source == "rules"
+    assert calls == []
+
+
 def test_llm_rewrites_only_the_visible_decision_message(kb):
     ctx = ConversationContext(
         original_request="Не работает CRM",

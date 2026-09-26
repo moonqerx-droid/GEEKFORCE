@@ -44,6 +44,13 @@ export function WelcomeScreen({ busy, onSubmit }: WelcomeScreenProps) {
           value={value}
           onChange={(event) => setValue(event.target.value)}
           rows={4}
+          maxLength={4000}
+          onKeyDown={(event) => {
+            if (event.key === "Enter" && !event.shiftKey && !event.nativeEvent.isComposing) {
+              event.preventDefault();
+              submit();
+            }
+          }}
           disabled={busy}
           aria-label="Описание проблемы"
         />

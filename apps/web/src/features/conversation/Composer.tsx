@@ -27,7 +27,7 @@ export function Composer({
   };
 
   const onKeyDown = (event: KeyboardEvent<HTMLTextAreaElement>) => {
-    if (event.key === "Enter" && !event.shiftKey) {
+    if (event.key === "Enter" && !event.shiftKey && !event.nativeEvent.isComposing) {
       event.preventDefault();
       void submit();
     }
@@ -42,6 +42,7 @@ export function Composer({
         onKeyDown={onKeyDown}
         placeholder={placeholder}
         rows={2}
+        maxLength={4000}
         disabled={busy}
         aria-label="Ваше сообщение"
       />
