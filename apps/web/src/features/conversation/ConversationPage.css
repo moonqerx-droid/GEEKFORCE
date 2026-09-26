@@ -1,0 +1,73 @@
+.conversation-page {
+  max-width: 720px;
+  margin: 0 auto;
+  padding: var(--space-5) var(--space-4) var(--space-7);
+}
+
+.conversation-page-center {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 60vh;
+}
+
+.conversation-shell {
+  display: flex;
+  flex-direction: column;
+}
+
+.conversation-statusbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: var(--space-3);
+}
+
+.conversation-status-label {
+  font-weight: 700;
+  font-size: var(--font-size-md);
+}
+
+.conversation-notice {
+  background: var(--color-warning-bg);
+  color: var(--color-warning);
+  border-radius: var(--radius-md);
+  padding: var(--space-3) var(--space-4);
+  margin-bottom: var(--space-3);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  font-size: var(--font-size-sm);
+}
+
+.conversation-notice-dismiss {
+  background: transparent;
+  border: none;
+  font-size: 18px;
+  line-height: 1;
+  color: inherit;
+}
+
+.conversation-error {
+  background: var(--color-danger-bg);
+  color: var(--color-danger);
+  border-radius: var(--radius-md);
+  padding: var(--space-3) var(--space-4);
+  margin-bottom: var(--space-3);
+  font-size: var(--font-size-sm);
+}
+
+.conversation-restart-link {
+  align-self: center;
+  margin-top: var(--space-4);
+  background: transparent;
+  border: none;
+  color: var(--color-text-muted);
+  font-size: var(--font-size-sm);
+  text-decoration: underline;
+}
+
+.conversation-restart-link:hover {
+  color: var(--color-text);
+}
