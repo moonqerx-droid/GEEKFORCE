@@ -5,7 +5,7 @@ MVP виртуального помощника технической подд�
 ## Что уже реализовано
 
 - FastAPI и интерактивная документация OpenAPI;
-- SQLite-хранилище обращений, сообщений и выполненных шагов;
+- PostgreSQL-хранилище в командном Docker-окружении и SQLite для быстрых локальных тестов;
 - Alembic-миграции для обновления постоянной базы;
 - контролируемая backend state machine;
 - интегрированный AI-модуль команды и 11 сценариев базы знаний;
@@ -39,7 +39,9 @@ docker compose up --build
 docker compose down
 ```
 
-Данные SQLite сохраняются в Docker volume `helpflow-data`.
+Данные PostgreSQL сохраняются в Docker volume `helpflow-postgres-data`. При первом запуске Compose создаёт базу `helpflow`, применяет Alembic-миграции и только затем запускает API.
+
+Для командной разработки достаточно одинаковой команды на macOS и Windows. При необходимости скопируйте `.env.example` в `.env` и замените `POSTGRES_DB`, `POSTGRES_USER`, `POSTGRES_PASSWORD` и `DATABASE_URL` согласованно. Значения по умолчанию предназначены только для локальной разработки.
 
 ## Локальный запуск на macOS
 
@@ -115,6 +117,8 @@ alembic upgrade head
 alembic downgrade -1
 ```
 
+Локальный запуск без Docker по умолчанию использует `sqlite:///./helpflow.db`. Чтобы подключиться к PostgreSQL вручную, задайте `DATABASE_URL=postgresql+psycopg://user:password@host:5432/database` перед запуском Alembic и API.
+
 ## Основной API
 
 ```text
@@ -132,7 +136,7 @@ GET  /api/operator/tickets
 
 ## AI и совместимость
 
-Новые обращения используют `services/ai/helpflow_ai`: вопросы, шаги и карточки берутся из `knowledge-base`. По умолчанию `AI_PROVIDER=mock` включает правила без сетевых запросов. Для LLM в Docker задайте `AI_PROVIDER=openai`, `AI_API_KEY`, при необходимости `AI_BASE_URL`, `AI_MODEL`, `AI_TIMEOUT_SECONDS` в корневом `.env`, затем пересоздайте сервис. Не добавляйте файл с ключами в Git.
+Новые обращения используют `services/ai/helpflow_ai`: вопросы, шаги и карточки берутся из `knowledge-base`. По умолчанию `AI_PROVIDER=mock` включает правила без сетевых запросов. Для LLM в Docker задайте `AI_PROVIDER=openai`, `AI_API_KEY`, при необходимости `AI_BASE_URL`, `AI_MODEL`, `AI_TIMEOUT_SECONDS` в корневом `.env`, затем пересоздайте сервис. LLM улучшает понимание и формулировку ответа, но не может менять выбранный шаг, вопрос или решение об эскалации; при любой ошибке остаётся исходный ответ сценария. Не добавляйте файл с ключами в Git.
 
 Существующие обращения сохраняют прежнюю логику через `workflow_version=legacy`. Новые получают `triage-v1`. HTTP-контракт сохраняет значения `normal` и `cannot_perform`; адаптер переводит их в AI-значения `medium` и `cannot_do`. В ответ добавлена `escalation_card` с причиной передачи, командой, вопросами, шагами и текущим результатом.
 

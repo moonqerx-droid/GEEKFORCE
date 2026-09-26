@@ -1,10 +1,26 @@
 services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-helpflow}
+      POSTGRES_USER: ${POSTGRES_USER:-helpflow}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-helpflow}
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 3s
+      timeout: 3s
+      retries: 10
+      start_period: 5s
+    volumes:
+      - helpflow-postgres-data:/var/lib/postgresql/data
+    restart: unless-stopped
+
   api:
     build:
       context: .
       dockerfile: apps/api/Dockerfile
     environment:
-      DATABASE_URL: sqlite:////data/helpflow.db
+      DATABASE_URL: ${DATABASE_URL:-postgresql+psycopg://helpflow:helpflow@db:5432/helpflow}
       AI_PROVIDER: ${AI_PROVIDER:-mock}
       AI_API_KEY: ${AI_API_KEY:-}
       AI_BASE_URL: ${AI_BASE_URL:-https://api.openai.com/v1}
@@ -13,9 +29,13 @@ services:
       CORS_ORIGINS: '${CORS_ORIGINS:-["http://localhost:3000","http://localhost:5173","http://127.0.0.1:3000","http://127.0.0.1:5173"]}'
     ports:
       - "8000:8000"
-    volumes:
-      - helpflow-data:/data
+    depends_on:
+      db:
+        condition: service_healthy
+    command: >-
+      sh -c "alembic upgrade head &&
+      uvicorn app.main:app --host 0.0.0.0 --port 8000"
     restart: unless-stopped
 
 volumes:
-  helpflow-data:
+  helpflow-postgres-data:
