@@ -1,0 +1,27 @@
+.composer {
+  display: flex;
+  gap: var(--space-3);
+  align-items: flex-end;
+  padding: var(--space-3);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  position: sticky;
+  bottom: 0;
+}
+
+.composer-textarea {
+  flex: 1;
+  resize: none;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  padding: var(--space-2) var(--space-3);
+  background: var(--color-bg);
+}
+
+@media (max-width: 480px) {
+  .composer {
+    flex-direction: column;
+    align-items: stretch;
+  }
+}
