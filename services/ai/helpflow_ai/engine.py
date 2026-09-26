@@ -93,7 +93,7 @@ class TriageEngine:
     def decide(self, context: ConversationContext) -> Decision:
         """Choose the flow with rules, then optionally improve only its wording."""
         decision = self._decide_rules(context)
-        if self.llm is None:
+        if self.llm is None or not self.llm.supports_response_rendering:
             return decision
         return self._render_decision(decision, context)
 

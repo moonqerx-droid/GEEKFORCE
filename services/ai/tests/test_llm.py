@@ -164,7 +164,7 @@ def test_ollama_uses_native_chat_with_thinking_disabled():
     assert calls[0]["body"]["format"] == "json"
 
 
-def test_ollama_keeps_analysis_local_and_uses_one_call_for_visible_reply(kb):
+def test_ollama_keeps_normal_dialogue_off_the_slow_model_path(kb):
     calls: list = []
 
     def handler(request: httpx.Request) -> httpx.Response:
@@ -192,8 +192,8 @@ def test_ollama_keeps_analysis_local_and_uses_one_call_for_visible_reply(kb):
     ))
 
     assert analysis.source == "rules"
-    assert decision.message_source == "llm"
-    assert len(calls) == 1
+    assert decision.message_source == "rules"
+    assert len(calls) == 0
 
 
 def test_llm_rewrites_only_the_visible_decision_message(kb):

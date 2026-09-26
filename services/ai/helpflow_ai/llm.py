@@ -82,6 +82,11 @@ class LLMClient:
         """Remote providers classify; local Ollama stays on the faster rules path."""
         return self._settings.provider != "ollama"
 
+    @property
+    def supports_response_rendering(self) -> bool:
+        """Local Ollama is too slow for cosmetic rewrites on the request path."""
+        return self._settings.provider != "ollama"
+
     def chat_json(self, system: str, user: str) -> dict[str, Any]:
         messages = [
             {"role": "system", "content": system},
