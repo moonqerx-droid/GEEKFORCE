@@ -38,18 +38,29 @@ def require_verified_user(user: CurrentUserDependency) -> User:
 
 
 def require_employee(user: Annotated[User, Depends(require_verified_user)]) -> User:
+    _require_password_changed(user)
     if user.role != "employee":
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Employee role required")
     return user
 
 
 def require_operator(user: Annotated[User, Depends(require_verified_user)]) -> User:
+    _require_password_changed(user)
     if user.role not in {"operator", "admin"}:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Operator role required")
     return user
 
 
 def require_admin(user: Annotated[User, Depends(require_verified_user)]) -> User:
+    _require_password_changed(user)
     if user.role != "admin":
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Admin role required")
     return user
+
+
+def _require_password_changed(user: User) -> None:
+    if user.must_change_password:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail={"code": "password_change_required", "message": "Сначала задайте постоянный пароль"},
+        )

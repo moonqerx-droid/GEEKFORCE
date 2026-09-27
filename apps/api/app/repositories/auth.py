@@ -38,12 +38,11 @@ class AuthRepository:
         auth_session.revoked_at = utc_now()
         self.session.commit()
 
-    def revoke_all_sessions(self, user_id: str) -> None:
-        self.session.execute(
-            update(AuthSession)
-            .where(AuthSession.user_id == user_id, AuthSession.revoked_at.is_(None))
-            .values(revoked_at=utc_now())
-        )
+    def revoke_all_sessions(self, user_id: str, *, except_token_hash: str | None = None) -> None:
+        conditions = [AuthSession.user_id == user_id, AuthSession.revoked_at.is_(None)]
+        if except_token_hash is not None:
+            conditions.append(AuthSession.token_hash != except_token_hash)
+        self.session.execute(update(AuthSession).where(*conditions).values(revoked_at=utc_now()))
         self.session.commit()
 
     def add_email_token(self, token: EmailToken) -> EmailToken:

@@ -6,15 +6,16 @@ from sqlalchemy.orm import Session
 
 from app.api.dependencies.auth import CurrentUserDependency
 from app.core.config import get_settings
+from app.core.security import hash_token
 from app.db.session import get_db
 from app.repositories.auth import AuthRepository
 from app.schemas.auth import (
-    CurrentUser, EmployeeRegister, ForgotPasswordRequest, LoginRequest, OperatorRegister,
+    ChangePasswordRequest, CurrentUser, EmployeeRegister, ForgotPasswordRequest, LoginRequest, OperatorRegister,
     ResetPasswordRequest, TokenRequest, VerifyEmailRequest,
 )
 from app.services.auth import (
     AuthService, DuplicateEmail, EmailDeliveryFailed, EmailNotVerified, InvalidCredentials,
-    InvalidInvite, InvalidOrExpiredToken,
+    InvalidCurrentPassword, InvalidInvite, InvalidOrExpiredToken,
 )
 from app.services.email import EmailSender, MemoryEmailSender, SmtpEmailSender
 from app.services.rate_limit import InMemoryRateLimiter, RateLimitExceeded
@@ -117,6 +118,24 @@ def logout(request: Request, response: Response, service: AuthServiceDependency)
 @router.get("/me", response_model=CurrentUser)
 def me(user: CurrentUserDependency):
     return user
+
+
+@router.post("/change-password", status_code=status.HTTP_204_NO_CONTENT)
+def change_password(
+    payload: ChangePasswordRequest,
+    request: Request,
+    user: CurrentUserDependency,
+    service: AuthServiceDependency,
+):
+    raw_token = request.cookies.get(get_settings().session_cookie_name)
+    try:
+        service.change_password(
+            user,
+            payload,
+            current_token_hash=hash_token(raw_token) if raw_token else None,
+        )
+    except InvalidCurrentPassword as exc:
+        raise error(400, "invalid_current_password", "Текущий пароль указан неверно") from exc
 
 
 @router.post("/verify-email", status_code=status.HTTP_204_NO_CONTENT)

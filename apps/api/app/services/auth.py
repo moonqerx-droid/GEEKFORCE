@@ -9,7 +9,7 @@ from app.core.config import get_settings
 from app.core.security import hash_password, hash_token, new_token, utc_now, verify_password
 from app.models.auth import AuthSession, EmailToken, User
 from app.repositories.auth import AuthRepository
-from app.schemas.auth import EmployeeRegister, LoginRequest, OperatorRegister, ResetPasswordRequest
+from app.schemas.auth import ChangePasswordRequest, EmployeeRegister, LoginRequest, OperatorRegister, ResetPasswordRequest
 from app.services.email import EmailPayload, EmailSender
 
 
@@ -41,6 +41,10 @@ class EmailDeliveryFailed(AuthError):
     def __init__(self, user: User):
         super().__init__("email delivery failed")
         self.user = user
+
+
+class InvalidCurrentPassword(AuthError):
+    pass
 
 
 class AuthService:
@@ -149,7 +153,19 @@ class AuthService:
         if user is None:
             raise InvalidOrExpiredToken()
         user.password_hash = hash_password(payload.password)
+        user.must_change_password = False
         self.repository.revoke_all_sessions(user.id)
+        self.repository.session.commit()
+
+    def change_password(
+        self, user: User, payload: ChangePasswordRequest, *, current_token_hash: str | None = None,
+    ) -> None:
+        if not verify_password(user.password_hash, payload.current_password):
+            raise InvalidCurrentPassword()
+        user.password_hash = hash_password(payload.password)
+        user.must_change_password = False
+        user.revision += 1
+        self.repository.revoke_all_sessions(user.id, except_token_hash=current_token_hash)
         self.repository.session.commit()
 
     def login(self, payload: LoginRequest, *, user_agent: str | None = None, ip_hash: str | None = None):

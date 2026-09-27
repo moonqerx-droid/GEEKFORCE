@@ -132,6 +132,22 @@ class CurrentUser(BaseModel):
     department: Department
     role: UserRole
     email_verified_at: datetime | None
+    must_change_password: bool = False
+    revision: int = 1
+
+
+class ChangePasswordRequest(BaseModel):
+    current_password: str = Field(min_length=1, max_length=128)
+    password: str = Field(min_length=10, max_length=128)
+    password_confirmation: str
+
+    _password = field_validator("password")(RegistrationBase.validate_password.__func__)
+
+    @model_validator(mode="after")
+    def passwords_match(self):
+        if self.password != self.password_confirmation:
+            raise ValueError("passwords do not match")
+        return self
 
 
 class ApiErrorBody(BaseModel):

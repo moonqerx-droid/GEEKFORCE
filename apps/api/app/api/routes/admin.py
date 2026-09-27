@@ -11,8 +11,22 @@ from app.core.config import get_settings
 from app.db.session import get_db
 from app.models.auth import User
 from app.schemas.auth import _normalize_email, _normalize_name
+from app.schemas.admin_users import (
+    AdminUserCreate,
+    AdminUserRead,
+    AdminUserUpdate,
+    TemporaryCredentialRead,
+)
 from app.services.admin import AdminService, SelfDeactivation, UserExists, UserNotFound
 from app.services.email import EmailPayload, EmailSender, MemoryEmailSender
+from app.services.user_admin import (
+    LastActiveAdmin,
+    ManagedUserExists,
+    ManagedUserNotFound,
+    SelfDisable,
+    StaleUserRevision,
+    UserAdminService,
+)
 
 router = APIRouter(prefix="/api/admin", tags=["admin"])
 
@@ -24,6 +38,13 @@ def get_admin_service(db: Annotated[Session, Depends(get_db)]) -> AdminService:
 
 
 ServiceDependency = Annotated[AdminService, Depends(get_admin_service)]
+
+
+def get_user_admin_service(db: Annotated[Session, Depends(get_db)]) -> UserAdminService:
+    return UserAdminService(db)
+
+
+UserAdminDependency = Annotated[UserAdminService, Depends(get_user_admin_service)]
 
 
 class InviteCreate(BaseModel):
@@ -108,3 +129,42 @@ def update_member(user_id: str, payload: TeamMemberUpdate, service: ServiceDepen
 @router.get("/metrics")
 def metrics(service: ServiceDependency, _admin: AdminDependency, days: Annotated[int, Query(ge=1, le=90)] = 7):
     return service.metrics(days)
+
+
+@router.get("/users", response_model=list[AdminUserRead])
+def list_users(service: UserAdminDependency, _admin: AdminDependency):
+    return service.list_users()
+
+
+@router.post("/users/operators", response_model=TemporaryCredentialRead, status_code=status.HTTP_201_CREATED)
+def create_operator(payload: AdminUserCreate, service: UserAdminDependency, admin: AdminDependency):
+    try:
+        user, temporary_password = service.create_operator(payload, admin)
+    except ManagedUserExists as exc:
+        raise HTTPException(status_code=409, detail="Пользователь с таким email уже есть") from exc
+    return {"user": user, "temporary_password": temporary_password}
+
+
+@router.patch("/users/{user_id}", response_model=AdminUserRead)
+def update_user(
+    user_id: str, payload: AdminUserUpdate, service: UserAdminDependency, admin: AdminDependency,
+):
+    try:
+        return service.update_user(user_id, payload, admin)
+    except ManagedUserNotFound as exc:
+        raise HTTPException(status_code=404, detail="Пользователь не найден") from exc
+    except ManagedUserExists as exc:
+        raise HTTPException(status_code=409, detail="Пользователь с таким email уже есть") from exc
+    except StaleUserRevision as exc:
+        raise HTTPException(status_code=409, detail="Данные пользователя уже изменились") from exc
+    except (LastActiveAdmin, SelfDisable) as exc:
+        raise HTTPException(status_code=400, detail="Нельзя отключить или понизить этого администратора") from exc
+
+
+@router.post("/users/{user_id}/reset-password", response_model=TemporaryCredentialRead)
+def reset_user_password(user_id: str, service: UserAdminDependency, admin: AdminDependency):
+    try:
+        user, temporary_password = service.reset_password(user_id, admin)
+    except ManagedUserNotFound as exc:
+        raise HTTPException(status_code=404, detail="Пользователь не найден") from exc
+    return {"user": user, "temporary_password": temporary_password}
