@@ -17,6 +17,24 @@ MVP виртуального помощника технической подд�
 - pytest и GitHub Actions;
 - одинаковый Docker-запуск на macOS и Windows.
 
+## Роли и демо
+
+HelpFlow работает для трёх ролей:
+
+- **Сотрудник** описывает проблему своими словами, проходит вопросы и шаги, видит «Карточку обращения» — что понял помощник. Если нужен человек, специалист подключается в тот же чат, сотрудник ничего не пересказывает и в конце ставит оценку.
+- **Специалист поддержки** работает в очереди: срочные наверху, у каждого обращения готовая карточка от помощника (исходные слова, факты, вопросы и ответы, выполненные шаги, причина передачи). Берёт обращение, отвечает, закрывает с итогом.
+- **Руководитель поддержки** видит метрики (доля решённых без специалиста, время до решения и до первого ответа, оценки, темы обращений и где помощник чаще передаёт людям, нагрузка команды) и приглашает специалистов.
+
+Сотрудники регистрируются сами. Специалистов приглашает только руководитель: ссылка из раздела «Команда» (и письмо, если настроен SMTP). Первого руководителя задают `ADMIN_EMAIL` и `ADMIN_PASSWORD` в `.env`.
+
+Демо-данные — аккаунты всех ролей и две недели истории, проигранной через настоящий движок:
+
+```bash
+docker compose exec api python -m app.seed_demo
+```
+
+Пароль всех демо-аккаунтов `DemoPass123`: `admin@helpflow.demo` (руководитель), `anna@helpflow.demo` и `oleg@helpflow.demo` (специалисты), `ivan@helpflow.demo` и ещё четверо сотрудников. В `npm run dev` на странице входа есть кнопки быстрого входа под каждой ролью.
+
 ## Быстрый запуск через Docker
 
 Требуется Docker Desktop.
@@ -150,7 +168,16 @@ GET  /api/conversations/{id}
 POST /api/conversations/{id}/messages
 POST /api/conversations/{id}/step-result
 POST /api/conversations/{id}/escalate
-GET  /api/operator/tickets
+POST /api/conversations/{id}/rating
+GET  /api/operator/tickets?scope=queue|mine|resolved
+GET  /api/operator/tickets/{id}
+POST /api/operator/tickets/{id}/assign
+POST /api/operator/tickets/{id}/messages
+POST /api/operator/tickets/{id}/resolve
+GET  /api/admin/metrics?days=7
+GET  /api/admin/operators
+POST /api/admin/operators/invite
+PATCH /api/admin/operators/{id}
 ```
 
 Полные схемы запросов и ответов всегда доступны в `/docs` и `/openapi.json`.
@@ -178,7 +205,7 @@ LLM может улучшать понимание, содержательный
 
 В standalone-запуске AI читает настройки из переменных окружения процесса; `.env` автоматически подставляет Docker Compose. Подробности модуля — в [services/ai/README.md](services/ai/README.md). Проверка AI: `pytest services/ai/tests` из корня после `pip install -e services/ai`.
 
-Debug UI и операторская очередь предназначены для локального демо команды. Аутентификация и ограничение доступа оператора пока не реализованы.
+Debug UI (`/debug`) предназначен для локальной отладки. Основной интерфейс — React-приложение с входом по ролям.
 
 Результаты изучения веток команды и точки интеграции — в [docs/integration-status.md](docs/integration-status.md).
 
