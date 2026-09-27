@@ -9,7 +9,9 @@ from sqlalchemy.orm.exc import StaleDataError
 from app.models import Incident
 from app.models.conversation import utc_now
 from app.repositories.incidents import IncidentRepository
-from app.schemas.incident import IncidentBroadcastResult, IncidentRead, IncidentUpdateRead
+from datetime import timedelta
+
+from app.schemas.incident import IncidentBroadcastResult, IncidentMember, IncidentRead, IncidentUpdateRead
 from app.services.incident_detection import (
     IncidentFingerprint,
     build_fingerprint,
@@ -19,6 +21,10 @@ from app.services.incident_detection import (
 
 
 logger = logging.getLogger(__name__)
+
+
+def _aware(value):
+    return value if value is None or value.tzinfo else value.replace(tzinfo=utc_now().tzinfo)
 
 
 class IncidentNotFound(LookupError):
@@ -37,17 +43,27 @@ class IncidentMatch:
 
 
 class IncidentService:
-    def __init__(self, repository: IncidentRepository, *, threshold: float, min_cluster_size: int):
+    def __init__(
+        self,
+        repository: IncidentRepository,
+        *,
+        threshold: float,
+        min_cluster_size: int,
+        window_minutes: int = 120,
+    ):
         self.repository = repository
         self.threshold = threshold
         self.min_cluster_size = min_cluster_size
+        self.window = timedelta(minutes=window_minutes)
 
     def read(self, incident_id: str) -> IncidentRead:
         incident = self.repository.get(incident_id)
         if incident is None:
             raise LookupError(incident_id)
-        conversation_ids = self.repository.conversation_ids(incident.id)
+        members = self.repository.conversations(incident.id)
+        conversation_ids = [member.id for member in members]
         latest = incident.updates[-1] if incident.updates else None
+        seen = [_aware(member.escalated_at or member.created_at) for member in members]
         return IncidentRead(
             id=incident.id,
             status=incident.status,
@@ -62,7 +78,73 @@ class IncidentService:
             conversation_ids=conversation_ids,
             evidence_tokens=list(incident.signature_tokens),
             latest_update=IncidentUpdateRead.model_validate(latest) if latest else None,
+            service_label=next((member.service for member in members if member.service), None),
+            affected_employees=len({member.owner_id or member.id for member in members}),
+            first_seen_at=min(seen) if seen else None,
+            members=[
+                IncidentMember(
+                    id=member.id,
+                    status=member.status,
+                    owner_name=member.owner_name,
+                    owner_department=member.owner_department,
+                    original_request=next(
+                        (message.content for message in member.messages if message.role == "user"), "",
+                    ),
+                    created_at=member.created_at,
+                )
+                for member in sorted(members, key=lambda item: _aware(item.created_at))
+            ],
         )
+
+    def latest_update_text(self, incident_id: str) -> str | None:
+        incident = self.repository.get(incident_id)
+        return incident.updates[-1].message if incident and incident.updates else None
+
+    def confirm(self, incident_id: str, expected_revision: int) -> IncidentRead:
+        """A specialist agrees this is a real outage."""
+        incident = self._open_for_change(incident_id, expected_revision)
+        incident.status = "ACTIVE"
+        incident.updated_at = utc_now()
+        self._commit()
+        return self.read(incident_id)
+
+    def resolve(self, incident_id: str, message: str, expected_revision: int, author=None) -> IncidentRead:
+        """The outage is over: tell everyone and close their requests."""
+        incident = self._open_for_change(incident_id, expected_revision)
+        now = utc_now()
+        for conversation in self.repository.conversations(incident.id):
+            if conversation.status not in {"ESCALATED", "IN_PROGRESS"}:
+                continue
+            self.repository.append_message(
+                conversation, message, role="operator", author_id=getattr(author, "id", None),
+            )
+            conversation.first_operator_reply_at = conversation.first_operator_reply_at or now
+            conversation.status = "RESOLVED"
+            conversation.resolved_at = now
+            conversation.resolved_by = "operator"
+        self.repository.create_update(incident, message=message, request_key="resolved")
+        incident.status = "RESOLVED"
+        incident.updated_at = now
+        self._commit()
+        logger.info("incident.resolved incident_id=%s", incident_id)
+        return self.read(incident_id)
+
+    def _open_for_change(self, incident_id: str, expected_revision: int) -> Incident:
+        incident = self.repository.get(incident_id)
+        if incident is None:
+            raise IncidentNotFound(incident_id)
+        if incident.status == "RESOLVED":
+            raise IncidentConflict("incident is already resolved")
+        if incident.revision != expected_revision:
+            raise IncidentConflict("incident changed; reload it before acting")
+        return incident
+
+    def _commit(self) -> None:
+        try:
+            self.repository.session.commit()
+        except (IntegrityError, StaleDataError) as error:
+            self.repository.session.rollback()
+            raise IncidentConflict("incident changed; reload it before acting") from error
 
     def list_incidents(self, *, include_resolved: bool = False) -> list[IncidentRead]:
         incidents = self.repository.list_incidents(include_resolved=include_resolved)
@@ -87,6 +169,7 @@ class IncidentService:
         message: str,
         request_key: str,
         expected_revision: int,
+        author=None,
     ) -> IncidentBroadcastResult:
         incident = self.repository.get(incident_id)
         if incident is None:
@@ -103,8 +186,14 @@ class IncidentService:
             raise IncidentConflict("incident changed; reload it before broadcasting")
 
         try:
+            now = utc_now()
             for conversation in self.repository.conversations(incident.id):
-                self.repository.append_message(conversation, message)
+                # The update comes from a person, so it reads and counts as a specialist reply.
+                self.repository.append_message(
+                    conversation, message, role="operator", author_id=getattr(author, "id", None),
+                )
+                if conversation.status in {"ESCALATED", "IN_PROGRESS"}:
+                    conversation.first_operator_reply_at = conversation.first_operator_reply_at or now
             self.repository.create_update(
                 incident,
                 message=message,
@@ -175,7 +264,8 @@ class IncidentService:
             return match
 
         candidates = []
-        for item in self.repository.list_unlinked_escalated(fingerprint.service, conversation.id):
+        since = utc_now() - self.window
+        for item in self.repository.list_unlinked_escalated(fingerprint.service, conversation.id, since):
             other = build_fingerprint(item)
             if other is not None and similarity(fingerprint, other).score >= self.threshold:
                 candidates.append((item, other))

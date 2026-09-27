@@ -6,7 +6,13 @@ from sqlalchemy.orm import Session
 from app.core.config import get_settings
 from app.db.session import get_db
 from app.repositories.incidents import IncidentRepository
-from app.schemas.incident import IncidentBroadcastCreate, IncidentBroadcastResult, IncidentRead
+from app.schemas.incident import (
+    IncidentBroadcastCreate,
+    IncidentBroadcastResult,
+    IncidentConfirm,
+    IncidentRead,
+    IncidentResolve,
+)
 from app.services.incidents import IncidentConflict, IncidentNotFound, IncidentService
 from app.schemas.conversation import ConversationRead, OperatorMessageCreate, OperatorTicket, ResolveCreate
 from app.api.dependencies.auth import require_operator
@@ -93,6 +99,7 @@ def get_incident_service(db: Annotated[Session, Depends(get_db)]) -> IncidentSer
         IncidentRepository(db),
         threshold=settings.incident_similarity_threshold,
         min_cluster_size=settings.incident_min_cluster_size,
+        window_minutes=settings.incident_window_minutes,
     )
 
 
@@ -108,16 +115,44 @@ def list_incidents(
     return service.list_incidents(include_resolved=include_resolved)
 
 
+def run_incident(action):
+    try:
+        return action()
+    except IncidentNotFound as error:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Incident not found") from error
+    except IncidentConflict as error:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(error)) from error
+
+
 @router.post("/incidents/{incident_id}/broadcast", response_model=IncidentBroadcastResult)
 def broadcast_incident(
     incident_id: str,
     payload: IncidentBroadcastCreate,
     service: IncidentServiceDependency,
-    _user: OperatorDependency,
+    user: OperatorDependency,
 ) -> IncidentBroadcastResult:
-    try:
-        return service.broadcast(incident_id, payload.message, payload.request_key, payload.expected_revision)
-    except IncidentNotFound as error:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Incident not found") from error
-    except IncidentConflict as error:
-        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(error)) from error
+    return run_incident(lambda: service.broadcast(
+        incident_id, payload.message, payload.request_key, payload.expected_revision, author=user,
+    ))
+
+
+@router.post("/incidents/{incident_id}/confirm", response_model=IncidentRead)
+def confirm_incident(
+    incident_id: str,
+    payload: IncidentConfirm,
+    service: IncidentServiceDependency,
+    _user: OperatorDependency,
+) -> IncidentRead:
+    return run_incident(lambda: service.confirm(incident_id, payload.expected_revision))
+
+
+@router.post("/incidents/{incident_id}/resolve", response_model=IncidentRead)
+def resolve_incident(
+    incident_id: str,
+    payload: IncidentResolve,
+    service: IncidentServiceDependency,
+    user: OperatorDependency,
+) -> IncidentRead:
+    return run_incident(lambda: service.resolve(
+        incident_id, payload.message, payload.expected_revision, author=user,
+    ))

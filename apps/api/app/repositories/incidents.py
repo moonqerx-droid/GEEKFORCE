@@ -7,6 +7,10 @@ from app.models import Conversation, Incident, IncidentUpdate, Message
 from app.models.conversation import utc_now
 
 
+def _aware(value):
+    return value if value is None or value.tzinfo else value.replace(tzinfo=utc_now().tzinfo)
+
+
 class IncidentRepository:
     def __init__(self, session: Session):
         self.session = session
@@ -45,11 +49,12 @@ class IncidentRepository:
             statement = statement.where(Incident.status.in_(("CANDIDATE", "ACTIVE")))
         return list(self.session.scalars(statement).all())
 
-    def list_unlinked_escalated(self, service: str, exclude_id: str) -> list[Conversation]:
+    def list_unlinked_escalated(self, service: str, exclude_id: str, since=None) -> list[Conversation]:
+        """Requests waiting for or taken by a specialist, not yet in an incident."""
         statement = (
             select(Conversation)
             .where(
-                Conversation.status == "ESCALATED",
+                Conversation.status.in_(("ESCALATED", "IN_PROGRESS")),
                 Conversation.incident_id.is_(None),
                 Conversation.id != exclude_id,
             )
@@ -61,6 +66,7 @@ class IncidentRepository:
         return [
             item for item in items
             if (item.service or "").strip().casefold().replace("ё", "е") == normalized
+            and (since is None or _aware(item.escalated_at or item.created_at) >= since)
         ]
 
     def conversation_ids(self, incident_id: str) -> list[str]:
@@ -102,8 +108,10 @@ class IncidentRepository:
         self.session.flush()
         return incident
 
-    def append_message(self, conversation: Conversation, message: str) -> None:
-        conversation.messages.append(Message(role="assistant", content=message))
+    def append_message(
+        self, conversation: Conversation, message: str, *, role: str = "assistant", author_id: str | None = None,
+    ) -> None:
+        conversation.messages.append(Message(role=role, content=message, author_id=author_id))
         conversation.updated_at = utc_now()
 
     def find_update(self, incident_id: str, request_key: str) -> IncidentUpdate | None:
