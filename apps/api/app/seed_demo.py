@@ -1,7 +1,8 @@
 """Fill the database with demo accounts and two weeks of realistic support history.
 
 Run from apps/api:  python -m app.seed_demo
-Idempotent: if the demo admin already exists, nothing is changed.
+Idempotent: if the demo admin already exists, the history is left as is; an open
+VPN outage for Incident Radar is added only when there is none.
 Every conversation is played through the real rules engine, so escalation cards,
 questions and steps look exactly like production ones.
 """
@@ -19,6 +20,7 @@ from app.core.security import hash_password, utc_now
 from app.db.session import SessionLocal
 from app.models.auth import User
 from app.models.conversation import Conversation
+from app.models.incident import Incident
 from app.repositories.conversations import ConversationRepository
 from app.services.admin import _aware
 from app.services.operator import OperatorService
@@ -113,9 +115,9 @@ def _shift(conversation: Conversation, start) -> None:
     conversation.updated_at = conversation.resolved_at or conversation.created_at
 
 
-def seed(total: int = 60, seed_value: int = 42) -> bool:
+def seed(total: int = 60, seed_value: int = 42, session_factory=SessionLocal) -> bool:
     rng = random.Random(seed_value)
-    with SessionLocal() as session:
+    with session_factory() as session:
         if session.scalar(select(User).where(User.email == f"admin@{DOMAIN}")):
             return False
         staff = {key: _user(session, key, first, last, role) for key, first, last, role in STAFF}
@@ -167,10 +169,50 @@ def seed(total: int = 60, seed_value: int = 42) -> bool:
         return True
 
 
+# A fresh VPN outage: five colleagues within half an hour. The first three go through the
+# usual diagnosis and escalate, which makes the radar group them; the rest join the known
+# outage on their first message, exactly as a live request would.
+OUTAGE = [
+    ("ivan", "VPN не подключается, пишет ошибку 809", 28),
+    ("elena", "Не могу подключиться к VPN из дома, ошибка 809", 22),
+    ("dmitry", "VPN не подключается с утра, выдаёт ошибку 809", 16),
+    ("olga", "Не подключается VPN, ошибка 809, а у меня отчёт горит", 9),
+    ("sergey", "VPN опять не подключается, пишет ошибка 809", 4),
+]
+
+
+def seed_incident(seed_value: int = 7, session_factory=SessionLocal) -> bool:
+    """Make sure Incident Radar has an open VPN outage to show. Safe to re-run."""
+    rng = random.Random(seed_value)
+    with session_factory() as session:
+        already_open = session.scalar(select(Incident).where(
+            Incident.status.in_(("CANDIDATE", "ACTIVE")), Incident.service == "vpn",
+        ))
+        people = {user.email.split("@")[0]: user for user in session.scalars(
+            select(User).where(User.email.like(f"%@{DOMAIN}"))
+        ).all()}
+        if already_open is not None or not all(key in people for key, *_ in OUTAGE):
+            return False
+        dialogue = TriageDialogueService(ConversationRepository(session), TriageEngine(KnowledgeBase.load(), None))
+        repository = ConversationRepository(session)
+        now = utc_now()
+        for key, text, minutes_ago in OUTAGE:
+            conversation = dialogue.create_conversation()
+            conversation.owner_id = people[key].id
+            session.commit()
+            result = _play(dialogue, conversation.id, text, solve=False, rng=rng)
+            _shift(repository.get(result.id), now - timedelta(minutes=minutes_ago))
+            session.commit()
+        return True
+
+
 def main() -> None:
     created = seed()
+    outage = seed_incident()
     if not created:
         print(f"Демо-данные уже есть. Вход: admin@{DOMAIN} / {PASSWORD}")
+        if outage:
+            print("Добавлен свежий сбой VPN для радара инцидентов.")
         return
     print("Демо-данные созданы. Пароль всех аккаунтов:", PASSWORD)
     print(f"  Админ:     admin@{DOMAIN}")
