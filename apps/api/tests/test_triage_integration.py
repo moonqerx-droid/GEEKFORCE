@@ -251,3 +251,38 @@ def test_unknown_issue_escalates_to_l1_without_invented_steps(client):
     assert state["escalation_card"]["recommended_team"] == "Service Desk L1"
     assert state["escalation_card"]["original_request"] == original
     assert state["completed_steps"] == []
+
+
+def test_fourth_matching_request_joins_before_diagnostics(client, seeded_crm_candidate):
+    cid = client.post("/api/conversations").json()["id"]
+
+    state = send(client, cid, "CRM не открывается, у меня ошибка 502")
+
+    assert state["status"] == "ESCALATED", {
+        key: state[key]
+        for key in ("status", "service", "summary", "symptoms", "known_facts", "playbook_id")
+    }
+    assert state["incident_id"] == seeded_crm_candidate.id
+    assert state["completed_steps"] == []
+    assert len([message for message in state["messages"] if message["role"] == "assistant"]) == 1
+    assert "массов" in state["messages"][-1]["content"].casefold()
+
+
+def test_radar_failure_keeps_normal_first_turn_flow(client, monkeypatch):
+    from app.services.incidents import IncidentService
+
+    def fail(*_args, **_kwargs):
+        raise RuntimeError("radar unavailable")
+
+    monkeypatch.setattr(IncidentService, "match_first_turn", fail)
+    cid = client.post("/api/conversations").json()["id"]
+
+    response = client.post(
+        f"/api/conversations/{cid}/messages",
+        json={"content": "Не работает VPN"},
+    )
+
+    assert response.status_code == 200
+    state = response.json()
+    assert state["status"] in {"CLARIFYING", "TROUBLESHOOTING", "ESCALATED"}
+    assert state["incident_id"] is None

@@ -134,6 +134,34 @@ class TriageDialogueService(DialogueService):
                     setattr(conversation, field, getattr(analysis, field))
                 conversation.urgency = "normal" if analysis.urgency.value == "medium" else analysis.urgency.value
                 conversation.playbook_id = analysis.recommended_playbook
+                match = None
+                try:
+                    with self.repository.session.begin_nested():
+                        match = self.incident_service.match_first_turn(conversation.id)
+                except Exception as error:
+                    logger.exception(
+                        "incident.detection_failed conversation_id=%s error=%s",
+                        conversation.id,
+                        type(error).__name__,
+                    )
+                if match is not None:
+                    conversation.incident_id = match.incident_id
+                    conversation.status = "ESCALATED"
+                    conversation.current_step_code = None
+                    conversation.current_step_instruction = None
+                    card = self.engine.build_escalation_card(
+                        self._context(conversation),
+                        "обращение совпало с возможным массовым инцидентом",
+                    )
+                    conversation.escalation_card = card.model_dump(mode="json")
+                    conversation.escalation_summary = card.ai_summary
+                    self._message(
+                        conversation,
+                        "assistant",
+                        "Похоже, проблема массовая. Команда поддержки уже расследует "
+                        "инцидент; обновления появятся в этом обращении.",
+                    )
+                    return self._commit(conversation)
                 if analysis.should_escalate:
                     self._escalate(conversation, "сценарий требует немедленного участия специалиста")
                 else:

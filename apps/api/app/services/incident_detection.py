@@ -13,7 +13,8 @@ STOP_WORDS = frozenset({
     "как", "к", "ли", "мне", "мы", "на", "не", "но", "о", "от", "по", "при",
     "с", "со", "у", "что", "это", "я",
     "a", "an", "and", "for", "from", "in", "is", "not", "of", "on", "or", "the", "to",
-    "http", "https", "ошибка", "ошибку", "проблема", "работает", "сервис",
+    "http", "https", "меня", "отвечает", "ошибка", "ошибку", "проблема", "работает",
+    "сервис", "сервера",
 })
 EXCLUDED_SERVICES = frozenset({"", "не определен", "не определено", "unknown"})
 
@@ -32,10 +33,12 @@ class SimilarityResult:
 
 def _tokens(value: str | None) -> list[str]:
     normalized = (value or "").casefold().replace("ё", "е")
-    return [
-        token for token in TOKEN_RE.findall(normalized)
-        if len(token) > 1 and token not in STOP_WORDS
-    ]
+    tokens = []
+    for token in TOKEN_RE.findall(normalized):
+        if len(token) <= 1 or token in STOP_WORDS:
+            continue
+        tokens.append("недоступен" if token.startswith("недоступ") else token)
+    return tokens
 
 
 def _put(tokens: dict[str, int], values: Iterable[str], weight: int) -> None:

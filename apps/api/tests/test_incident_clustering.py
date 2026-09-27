@@ -2,6 +2,7 @@ import pytest
 from sqlalchemy.exc import IntegrityError
 
 from app.models import Incident
+from app.models import Conversation, Message
 from app.repositories.conversations import ConversationRepository
 from app.repositories.incidents import IncidentRepository
 
@@ -51,7 +52,7 @@ def test_cluster_create_race_rereads_once(
         status="CANDIDATE",
         service="crm",
         title="Массовая недоступность CRM",
-        signature_tokens=["502", "crm", "недоступна"],
+        signature_tokens=["502", "crm", "недоступен"],
         similarity_threshold=0.55,
     )
     db_session.add(competing)
@@ -97,3 +98,28 @@ def test_signature_failure_rolls_back_membership(
         ConversationRepository(db_session).get(item.id).incident_id is None
         for item in members
     )
+
+
+def test_first_turn_fields_match_existing_candidate(
+    db_session, incident_service, candidate
+):
+    fourth = Conversation(
+        workflow_version="triage-v1",
+        status="NEW",
+        service="CRM",
+        summary="Проблема с CRM: CRM не открывается",
+        symptoms=["CRM не открывается"],
+        known_facts={"error_text": "502"},
+        playbook_id="crm_login_device_specific",
+    )
+    fourth.messages.append(Message(
+        role="user", content="CRM не открывается, у меня ошибка 502"
+    ))
+    db_session.add(fourth)
+    db_session.flush()
+
+    match = incident_service.match_first_turn(fourth.id)
+
+    assert match is not None
+    assert match.incident_id == candidate.id
+    assert match.score >= 0.55
