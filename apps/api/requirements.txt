@@ -9,3 +9,6 @@ httpx==0.28.1
 alembic==1.16.5
 PyYAML==6.0.2
 argon2-cffi==25.1.0
+pypdf==6.19.0
+python-docx==1.2.0
+python-multipart==0.0.32
