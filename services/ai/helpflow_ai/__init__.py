@@ -3,12 +3,15 @@
 from .engine import TriageEngine
 from .knowledge import KnowledgeBase, KnowledgeBaseError
 from .llm import LLMClient, LLMError, LLMSettings
+from .retrieval import KnowledgeRetriever
 from .schemas import (
     Analysis,
     ConversationContext,
     Decision,
     DecisionAction,
     EscalationCard,
+    KnowledgeChunk,
+    KnowledgeMatch,
     Playbook,
     Question,
     Step,
@@ -25,6 +28,9 @@ __all__ = [
     "EscalationCard",
     "KnowledgeBase",
     "KnowledgeBaseError",
+    "KnowledgeChunk",
+    "KnowledgeMatch",
+    "KnowledgeRetriever",
     "LLMClient",
     "LLMError",
     "LLMSettings",

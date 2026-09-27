@@ -86,6 +86,27 @@ class Playbook(BaseModel):
     default_urgency: Urgency = Urgency.MEDIUM
 
 
+class KnowledgeChunk(BaseModel):
+    """One approved, attributable fragment available to grounded replies."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    id: str
+    service: str
+    title: str
+    text: str
+    keywords: list[str] = Field(default_factory=list)
+    safety_notice: str | None = None
+    escalation_team: str
+
+
+class KnowledgeMatch(BaseModel):
+    """A retrieval result with a normalized deterministic score."""
+
+    chunk: KnowledgeChunk
+    score: float = Field(ge=0.0, le=1.0)
+
+
 class Analysis(BaseModel):
     """Structured understanding of the user's request."""
 
