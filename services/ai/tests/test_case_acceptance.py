@@ -149,3 +149,81 @@ def test_urgent_lost_internet_offers_phone_hotspot_first(simulate):
 def test_calm_lost_internet_keeps_regular_order(simulate):
     sim = simulate("Интернет пропал на ноутбуке")
     assert sim.decision.action == DecisionAction.ASK
+
+
+# --- what we understood is used, meaningless questions are not asked --------
+
+PRINTER = "Принтер не печатает, пишет замятие бумаги"
+
+
+def test_printer_jam_is_understood(engine):
+    analysis = engine.analyze(PRINTER)
+    assert analysis.recommended_playbook == "printer"
+    assert analysis.service == "Принтер"
+    assert "замятие бумаги" in analysis.symptoms
+    assert "замятие" in analysis.known_facts["error_text"]
+
+
+def test_printer_jam_starts_with_clearing_the_jam(simulate):
+    sim = simulate(PRINTER)
+    assert sim.decision.action == DecisionAction.STEP
+    assert sim.decision.step.id == "clear_paper_jam"
+
+
+@pytest.mark.parametrize("message, first_step", [
+    ("принтер зажевал бумагу((", "clear_paper_jam"),
+    ("не печатает мфу на 3 этаже, ничего не пишет", "check_printer_ready"),
+    ("Отправляю на печать документ, а принтер молчит и не печатает", "check_printer_ready"),
+])
+def test_printer_variations_skip_pointless_questions(simulate, message, first_step):
+    sim = simulate(message)
+    assert sim.analysis.recommended_playbook == "printer"
+    assert sim.decision.action == DecisionAction.STEP
+    assert sim.decision.step.id == first_step
+
+
+def test_printer_without_details_asks_what_it_shows(simulate):
+    sim = simulate("Принтер сломался")
+    assert sim.decision.action == DecisionAction.ASK
+    assert sim.decision.question.fact == "error_text"
+
+
+def test_printer_jam_that_does_not_clear_goes_to_specialist(simulate, engine):
+    sim = simulate(PRINTER)
+    while sim.decision.action == DecisionAction.STEP:
+        sim.step_result(StepOutcome.NOT_HELPED)
+    assert sim.decision.action == DecisionAction.ESCALATE
+    card = engine.build_escalation_card(sim.ctx, sim.decision.reason)
+    assert card.service == "Принтер"
+    assert "замятие" in card.known_facts["error_text"]
+    assert len(card.performed_steps) >= 2
+
+
+@pytest.mark.parametrize("message, subject", [
+    ("Мышка перестала работать", "Мышь"),
+    ("не включается монитор, горит оранжевая лампочка!!", "Монитор"),
+    ("клава не печатает русские буквы", "Клавиатура"),
+])
+def test_named_device_without_playbook_is_handed_off_at_once(simulate, engine, message, subject):
+    sim = simulate(message)
+    assert sim.analysis.recommended_playbook == "unknown"
+    assert sim.analysis.service == subject
+    assert sim.decision.action == DecisionAction.ESCALATE, "no pointless 'which program?' question"
+    assert "готового решения" in sim.decision.message
+    card = engine.build_escalation_card(sim.ctx, sim.decision.reason)
+    assert card.original_request == message
+    assert card.service == subject
+    assert subject in card.summary
+
+
+@pytest.mark.parametrize("message", [
+    "Ничего не работает, помогите пожалуйста",
+    "всё тупит и глючит, сделайте что-нибудь!!!",
+    "у меня какая-то беда с компом не пойму что",
+])
+def test_ambiguous_request_asks_what_is_broken_first(simulate, message):
+    sim = simulate(message)
+    assert sim.decision.action == DecisionAction.ASK
+    assert sim.decision.question.fact in ("service_name", "error_text")
+    asked = first_question_facts(sim)
+    assert len(asked) <= 3 and len(asked) == len(set(asked))

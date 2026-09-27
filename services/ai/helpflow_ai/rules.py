@@ -29,6 +29,23 @@ SERVICE_ALIASES: dict[str, list[str]] = {
     "Сеть": ["wi-fi", "wifi", "вай-фай", "вайфай", "интернет"],
 }
 
+# Things a user can name when no playbook fits. Generic words like "компьютер"
+# are left out on purpose: "беда с компом" is still an ambiguous request.
+DEVICE_ALIASES: dict[str, list[str]] = {
+    "Мышь": ["мыш"],
+    "Клавиатура": ["клавиатур", "клава", "клаву", "клавой"],
+    "Монитор": ["монитор"],
+    "Принтер": ["принтер", "мфу"],
+    "Сканер": ["сканер"],
+    "Проектор": ["проектор"],
+    "Док-станция": ["док-станц", "докстанц"],
+    "Веб-камера": ["веб-камер", "вебк"],
+    "Excel": ["excel", "эксель", "ексель"],
+    "Word": ["word", "ворд"],
+    "Браузер": ["браузер", "chrome", "хром"],
+    "Телефония": ["ip-телефон", "sip"],
+}
+
 # stem -> noun used in the urgency reason
 _MEETINGS = {
     "встреч": "встреча",
@@ -129,6 +146,15 @@ def detect_service(text: str, playbook: Playbook) -> str:
         if any(contains(norm, alias) for alias in aliases):
             return service
     return playbook.service
+
+
+def detect_subject(text: str) -> str | None:
+    """What the user is talking about, when it is named explicitly."""
+    norm = normalize(text)
+    for subject, aliases in {**SERVICE_ALIASES, **DEVICE_ALIASES}.items():
+        if any(contains(norm, alias) for alias in aliases):
+            return subject
+    return None
 
 
 def detect_symptoms(text: str, playbook: Playbook) -> list[str]:

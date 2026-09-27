@@ -124,6 +124,13 @@ class TriageEngine:
             if workaround is not None:
                 return _step_decision(workaround, URGENT_WORKAROUND_INTRO,
                                       "срочно: сначала быстрый обходной путь")
+        subject = rules.detect_subject(_user_text(context)) if playbook.id == "unknown" else None
+        if subject:
+            # No playbook for a named thing: extra questions would not change anything.
+            decision = self._escalate(playbook, f"нет сценария в базе знаний для: {subject}")
+            note = (f"Для «{subject}» у меня нет готового решения, поэтому не буду мучить вас "
+                    "лишними вопросами.")
+            return decision.model_copy(update={"message": f"{note} {decision.message}"})
         question = self.next_question(playbook, context)
         if question is not None:
             return Decision(action=DecisionAction.ASK, message=question.text, question=question,
@@ -258,13 +265,18 @@ class TriageEngine:
         urgency, reason = rules.detect_urgency(text, playbook)
         service = rules.detect_service(text, playbook)
         symptoms = rules.detect_symptoms(text, playbook)
+        stated = rules.extract_facts(text)
+        subject = rules.detect_subject(text) if playbook.id == "unknown" else None
+        if subject:
+            service = subject
+            stated.setdefault("service_name", subject)
         return Analysis(
             summary=_summary(playbook, service, symptoms),
             service=service,
             symptoms=symptoms,
             urgency=urgency,
             urgency_reason=reason,
-            known_facts={**rules.extract_facts(text), **ctx.known_facts},
+            known_facts={**stated, **ctx.known_facts},
             confidence=classification.confidence,
             recommended_playbook=playbook.id,
             source="rules",
@@ -420,7 +432,12 @@ def _step_decision(step: Step, intro: str, reason: str) -> Decision:
 
 
 def _summary(playbook: Playbook, service: str, symptoms: list[str]) -> str:
-    title = f"Недоступен сервис {service}" if playbook.id == "service_unavailable" else playbook.title
+    if playbook.id == "service_unavailable":
+        title = f"Недоступен сервис {service}"
+    elif playbook.id == "unknown" and service != playbook.service:
+        title = f"Проблема: {service} (готового сценария нет)"
+    else:
+        title = playbook.title
     extra = [s for s in symptoms if s.lower() not in title.lower()]
     return f"{title}: {', '.join(extra)}" if extra else title
 
