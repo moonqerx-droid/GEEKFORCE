@@ -112,6 +112,11 @@ class LLMClient:
         """Avoid a second synchronous Ollama call when handing off a ticket."""
         return self._settings.provider != "ollama"
 
+    @property
+    def prefers_deterministic_playbooks(self) -> bool:
+        """Local models are reserved for company-document answers, not UI polish."""
+        return self._settings.provider == "ollama"
+
     def chat_json(self, system: str, user: str) -> dict[str, Any]:
         messages = [
             {"role": "system", "content": system},

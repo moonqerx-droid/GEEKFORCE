@@ -113,6 +113,16 @@ class TriageEngine:
             return decision
         if self.llm is None or not self.llm.supports_response_rendering:
             return decision
+        if self.llm.prefers_deterministic_playbooks:
+            query = context.original_request or _first_user_message(context)
+            matches = self.retriever.search(query, decision.playbook_id or context.playbook_id)
+            route = self.answer_policy.route(
+                query,
+                matches,
+                decision.playbook_id or context.playbook_id,
+            )
+            if route != AnswerRoute.COMPANY:
+                return decision
         return self._render_decision(decision, context)
 
     def _decide_rules(self, context: ConversationContext) -> Decision:

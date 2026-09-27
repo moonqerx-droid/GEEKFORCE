@@ -10,6 +10,8 @@ import pytest
 from helpflow_ai import (
     ConversationContext,
     DecisionAction,
+    KnowledgeBase,
+    KnowledgeChunk,
     KnowledgeRetriever,
     LLMClient,
     LLMSettings,
@@ -207,7 +209,7 @@ def test_ollama_uses_native_chat_with_thinking_disabled():
     assert client._http.timeout.read == 20
 
 
-def test_ollama_uses_grounded_response_path_without_analysis_call(kb):
+def test_ollama_does_not_rewrite_an_approved_playbook_step(kb):
     calls: list = []
     source_id = KnowledgeRetriever(kb.chunks).search(
         "Не работает VPN", "vpn_connection"
@@ -244,8 +246,60 @@ def test_ollama_uses_grounded_response_path_without_analysis_call(kb):
     ))
 
     assert analysis.source == "rules"
+    assert decision.message_source == "rules"
+    assert decision.source_ids == []
+    assert calls == []
+
+
+def test_ollama_answers_once_when_company_document_is_relevant(kb):
+    calls: list = []
+    document = KnowledgeChunk(
+        id="document:leave-policy:0",
+        service="HR",
+        title="Правила отпуска",
+        text="Ежегодный отпуск составляет 28 календарных дней.",
+        keywords=["отпуск", "дни отпуска"],
+        escalation_team="HR",
+    )
+    knowledge = KnowledgeBase(kb.playbooks, [*kb.chunks, document])
+    answer = "По документу компании ежегодный отпуск составляет 28 календарных дней."
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        calls.append(json.loads(request.content))
+        return httpx.Response(200, json={
+            "message": {"content": json.dumps({
+                "answer": answer,
+                "claims": [{
+                    "text": answer,
+                    "source_id": document.id,
+                    "quote": document.text,
+                }],
+                "source_ids": [document.id],
+                "confidence": 0.94,
+                "needs_operator": False,
+                "reason": "Ответ подтверждён документом компании",
+            }, ensure_ascii=False)},
+        })
+
+    client = LLMClient(
+        LLMSettings(
+            provider="ollama",
+            api_key="ollama",
+            base_url="http://ollama.test:11434",
+            model="qwen3.5:9b",
+            timeout=20,
+        ),
+        transport=httpx.MockTransport(handler),
+    )
+
+    decision = TriageEngine(knowledge, client).decide(ConversationContext(
+        original_request="Сколько дней отпуска положено?",
+        playbook_id="unknown",
+    ))
+
+    assert decision.message == answer
     assert decision.message_source == "llm"
-    assert decision.source_ids == [source_id]
+    assert decision.source_ids == [document.id]
     assert len(calls) == 1
 
 
