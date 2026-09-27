@@ -50,6 +50,12 @@ class Question(BaseModel):
     options: dict[str, list[str]] = Field(default_factory=dict)
     # For YES_NO: store the opposite answer (question is phrased positively).
     invert: bool = False
+    # Asked only when one of these symptoms was described (empty = always).
+    when_symptoms: list[str] = Field(default_factory=list)
+    # Skipped when one of these symptoms was described.
+    unless_symptoms: list[str] = Field(default_factory=list)
+    # Asked only while no symptom of the playbook is known: "what exactly is wrong?"
+    only_without_symptoms: bool = False
 
 
 class Step(BaseModel):
@@ -64,7 +70,13 @@ class Step(BaseModel):
     when: dict[str, list[str]] = Field(default_factory=dict)
     # Step is skipped when any listed fact has one of the given values.
     unless: dict[str, list[str]] = Field(default_factory=dict)
+    # Same as when/unless, but over symptoms described by the user.
+    when_symptoms: list[str] = Field(default_factory=list)
+    unless_symptoms: list[str] = Field(default_factory=list)
     requires_admin: bool = False
+    # Quick way around the problem (phone, web version). Offered first when urgent;
+    # "helped" does not close the problem, the diagnosis continues.
+    workaround: bool = False
 
 
 class Playbook(BaseModel):
@@ -82,6 +94,10 @@ class Playbook(BaseModel):
     # Shown to the user together with the escalation message.
     safety_notice: str | None = None
     escalate_immediately: bool = False
+    # Hand off once questions are answered, if one of these symptoms was described.
+    escalate_on_symptoms: list[str] = Field(default_factory=list)
+    # Shown to the user before the standard hand-off text; {fact} placeholders allowed.
+    escalation_note: str | None = None
     escalation_team: str = "Service Desk L2"
     default_urgency: Urgency = Urgency.MEDIUM
 
@@ -119,6 +135,20 @@ class GroundedAnswer(BaseModel):
     reason: str = Field(min_length=1, max_length=300)
 
 
+class DetectedIssue(BaseModel):
+    """One of several problems found in a single request."""
+
+    playbook_id: str
+    title: str
+    service: str
+    symptoms: list[str] = Field(default_factory=list)
+    # The part of the user's text this problem was found in, as written.
+    evidence: str = ""
+    # For the escalation card: pending = not handled yet, in_progress = being solved,
+    # resolved = a step helped or the user said it went away.
+    status: Literal["pending", "in_progress", "resolved"] = "pending"
+
+
 class Analysis(BaseModel):
     """Structured understanding of the user's request."""
 
@@ -134,6 +164,8 @@ class Analysis(BaseModel):
     recommended_playbook: str
     should_escalate: bool = False
     source: str = "rules"
+    # Other problems from the same message, in the order they will be handled.
+    additional_issues: list[DetectedIssue] = Field(default_factory=list)
 
     @field_validator("summary", "service", "recommended_playbook")
     @classmethod
@@ -178,6 +210,9 @@ class Decision(BaseModel):
     source_ids: list[str] = Field(default_factory=list)
     fallback_reason: str | None = None
     llm_latency_ms: int | None = Field(default=None, ge=0)
+    # Playbook of the problem this decision is about (differs from the dialogue's
+    # playbook_id once the next of several problems is being handled).
+    playbook_id: str | None = None
 
 
 class EscalationCard(BaseModel):
@@ -196,3 +231,5 @@ class EscalationCard(BaseModel):
     recommended_team: str
     ai_summary: str
     source: str = "rules"
+    # Every problem from the request with its status; the first one is the main one.
+    issues: list[DetectedIssue] = Field(default_factory=list)

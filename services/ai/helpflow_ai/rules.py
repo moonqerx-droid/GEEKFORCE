@@ -11,6 +11,10 @@ URGENCY_ORDER = [Urgency.LOW, Urgency.MEDIUM, Urgency.HIGH, Urgency.CRITICAL]
 MAX_FREE_TEXT_FACT = 300
 # Playbooks that must win whenever they match: safety before convenience.
 PRIORITY_PLAYBOOKS = ("security_incident", "mass_incident")
+# When several problems are reported, these go first: the rest often depends on them.
+ROOT_CAUSE_PLAYBOOKS = ("network_wifi", "vpn_connection")
+# Handled first among the rest when time is short: a call cannot wait.
+TIME_CRITICAL_PLAYBOOKS = ("video_calls",)
 # Playbooks whose service name is refined from the text (e.g. CRM vs "рабочая система").
 GENERIC_SERVICE_PLAYBOOKS = {
     "service_unavailable", "mass_incident", "access_rights", "unknown", "crm_login_device_specific",
@@ -27,6 +31,23 @@ SERVICE_ALIASES: dict[str, list[str]] = {
     "Zoom": ["zoom", "зум"],
     "Teams": ["teams", "тимс"],
     "Сеть": ["wi-fi", "wifi", "вай-фай", "вайфай", "интернет"],
+}
+
+# Things a user can name when no playbook fits. Generic words like "компьютер"
+# are left out on purpose: "беда с компом" is still an ambiguous request.
+DEVICE_ALIASES: dict[str, list[str]] = {
+    "Мышь": ["мыш"],
+    "Клавиатура": ["клавиатур", "клава", "клаву", "клавой"],
+    "Монитор": ["монитор"],
+    "Принтер": ["принтер", "мфу"],
+    "Сканер": ["сканер"],
+    "Проектор": ["проектор"],
+    "Док-станция": ["док-станц", "докстанц"],
+    "Веб-камера": ["веб-камер", "вебк"],
+    "Excel": ["excel", "эксель", "ексель"],
+    "Word": ["word", "ворд"],
+    "Браузер": ["браузер", "chrome", "хром"],
+    "Телефония": ["ip-телефон", "sip"],
 }
 
 # stem -> noun used in the urgency reason
@@ -121,6 +142,85 @@ def classify(text: str, playbooks: list[Playbook]) -> Classification:
     return Classification(best_id, round(confidence, 2))
 
 
+# --- several problems in one message ----------------------------------------
+
+_CLAUSE_SPLIT_RE = re.compile(r"[.,;:!?\n]+")
+_CONJUNCTION_SPLIT_RE = re.compile(
+    r"\s+(?:а\s+(?:еще|ещё|также|вдобавок)|и\s+(?:еще|ещё)|(?:еще|ещё)\s+и|да\s+и|плюс|также|а|и|но)\s+",
+    re.IGNORECASE,
+)
+_FAILURE_RE = re.compile(
+    r"(?<!\w)(?:не|нет|ни)(?!\w)|отвал|пропа|ошибк|слома|глюч|тормоз|лага|вылета|завис|упал|"
+    r"лежит|прерыва|разрыва|без доступа|замят|зажев|сбо[ий]"
+)
+
+
+# "ошибка 403", "пишет «Сессия истекла»": details of a neighbouring problem, not a problem.
+_DETAIL_RE = re.compile(r"^(?:пишет|выда[её]т|показывает|ошибка|error|код|сообщение)(?!\w)|^[«\"“\d]")
+
+
+def split_clauses(text: str) -> list[tuple[str, bool]]:
+    """Split a message into clauses; the flag says whether the clause reports a failure.
+
+    "Не работает почта и интернет": the bare "интернет" inherits the failure.
+    "Почта и интернет не работают": a single noun before the conjunction shares it too.
+    Error texts and codes never count as a failure on their own.
+    """
+    clauses: list[tuple[str, bool]] = []
+    for segment in _CLAUSE_SPLIT_RE.split(text):
+        parts: list[list] = []  # [text, failing, is_detail]
+        for part in _CONJUNCTION_SPLIT_RE.split(f" {segment} "):
+            part = part.strip()
+            if not part:
+                continue
+            detail = bool(_DETAIL_RE.search(normalize(part)))
+            failing = not detail and bool(_FAILURE_RE.search(normalize(part)))
+            if parts and not detail and not failing and parts[-1][1] and len(part.split()) <= 3:
+                failing = True
+            parts.append([part, failing, detail])
+        for current, following in zip(parts, parts[1:]):
+            if not current[1] and not current[2] and following[1] and len(current[0].split()) == 1:
+                current[1] = True
+        clauses += [(part, failing) for part, failing, _ in parts]
+    return clauses
+
+
+def plan_issues(text: str, playbooks: list[Playbook], best_id: str,
+                urgent: bool = False) -> list[tuple[str, str]]:
+    """Problems found in the text as (playbook_id, evidence), in the order to handle them.
+
+    A clause mentioning the best playbook belongs to it ("Outlook просит пароль" is one
+    mail problem). Any other clause becomes a separate problem only if it reports a failure,
+    so "VPN подключен" stays a fact.
+    """
+    candidates = [pb for pb in playbooks if pb.id not in ("unknown", *PRIORITY_PLAYBOOKS)]
+    found: dict[str, str] = {}
+    best_fails = False
+    for clause, failing in split_clauses(text):
+        norm = normalize(clause)
+        scores = {pb.id: score_playbook(norm, pb) for pb in candidates}
+        if scores.get(best_id, 0) > 0:
+            owner = best_id
+            best_fails = best_fails or failing
+        elif failing and scores and max(scores.values()) > 0:
+            owner = max(scores, key=scores.get)
+        else:
+            continue
+        found.setdefault(owner, clause)
+    if not best_fails and len(found) > (1 if best_id in found else 0):
+        # The best match rests on details only («ошибка 403» next to "CRM не работает"):
+        # the text describes one problem, not several.
+        return [(best_id, "")]
+    found.setdefault(best_id, "")
+    # First the root cause, then a call that cannot wait; otherwise the best match.
+    # The rest follows in the order the user wrote it.
+    first = [pid for pid in ROOT_CAUSE_PLAYBOOKS if pid in found]
+    if urgent:
+        first += [pid for pid in TIME_CRITICAL_PLAYBOOKS if pid in found]
+    order = [*(first or [best_id]), *found]
+    return [(pid, found[pid]) for pid in dict.fromkeys(order)]
+
+
 def detect_service(text: str, playbook: Playbook) -> str:
     if playbook.id not in GENERIC_SERVICE_PLAYBOOKS:
         return playbook.service
@@ -129,6 +229,15 @@ def detect_service(text: str, playbook: Playbook) -> str:
         if any(contains(norm, alias) for alias in aliases):
             return service
     return playbook.service
+
+
+def detect_subject(text: str) -> str | None:
+    """What the user is talking about, when it is named explicitly."""
+    norm = normalize(text)
+    for subject, aliases in {**SERVICE_ALIASES, **DEVICE_ALIASES}.items():
+        if any(contains(norm, alias) for alias in aliases):
+            return subject
+    return None
 
 
 def detect_symptoms(text: str, playbook: Playbook) -> list[str]:
@@ -209,8 +318,18 @@ _FACT_PATTERNS: list[tuple[str, str, str]] = [
     ("password_changed_recently", "yes", r"\w*мен\w*л\w* пароль"),
     ("device", "laptop", r"ноут"),
     ("device", "desktop", r"(с|на) (компьютер|пк|компе)"),
+    ("had_access_before", "yes",
+     r"(пропал|исчез|отобрали|слетел)\w* доступ|доступ\w* (пропал|исчез|слетел)|был доступ|больше нет доступа"),
+    ("had_access_before", "no",
+     r"(нуж\w*|дайте|дать|выда\w*|откро\w*|открыть|предостав\w*) доступ|нов\w* сотрудник"),
 ]
 
+# "доступ к папке бухгалтерии на общем диске" -> "папке бухгалтерии на общем диске"
+_RESOURCE_RE = re.compile(
+    r"доступ\w*\s+(?:к|ко|в|во|на)\s+(.+?)"
+    r"(?=\s*[,.!?;:(]|\s+(?:пишет|выдает|выдаёт|горит|срочно|пожалуйста|плиз|пж)\b|$)",
+    re.IGNORECASE,
+)
 _ERROR_CODE_RE = re.compile(r"(?<!\d)([45]\d\d)(?!\d)")
 _QUOTED_RE = re.compile(r"[«\"“]([^»\"”]{3,200})[»\"”]")
 _ERROR_PHRASE_RE = re.compile(
@@ -229,6 +348,9 @@ def extract_facts(text: str) -> dict[str, str]:
     error_text = extract_error_text(text)
     if error_text:
         facts["error_text"] = error_text
+    resource = _RESOURCE_RE.search(text)
+    if resource:
+        facts["resource"] = resource.group(1).strip()[:MAX_FREE_TEXT_FACT]
     return facts
 
 

@@ -29,6 +29,10 @@ def test_triage_case(case, engine, simulate):
         assert value.lower() in result.known_facts.get(fact, "").lower(), (fact, result.known_facts)
     for fact in expect.get("not_missing", []):
         assert fact not in result.missing_facts, "must not ask what the user already said"
+    if "additional_issues" in expect:
+        assert [i.playbook_id for i in result.additional_issues] == expect["additional_issues"]
+    elif "questions_before_step" in expect:
+        assert result.additional_issues == [], "one problem must not be split"
     if "should_escalate" in expect:
         assert result.should_escalate is expect["should_escalate"]
     if "questions_before_step" in expect:

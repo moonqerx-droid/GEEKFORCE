@@ -101,3 +101,47 @@ cases:
     expect:
       playbook: network_wifi
       facts: {location: office}
+
+  - name: несколько симптомов — интернет, почта и звонок
+    message: Outlook не синхронизируется, а ещё в Zoom нет звука и интернет постоянно отваливается
+    expect:
+      playbook: network_wifi
+      symptoms: [частые разрывы]
+      additional_issues: [email_outlook, video_calls]
+
+  - name: срочно — не запускается Teams
+    message: Через 5 минут звонок с клиентом, не запускается Teams, горит!
+    expect:
+      playbook: video_calls
+      urgency: high
+      symptoms: [приложение не запускается]
+      facts: {call_app: teams}
+      questions_before_step: 0
+
+  - name: нерешаемое самостоятельно — новый доступ
+    message: Нужен доступ к папке бухгалтерии на общем диске
+    expect:
+      playbook: access_rights
+      symptoms: [нужен новый доступ]
+      facts: {resource: папке бухгалтерии на общем диске, had_access_before: "no"}
+      not_missing: [resource]
+      questions_before_step: 0
+      action_after_questions: escalate
+
+  - name: принтер — замятие бумаги
+    message: Принтер не печатает, пишет замятие бумаги
+    expect:
+      playbook: printer
+      service: Принтер
+      symptoms: [замятие бумаги]
+      facts: {error_text: замятие бумаги}
+      questions_before_step: 0
+
+  - name: устройство без сценария — сразу специалисту
+    message: Мышка перестала работать
+    expect:
+      playbook: unknown
+      service: Мышь
+      facts: {service_name: Мышь}
+      questions_before_step: 0
+      action_after_questions: escalate
