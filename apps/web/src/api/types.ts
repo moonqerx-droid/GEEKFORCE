@@ -118,3 +118,7 @@ export interface RegistrationPayload {
   password_confirmation: string;
   accepted_terms: boolean;
 }
+
+export type OperatorRegistrationPayload = Omit<RegistrationPayload, "accepted_terms"> & {
+  invite_token: string;
+};

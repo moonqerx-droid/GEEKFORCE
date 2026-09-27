@@ -34,3 +34,19 @@ def test_forgot_password_is_neutral_for_unknown_email(client):
     response = client.post("/api/auth/forgot-password", json={"email": "missing@example.ru"})
     assert response.status_code == 202
     assert response.json()["code"] == "password_reset_requested"
+
+
+def test_auth_mutation_rejects_untrusted_origin(client):
+    response = client.post(
+        "/api/auth/forgot-password",
+        json={"email": "origin@example.ru"},
+        headers={"Origin": "https://evil.example"},
+    )
+    assert response.status_code == 403
+
+
+def test_login_is_rate_limited(client):
+    payload = {"email": "rate-limit@example.ru", "password": "WrongPassword7"}
+    for _ in range(5):
+        assert client.post("/api/auth/login", json=payload).status_code == 401
+    assert client.post("/api/auth/login", json=payload).status_code == 429
