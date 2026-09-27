@@ -8,6 +8,7 @@ import { AuthProvider } from "./AuthProvider";
 import { LoginPage } from "./LoginPage";
 import { RegisterPage } from "./RegisterPage";
 import { OperatorRegisterPage } from "./OperatorRegisterPage";
+import { VerifyEmailPage } from "./VerifyEmailPage";
 
 function renderPage(page: React.ReactNode) {
   server.use(http.get("*/api/auth/me", () => HttpResponse.json({}, { status: 401 })));
@@ -50,5 +51,20 @@ describe("auth pages", () => {
     await userEvent.type(screen.getByLabelText("Повторите пароль"), "StrongPass7");
     await userEvent.click(screen.getByRole("button", { name: "Создать аккаунт специалиста" }));
     expect(await screen.findByText(/проверьте письмо/i)).toBeInTheDocument();
+  });
+
+  it("verifies an email with a six digit code", async () => {
+    let body: unknown;
+    server.use(http.post("*/api/auth/verify-email", async ({ request }) => {
+      body = await request.json();
+      return new HttpResponse(null, { status: 204 });
+    }));
+    render(<MemoryRouter initialEntries={["/verify-email?email=user@example.ru"]}>
+      <VerifyEmailPage />
+    </MemoryRouter>);
+    await userEvent.type(screen.getByLabelText("Код из письма"), "123456");
+    await userEvent.click(screen.getByRole("button", { name: "Подтвердить email" }));
+    expect(await screen.findByText(/email подтверждён/i)).toBeInTheDocument();
+    expect(body).toEqual({ email: "user@example.ru", code: "123456" });
   });
 });

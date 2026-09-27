@@ -1,4 +1,4 @@
-from urllib.parse import parse_qs, urlparse
+import re
 
 import pytest
 
@@ -15,8 +15,8 @@ def payload():
     )
 
 
-def token_from(sender: MemoryEmailSender) -> str:
-    return parse_qs(urlparse(sender.messages[-1].action_url).query)["token"][0]
+def code_from(sender: MemoryEmailSender) -> str:
+    return re.search(r"\b\d{6}\b", sender.messages[-1].text).group(0)
 
 
 def test_registration_sends_verification_and_token_is_single_use(db_session):
@@ -24,12 +24,14 @@ def test_registration_sends_verification_and_token_is_single_use(db_session):
     service = AuthService(AuthRepository(db_session), sender, "http://localhost:5173")
 
     user = service.register_employee(payload())
-    token = token_from(sender)
-    service.verify_email(token)
+    code = code_from(sender)
+    service.verify_email(payload().email, code)
 
     assert user.email_verified_at is not None
     with pytest.raises(InvalidOrExpiredToken):
-        service.verify_email(token)
+        service.verify_email(payload().email, code)
+
+    assert "15 минут" in sender.messages[-1].text
 
 
 def test_registration_survives_delivery_failure(db_session):

@@ -1,5 +1,6 @@
 from datetime import timedelta
 from html import escape
+import secrets
 from urllib.parse import quote
 
 from sqlalchemy.exc import IntegrityError
@@ -80,8 +81,8 @@ class AuthService:
 
     def _send_action(self, user: User, purpose: str) -> None:
         self.repository.invalidate_email_tokens(user.id, purpose)
-        raw_token = new_token()
-        lifetime = timedelta(hours=24 if purpose == "verify_email" else 1)
+        raw_token = f"{secrets.randbelow(1_000_000):06d}" if purpose == "verify_email" else new_token()
+        lifetime = timedelta(minutes=15) if purpose == "verify_email" else timedelta(hours=1)
         token = EmailToken(
             user_id=user.id,
             purpose=purpose,
@@ -89,20 +90,24 @@ class AuthService:
             expires_at=utc_now() + lifetime,
         )
         self.repository.add_email_token(token)
-        page = "verify-email" if purpose == "verify_email" else "reset-password"
-        action_url = f"{self.app_public_url}/{page}?token={quote(raw_token)}"
         safe_name = escape(user.first_name)
         if purpose == "verify_email":
-            subject = "Подтвердите email в HelpFlow"
-            intro = "Подтвердите адрес, чтобы начать работу с HelpFlow. Ссылка действует 24 часа."
+            subject = f"Код подтверждения HelpFlow: {raw_token}"
+            intro = "Введите этот код в HelpFlow. Код действует 15 минут и используется один раз."
+            action_url = f"{self.app_public_url}/verify-email?email={quote(user.email)}"
+            text = f"Здравствуйте, {user.first_name}!\n\n{intro}\n\nКод: {raw_token}"
+            html = f"<p>Здравствуйте, {safe_name}!</p><p>{escape(intro)}</p><p style=\"font-size:28px;font-weight:700;letter-spacing:6px\">{raw_token}</p>"
         else:
             subject = "Восстановление пароля HelpFlow"
             intro = "Используйте ссылку для смены пароля. Она действует 1 час."
+            action_url = f"{self.app_public_url}/reset-password?token={quote(raw_token)}"
+            text = f"Здравствуйте, {user.first_name}!\n\n{intro}\n\n{action_url}"
+            html = f"<p>Здравствуйте, {safe_name}!</p><p>{escape(intro)}</p><p><a href=\"{escape(action_url)}\">Продолжить</a></p>"
         self.email_sender.send(EmailPayload(
             recipient=user.email,
             subject=subject,
-            text=f"Здравствуйте, {user.first_name}!\n\n{intro}\n\n{action_url}",
-            html=f"<p>Здравствуйте, {safe_name}!</p><p>{escape(intro)}</p><p><a href=\"{escape(action_url)}\">Продолжить</a></p>",
+            text=text,
+            html=html,
             action_url=action_url,
         ))
 
@@ -111,8 +116,13 @@ class AuthService:
         if user and user.email_verified_at is None:
             self._send_action(user, "verify_email")
 
-    def verify_email(self, raw_token: str) -> User:
-        token = self.repository.consume_email_token(hash_token(raw_token), "verify_email")
+    def verify_email(self, email: str, raw_token: str) -> User:
+        candidate = self.repository.get_user_by_email(email)
+        if candidate is None:
+            raise InvalidOrExpiredToken()
+        token = self.repository.consume_email_token(
+            hash_token(raw_token), "verify_email", user_id=candidate.id,
+        )
         if token is None:
             raise InvalidOrExpiredToken()
         user = self.repository.get_user(token.user_id)

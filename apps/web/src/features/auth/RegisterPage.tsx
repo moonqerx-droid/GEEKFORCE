@@ -1,6 +1,6 @@
 import { useState } from "react";
-import { Link } from "react-router-dom";
-import { api } from "../../api/client";
+import { Link, useNavigate } from "react-router-dom";
+import { api, ConflictError } from "../../api/client";
 import type { RegistrationPayload } from "../../api/types";
 import { AuthLayout } from "./AuthLayout";
 import { Field } from "./Field";
@@ -9,6 +9,7 @@ import { validateRegistration, type RegistrationErrors } from "./validation";
 const initial: RegistrationPayload = { first_name: "", last_name: "", email: "", department: "", password: "", password_confirmation: "", accepted_terms: false };
 
 export function RegisterPage() {
+  const navigate = useNavigate();
   const [value, setValue] = useState(initial);
   const [errors, setErrors] = useState<RegistrationErrors>({});
   const [message, setMessage] = useState("");
@@ -19,8 +20,18 @@ export function RegisterPage() {
       event.preventDefault(); const nextErrors = validateRegistration(value); setErrors(nextErrors);
       if (Object.keys(nextErrors).length) return;
       setBusy(true); setMessage("");
-      try { await api.register(value); setMessage("Аккаунт создан. Проверьте письмо и подтвердите email."); }
-      catch { setMessage("Не удалось завершить регистрацию. Проверьте данные или повторите позже."); }
+      try {
+        await api.register(value);
+        setMessage("Аккаунт создан. Код подтверждения отправлен на email.");
+        navigate(`/verify-email?email=${encodeURIComponent(value.email)}`);
+      }
+      catch (error) {
+        if (error instanceof ConflictError) {
+          navigate(`/verify-email?email=${encodeURIComponent(value.email)}`);
+        } else {
+          setMessage("Не удалось завершить регистрацию. Проверьте данные или повторите позже.");
+        }
+      }
       finally { setBusy(false); }
     }}>
       {message ? <div className="auth-message" role="status">{message}</div> : null}

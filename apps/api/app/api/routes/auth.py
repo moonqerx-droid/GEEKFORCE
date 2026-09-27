@@ -10,7 +10,7 @@ from app.db.session import get_db
 from app.repositories.auth import AuthRepository
 from app.schemas.auth import (
     CurrentUser, EmployeeRegister, ForgotPasswordRequest, LoginRequest, OperatorRegister,
-    ResetPasswordRequest, TokenRequest,
+    ResetPasswordRequest, TokenRequest, VerifyEmailRequest,
 )
 from app.services.auth import (
     AuthService, DuplicateEmail, EmailDeliveryFailed, EmailNotVerified, InvalidCredentials,
@@ -122,11 +122,11 @@ def me(user: CurrentUserDependency):
 
 
 @router.post("/verify-email", status_code=status.HTTP_204_NO_CONTENT)
-def verify_email(payload: TokenRequest, service: AuthServiceDependency):
+def verify_email(payload: VerifyEmailRequest, service: AuthServiceDependency):
     try:
-        service.verify_email(payload.token)
+        service.verify_email(payload.email, payload.code)
     except InvalidOrExpiredToken as exc:
-        raise error(400, "invalid_or_expired_token", "Ссылка недействительна или истекла") from exc
+        raise error(400, "invalid_or_expired_code", "Код недействителен или истёк") from exc
 
 
 @router.post("/resend-verification", status_code=status.HTTP_202_ACCEPTED)

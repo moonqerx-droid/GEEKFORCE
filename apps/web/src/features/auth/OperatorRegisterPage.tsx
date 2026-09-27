@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useSearchParams } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { api } from "../../api/client";
 import type { Department, RegistrationPayload } from "../../api/types";
 import { AuthLayout } from "./AuthLayout";
@@ -19,6 +19,7 @@ const initial: OperatorForm = {
 
 export function OperatorRegisterPage() {
   const [searchParams] = useSearchParams();
+  const navigate = useNavigate();
   const inviteToken = searchParams.get("invite") ?? "";
   const [value, setValue] = useState(initial);
   const [errors, setErrors] = useState<RegistrationErrors>({});
@@ -40,7 +41,8 @@ export function OperatorRegisterPage() {
       setMessage("");
       try {
         await api.registerOperator({ ...value, invite_token: inviteToken });
-        setMessage("Аккаунт специалиста создан. Проверьте письмо и подтвердите email.");
+        setMessage("Аккаунт специалиста создан. Проверьте письмо: мы отправили код подтверждения.");
+        navigate(`/verify-email?email=${encodeURIComponent(value.email)}`);
       } catch {
         setMessage("Не удалось завершить регистрацию. Проверьте приглашение и введённые данные.");
       } finally {

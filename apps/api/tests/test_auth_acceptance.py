@@ -1,4 +1,4 @@
-from urllib.parse import parse_qs, urlparse
+import re
 
 from app.api.routes.auth import get_email_sender
 from app.main import app
@@ -14,8 +14,10 @@ def test_employee_authentication_acceptance_flow(client):
         "accepted_terms": True,
     }
     assert client.post("/api/auth/register", json=registration).status_code == 201
-    token = parse_qs(urlparse(outbox.messages[-1].action_url).query)["token"][0]
-    assert client.post("/api/auth/verify-email", json={"token": token}).status_code == 204
+    code = re.search(r"\b\d{6}\b", outbox.messages[-1].text).group(0)
+    assert client.post("/api/auth/verify-email", json={
+        "email": "anna@example.ru", "code": code,
+    }).status_code == 204
     assert client.post("/api/auth/login", json={
         "email": "anna@example.ru", "password": "StrongPass7", "remember_me": False,
     }).status_code == 200

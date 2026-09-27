@@ -162,8 +162,8 @@ export const api = {
     return request("/api/auth/operator/register", { method: "POST", body: JSON.stringify(payload) }, signal);
   },
 
-  verifyEmail(token: string, signal?: AbortSignal): Promise<void> {
-    return request("/api/auth/verify-email", { method: "POST", body: JSON.stringify({ token }) }, signal);
+  verifyEmail(email: string, code: string, signal?: AbortSignal): Promise<void> {
+    return request("/api/auth/verify-email", { method: "POST", body: JSON.stringify({ email, code }) }, signal);
   },
 
   resendVerification(email: string, signal?: AbortSignal): Promise<{ code: string }> {

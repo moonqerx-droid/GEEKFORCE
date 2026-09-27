@@ -36,6 +36,14 @@ def test_forgot_password_is_neutral_for_unknown_email(client):
     assert response.json()["code"] == "password_reset_requested"
 
 
+def test_verify_email_accepts_email_and_six_digit_code(client):
+    response = client.post("/api/auth/verify-email", json={
+        "email": "employee@example.ru", "code": "123456",
+    })
+    assert response.status_code == 400
+    assert response.json()["detail"]["code"] == "invalid_or_expired_code"
+
+
 def test_auth_mutation_rejects_untrusted_origin(client):
     response = client.post(
         "/api/auth/forgot-password",
