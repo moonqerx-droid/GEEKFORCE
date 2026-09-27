@@ -4,11 +4,18 @@ import type {
   Incident,
   MessageCreatePayload,
   OperatorTicket,
+  AdminUser,
+  AdminUserUpdate,
   AuthUser,
-  InviteResult,
+  ChangePasswordPayload,
+  NewOperatorPayload,
+  PersonalMetrics,
+  Profile,
+  ProfileUpdate,
+  SpecialistMetrics,
+  TemporaryCredential,
   LoginPayload,
   Metrics,
-  TeamMember,
   TicketScope,
   OperatorRegistrationPayload,
   RegistrationPayload,
@@ -167,17 +174,44 @@ export const api = {
     return request(`/api/admin/metrics?days=${days}`, {}, signal);
   },
 
-  listTeam(signal?: AbortSignal): Promise<TeamMember[]> {
-    return request("/api/admin/operators", {}, signal);
+  listUsers(signal?: AbortSignal): Promise<AdminUser[]> {
+    return request("/api/admin/users", {}, signal);
   },
 
-  inviteOperator(payload: { email: string; first_name: string; last_name: string }): Promise<InviteResult> {
-    return request("/api/admin/operators/invite", { method: "POST", body: JSON.stringify(payload) });
+  createOperator(payload: NewOperatorPayload): Promise<TemporaryCredential> {
+    return request("/api/admin/users/operators", { method: "POST", body: JSON.stringify(payload) });
   },
 
-  setMemberActive(id: string, is_active: boolean): Promise<TeamMember> {
-    return request(`/api/admin/operators/${id}`, { method: "PATCH", body: JSON.stringify({ is_active }) });
+  updateUser(id: string, payload: AdminUserUpdate): Promise<AdminUser> {
+    return request(`/api/admin/users/${id}`, { method: "PATCH", body: JSON.stringify(payload) });
   },
+
+  resetUserPassword(id: string): Promise<TemporaryCredential> {
+    return request(`/api/admin/users/${id}/reset-password`, { method: "POST" });
+  },
+
+  userMetrics(id: string, days: number, signal?: AbortSignal): Promise<SpecialistMetrics> {
+    return request(`/api/admin/users/${id}/metrics?days=${days}`, {}, signal);
+  },
+
+  profile(signal?: AbortSignal): Promise<Profile> {
+    return request("/api/profile", {}, signal);
+  },
+
+  updateProfile(payload: ProfileUpdate): Promise<Profile> {
+    return request("/api/profile", { method: "PATCH", body: JSON.stringify(payload) });
+  },
+
+  profileMetrics(days: number, signal?: AbortSignal): Promise<PersonalMetrics> {
+    return request(`/api/profile/metrics?days=${days}`, {}, signal);
+  },
+
+  changePassword(payload: ChangePasswordPayload): Promise<void> {
+    return request("/api/auth/change-password", { method: "POST", body: JSON.stringify(payload) });
+  },
+
+
+
 
   /**
    * Incident Radar backend is still being designed (see PROJECT_PLAN.md).

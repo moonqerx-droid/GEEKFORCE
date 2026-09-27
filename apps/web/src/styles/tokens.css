@@ -17,6 +17,10 @@
   --coral-wash: #fde9e0;
   --sea: #1f4a5a;
   --sea-wash: #e3eef0;
+  /* Account and admin actions: calm, trustworthy, distinct from the assistant's coral. */
+  --blue: #315efb;
+  --blue-deep: #2146d6;
+  --blue-wash: #eaf0ff;
 
   --color-bg: var(--paper);
   --color-surface: #ffffff;

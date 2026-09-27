@@ -14,13 +14,13 @@ describe("role-specific header", () => {
     render(<MemoryRouter><Header role="operator" name="Иван Петров" onLogout={() => undefined} /></MemoryRouter>);
     expect(screen.getByRole("link", { name: "Обращения" })).toBeInTheDocument();
     expect(screen.queryByRole("link", { name: "Мои обращения" })).not.toBeInTheDocument();
-    expect(screen.queryByRole("link", { name: "Команда" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "Пользователи" })).not.toBeInTheDocument();
   });
 
   it("gives the support lead the overview, the queue and the team", () => {
     render(<MemoryRouter><Header role="admin" name="Мария Иванова" onLogout={() => undefined} /></MemoryRouter>);
     expect(screen.getByRole("link", { name: "Обзор" })).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Обращения" })).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "Команда" })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Пользователи" })).toBeInTheDocument();
   });
 });

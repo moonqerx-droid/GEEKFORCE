@@ -18,7 +18,7 @@ export function Badge({ tone = "neutral", children }: { tone?: Tone; children: R
 
 export function Spinner({ label }: { label?: string }) {
   return (
-    <span className="spinner-wrap" role="status" aria-live="polite">
+    <span className="spinner-wrap" role="status" aria-live="polite" aria-label={label ?? "Загрузка…"}>
       <span className="spinner" aria-hidden="true" />
       <span>{label ?? "Загрузка…"}</span>
     </span>

@@ -1,0 +1,28 @@
+.period-switch {
+  display: inline-flex;
+  gap: 2px;
+  padding: 3px;
+  border-radius: var(--radius-pill);
+  background: var(--paper-deep);
+}
+
+.period-switch button {
+  min-height: 32px;
+  padding: 4px 14px;
+  border: 0;
+  border-radius: var(--radius-pill);
+  background: none;
+  color: var(--ink-soft);
+  font-size: var(--font-size-sm);
+  font-weight: 600;
+}
+
+.period-switch button:hover {
+  color: var(--ink);
+}
+
+.period-switch button[aria-pressed="true"] {
+  background: var(--color-surface);
+  color: var(--ink);
+  box-shadow: var(--shadow-sm);
+}

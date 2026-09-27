@@ -76,3 +76,22 @@
 .btn[aria-busy="true"] {
   cursor: progress;
 }
+
+.btn-blue {
+  background: var(--blue);
+  color: #fff;
+}
+
+.btn-blue:hover:not(:disabled) {
+  background: var(--blue-deep);
+}
+
+/* Irreversible or weighty actions (password reset): coral, never the default. */
+.btn-important {
+  background: var(--coral);
+  color: #fff;
+}
+
+.btn-important:hover:not(:disabled) {
+  background: var(--coral-deep);
+}

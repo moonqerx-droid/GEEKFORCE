@@ -98,21 +98,7 @@ export interface EscalationCard {
   ai_summary: string;
 }
 
-export interface TeamMember {
-  id: string;
-  email: string;
-  name: string;
-  role: "operator" | "admin";
-  status: "active" | "disabled" | "invited";
-  created_at: string;
-  last_login_at: string | null;
-}
 
-export interface InviteResult {
-  invite_url: string;
-  expires_at: string;
-  email_sent: boolean;
-}
 
 export interface DailyMetric {
   date: string;
@@ -191,6 +177,92 @@ export interface AuthUser {
   department: Department;
   role: UserRole;
   email_verified_at: string | null;
+  /** Set for accounts created or reset by an admin: nothing else is available until it is changed. */
+  must_change_password?: boolean;
+  revision?: number;
+}
+
+/** A row in the admin user directory (GET /api/admin/users). */
+export interface AdminUser {
+  id: string;
+  name: string;
+  email: string;
+  department: Department;
+  role: UserRole;
+  is_active: boolean;
+  status: "active" | "disabled";
+  must_change_password: boolean;
+  revision: number;
+  created_at: string;
+  last_login_at: string | null;
+}
+
+export interface NewOperatorPayload {
+  full_name: string;
+  email: string;
+  department: Department;
+}
+
+export interface AdminUserUpdate {
+  revision: number;
+  full_name?: string;
+  email?: string;
+  department?: Department;
+  role?: UserRole;
+  is_active?: boolean;
+}
+
+/** Returned once on create/reset; the password is never available again. */
+export interface TemporaryCredential {
+  user: AdminUser;
+  temporary_password: string;
+}
+
+export interface Profile {
+  id: string;
+  name: string;
+  email: string;
+  department: Department;
+  role: UserRole;
+  is_active: boolean;
+  must_change_password: boolean;
+  revision: number;
+  created_at: string;
+  last_login_at: string | null;
+}
+
+export interface ProfileUpdate {
+  full_name?: string;
+  department?: Department;
+}
+
+export interface ChangePasswordPayload {
+  current_password: string;
+  password: string;
+  password_confirmation: string;
+}
+
+export interface PersonalMetrics {
+  days: number;
+  resolved: number;
+  in_progress: number;
+  waiting_first_reply: number;
+  median_first_reply_minutes: number | null;
+  median_resolution_minutes: number | null;
+  average_rating: number | null;
+  ratings_count: number;
+}
+
+export interface SpecialistMetrics extends PersonalMetrics {
+  operator_id: string;
+  operator_name: string;
+  assigned: number;
+  p90_first_reply_minutes: number | null;
+  p90_resolution_minutes: number | null;
+  first_reply_sla_rate: number | null;
+  daily: { date: string; resolved: number }[];
+  topics: { name: string; count: number }[];
+  urgency: Record<string, number>;
 }
 
 export interface LoginPayload {

@@ -1,0 +1,85 @@
+.dialog-layer {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: grid;
+  place-items: center;
+  padding: var(--space-4);
+}
+
+.dialog-backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(42, 33, 27, 0.38);
+}
+
+.dialog {
+  position: relative;
+  display: grid;
+  gap: var(--space-4);
+  width: min(100%, 480px);
+  max-height: calc(100dvh - 2 * var(--space-4));
+  overflow-y: auto;
+  padding: var(--space-6);
+  border-top: 4px solid var(--blue);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+  box-shadow: var(--shadow-lift);
+}
+
+.dialog-lg {
+  width: min(100%, 560px);
+}
+
+.dialog-important {
+  border-top-color: var(--coral);
+}
+
+.dialog-title {
+  font-size: var(--font-size-lg);
+}
+
+.dialog p {
+  color: var(--ink-soft);
+}
+
+.dialog-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: var(--space-2);
+  padding-top: var(--space-2);
+}
+
+/* Side panel: the list stays visible for context, the panel scrolls on its own. */
+.dialog-layer-side {
+  place-items: stretch end;
+  padding: 0;
+}
+
+.dialog-side {
+  width: min(100%, 640px);
+  height: 100%;
+  max-height: none;
+  align-content: start;
+  padding: var(--space-6) var(--space-6) var(--space-7);
+  border-top: 0;
+  border-left: 4px solid var(--sea);
+  border-radius: 0;
+  animation: side-in 220ms var(--ease) both;
+}
+
+@keyframes side-in {
+  from { transform: translateX(24px); opacity: 0; }
+  to { transform: none; opacity: 1; }
+}
+
+@media (max-width: 520px) {
+  .dialog {
+    padding: var(--space-5);
+  }
+
+  .dialog-actions .btn {
+    flex: 1 1 100%;
+  }
+}

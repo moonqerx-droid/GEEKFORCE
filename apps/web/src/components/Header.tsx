@@ -3,7 +3,7 @@ import { Link, NavLink } from "react-router-dom";
 import { LogOut } from "lucide-react";
 import { api } from "../api/client";
 import type { UserRole } from "../api/types";
-import { homePathFor } from "../lib/labels";
+import { ROLE_LABEL, homePathFor } from "../lib/labels";
 import { Avatar } from "./primitives";
 import "./Header.css";
 
@@ -16,14 +16,8 @@ const NAV: Record<UserRole, { to: string; label: string; end?: boolean }[]> = {
   admin: [
     { to: "/admin", label: "Обзор", end: true },
     { to: "/operator", label: "Обращения" },
-    { to: "/admin/team", label: "Команда" },
+    { to: "/admin/team", label: "Пользователи" },
   ],
-};
-
-const ROLE_LABEL: Record<UserRole, string> = {
-  employee: "Сотрудник",
-  operator: "Специалист поддержки",
-  admin: "Руководитель поддержки",
 };
 
 interface HeaderProps {
@@ -65,13 +59,13 @@ export function Header({ role, name, onLogout }: HeaderProps) {
         ))}
       </nav>
       {offline ? <span className="app-header-offline" role="status">Нет связи с сервером</span> : null}
-      <div className="app-header-user">
+      <NavLink to="/profile" className={({ isActive }) => `app-header-user ${isActive ? "active" : ""}`} aria-label={`Профиль: ${name}`}>
         <Avatar kind={role === "employee" ? "employee" : "human"} name={name} size={30} />
         <span className="app-header-user-text">
           <span className="app-header-user-name">{name}</span>
           <span className="app-header-user-role">{ROLE_LABEL[role]}</span>
         </span>
-      </div>
+      </NavLink>
       <button type="button" className="app-header-logout" onClick={() => void onLogout()} aria-label="Выйти">
         <LogOut size={17} aria-hidden="true" />
       </button>

@@ -155,7 +155,7 @@ export function AdminDashboard() {
               ))}
             </tbody>
           </table>
-        ) : <p className="admin-note">В команде пока нет специалистов. <Link to="/admin/team">Пригласить</Link></p>}
+        ) : <p className="admin-note">В команде пока нет специалистов. <Link to="/admin/team">Создать специалиста</Link></p>}
       </section>
     </div>
   );

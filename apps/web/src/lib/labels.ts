@@ -1,4 +1,4 @@
-import type { ConversationStatus, Department, StepOutcome, Urgency } from "../api/types";
+import type { ConversationStatus, Department, StepOutcome, Urgency, UserRole } from "../api/types";
 
 export const URGENCY_LABEL: Record<Urgency, string> = {
   low: "Не срочно",
@@ -115,6 +115,37 @@ const FACT_VALUE: Record<string, string> = {
   salesforce: "Salesforce",
   crm: "CRM",
 };
+
+export const ROLE_LABEL: Record<UserRole, string> = {
+  employee: "Сотрудник",
+  operator: "Специалист поддержки",
+  admin: "Руководитель поддержки",
+};
+
+export const ROLE_SHORT: Record<UserRole, string> = {
+  employee: "Сотрудник",
+  operator: "Специалист",
+  admin: "Руководитель",
+};
+
+export const DEPARTMENTS = Object.keys(DEPARTMENT_LABEL) as Department[];
+
+export function formatDateLong(iso: string | null | undefined): string {
+  if (!iso) return "—";
+  try {
+    return new Date(iso).toLocaleString("ru-RU", { day: "numeric", month: "long", hour: "2-digit", minute: "2-digit" });
+  } catch {
+    return iso;
+  }
+}
+
+export function formatRating(value: number | null | undefined): string {
+  return value == null ? "—" : value.toFixed(1).replace(".", ",");
+}
+
+export function formatPercent(value: number | null | undefined): string {
+  return value == null ? "—" : `${Math.round(value * 100)}%`;
+}
 
 export function factLabel(key: string): string {
   return FACT_LABEL[key] ?? key.replaceAll("_", " ");
