@@ -7,6 +7,8 @@ on:
       - "services/ai/**"
       - "knowledge-base/**"
       - "docker-compose.yml"
+      - "scripts/smoke-p0.*"
+      - ".env.example"
       - ".github/workflows/backend.yml"
   pull_request:
     paths:
@@ -14,6 +16,8 @@ on:
       - "services/ai/**"
       - "knowledge-base/**"
       - "docker-compose.yml"
+      - "scripts/smoke-p0.*"
+      - ".env.example"
       - ".github/workflows/backend.yml"
 
 jobs:
@@ -44,7 +48,8 @@ jobs:
           cache: pip
           cache-dependency-path: apps/api/requirements.txt
       - run: pip install -r requirements.txt
-      - run: pytest -v
+      - name: Backend and P0 acceptance tests
+        run: pytest -v
       - run: PYTHONPATH=../../services/ai pytest ../../services/ai/tests -v
       - name: PostgreSQL migration and API smoke test
         env:
