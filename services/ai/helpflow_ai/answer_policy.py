@@ -51,3 +51,8 @@ class AnswerPolicy:
         if _LOW_RISK.search(query):
             return AnswerRoute.GENERAL
         return AnswerRoute.OPERATOR
+
+    @staticmethod
+    def requires_verified_source(query: str) -> bool:
+        """Whether clarification cannot make an unsourced answer safe."""
+        return bool(_SENSITIVE.search(query) or _DESTRUCTIVE.search(query))

@@ -15,6 +15,7 @@ from typing import Any
 from pydantic import ValidationError
 
 from . import prompts, rules
+from .answer_policy import AnswerPolicy, AnswerRoute
 from .evidence import EvidenceValidator
 from .knowledge import KnowledgeBase
 from .llm import LLMClient, LLMError, LLMSettings
@@ -27,6 +28,7 @@ from .schemas import (
     DecisionAction,
     EscalationCard,
     GroundedAnswer,
+    KnowledgeChunk,
     Playbook,
     Question,
     QuestionKind,
@@ -56,6 +58,7 @@ class TriageEngine:
         self.kb = knowledge
         self.llm = llm
         self.retriever = KnowledgeRetriever(knowledge.chunks)
+        self.answer_policy = AnswerPolicy()
 
     @classmethod
     def from_env(cls) -> "TriageEngine":
@@ -104,6 +107,10 @@ class TriageEngine:
     def decide(self, context: ConversationContext) -> Decision:
         """Choose the flow with rules, then optionally improve only its wording."""
         decision = self._decide_rules(context)
+        if decision.step is not None and decision.step.id.startswith("general."):
+            # These tiny, deterministic hints exist specifically to avoid a
+            # multi-second model call for reversible first-aid actions.
+            return decision
         if self.llm is None or not self.llm.supports_response_rendering:
             return decision
         return self._render_decision(decision, context)
@@ -116,6 +123,18 @@ class TriageEngine:
         index, needs_check = self._progress(plan, context)
         last = context.completed_steps[-1] if context.completed_steps else None
         after_workaround = bool(last and self._is_workaround(last.step_id))
+        if (
+            last
+            and last.step_id.startswith("general.")
+            and last.outcome == StepOutcome.HELPED
+            and not context.verification_failed
+        ):
+            return Decision(
+                action=DecisionAction.VERIFY,
+                message="Проверьте, пожалуйста: проблема решена и всё работает как нужно?",
+                reason="общая безопасная рекомендация помогла",
+                playbook_id="unknown",
+            )
         solved = bool(last and last.outcome == StepOutcome.HELPED and not context.verification_failed
                       and not after_workaround)
         if solved and index is None:
@@ -143,6 +162,21 @@ class TriageEngine:
 
     def _work_on(self, playbook: Playbook, context: ConversationContext, last, after_workaround: bool) -> Decision:
         """Next action for one problem: workaround, question, step or hand-off."""
+        if playbook.id == "unknown":
+            query = context.original_request or _first_user_message(context)
+            if last is not None and last.step_id.startswith("general."):
+                return self._escalate(playbook, "общий совет не помог")
+            matches = self.retriever.search(query, playbook.id)
+            route = self.answer_policy.route(query, matches, playbook.id)
+            if route == AnswerRoute.GENERAL:
+                return _general_guidance_decision(query)
+            if route == AnswerRoute.COMPANY:
+                return _company_knowledge_decision(matches[0].chunk)
+            if route == AnswerRoute.OPERATOR and self.answer_policy.requires_verified_source(query):
+                return self._escalate(
+                    playbook,
+                    "нет подтверждённого источника для безопасного ответа",
+                )
         if context.urgency in URGENT_LEVELS:
             workaround = next((s for s in _open_steps(playbook, context) if s.workaround), None)
             if workaround is not None:
@@ -575,6 +609,61 @@ def _step_decision(step: Step, intro: str, reason: str) -> Decision:
     text = f"{step.title}. {step.instruction}"
     return Decision(action=DecisionAction.STEP, message=f"{intro} {text}" if intro else text,
                     step=step, reason=reason)
+
+
+def _general_guidance_decision(query: str) -> Decision:
+    normalized = query.casefold()
+    if "кэш" in normalized or "cache" in normalized or "cookie" in normalized:
+        step_id = "general.browser_cache"
+        instruction = (
+            "Сначала сохраните несохранённые данные и обновите страницу. Если не поможет, "
+            "очистите кэш только для проблемного сайта и войдите заново; сохранённые пароли "
+            "и данные других сайтов не удаляйте."
+        )
+    elif "wi-fi" in normalized or "wifi" in normalized or "интернет" in normalized:
+        step_id = "general.connection"
+        instruction = (
+            "Проверьте, открывается ли другой сайт, затем отключитесь от сети и подключитесь "
+            "снова. Не меняйте системные сетевые настройки и корпоративные сертификаты."
+        )
+    elif "обнов" in normalized and "страниц" in normalized:
+        step_id = "general.refresh"
+        instruction = "Сохраните введённые данные и выполните обычное обновление страницы."
+    elif "перезапуст" in normalized or "перезагруз" in normalized:
+        step_id = "general.restart"
+        instruction = (
+            "Сохраните работу, полностью закройте проблемное приложение и откройте его снова."
+        )
+    else:
+        step_id = "general.basic_check"
+        instruction = (
+            "Сохраните работу, проверьте подключение и один раз перезапустите проблемное "
+            "приложение. Не устанавливайте программы и не меняйте системные настройки."
+        )
+    prefix = "Общий безопасный совет, не правило компании:"
+    step = Step(id=step_id, title="Базовая проверка", instruction=instruction)
+    return Decision(
+        action=DecisionAction.STEP,
+        message=f"{prefix} {instruction}",
+        step=step,
+        reason="низкорисковая обратимая общая рекомендация",
+    )
+
+
+def _company_knowledge_decision(chunk: KnowledgeChunk) -> Decision:
+    instruction = chunk.text.strip()[:900]
+    step = Step(
+        id=f"knowledge.{chunk.id}",
+        title=f"По документу «{chunk.title}»",
+        instruction=instruction,
+    )
+    return Decision(
+        action=DecisionAction.STEP,
+        message=f"По документу «{chunk.title}»: {instruction}",
+        step=step,
+        reason="найден подтверждённый документ компании",
+        source_ids=[chunk.id],
+    )
 
 
 def _summary(playbook: Playbook, service: str, symptoms: list[str]) -> str:
