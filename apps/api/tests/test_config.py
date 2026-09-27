@@ -86,3 +86,11 @@ def test_ci_runs_a_real_postgres_smoke_test():
     assert "postgres:16-alpine" in workflow
     assert "POSTGRES_TEST_DATABASE_URL" in workflow
     assert "test_postgres_smoke.py" in workflow
+
+
+def test_knowledge_settings_have_safe_defaults():
+    settings = Settings(_env_file=None)
+
+    assert settings.knowledge_max_upload_bytes == 10 * 1024 * 1024
+    assert settings.knowledge_max_pdf_pages == 200
+    assert (settings.knowledge_chunk_chars, settings.knowledge_chunk_overlap) == (1200, 150)

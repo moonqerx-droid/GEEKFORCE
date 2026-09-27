@@ -89,3 +89,43 @@ def test_postgres_radar_groups_requests_and_delivers_a_broadcast():
 
     assert result.status_code == 200, result.text
     assert len(result.json()["delivered_to"]) == 3
+
+
+def test_postgres_knowledge_upload_cascade_and_unique_positions():
+    from sqlalchemy import select
+    from sqlalchemy.exc import IntegrityError
+
+    from app.models.knowledge import KnowledgeChunk, KnowledgeDocument
+
+    email = f"smoke-admin-{uuid4().hex[:8]}@example.ru"
+    with Session(engine) as session:
+        session.add(User(
+            first_name="Смоук", last_name="Админ", email=email, department="it",
+            password_hash=hash_password("StrongPass123"), role="admin", email_verified_at=utc_now(),
+        ))
+        session.commit()
+    body = f"# Правила VPN {uuid4().hex}\n\nПодключайтесь через «Континент». Ошибка 809 — роутер.".encode()
+
+    with TestClient(app) as client:
+        assert client.post("/api/auth/login", json={"email": email, "password": "StrongPass123"}).status_code == 200
+        created = client.post(
+            "/api/admin/knowledge/documents",
+            files={"file": ("vpn.md", body, "text/markdown")},
+        )
+        assert created.status_code == 201, created.text
+        document_id = created.json()["id"]
+        assert created.json()["status"] == "ready"
+
+        with Session(engine) as session:
+            session.add(KnowledgeChunk(
+                document_id=document_id, position=0, text="дубль", char_count=5, token_count=1,
+            ))
+            with pytest.raises(IntegrityError):
+                session.commit()
+
+        # The database itself cascades, not only the ORM.
+        with engine.begin() as connection:
+            connection.execute(text("DELETE FROM knowledge_documents WHERE id = :id"), {"id": document_id})
+        with Session(engine) as session:
+            assert session.scalars(select(KnowledgeChunk).where(KnowledgeChunk.document_id == document_id)).all() == []
+            assert session.get(KnowledgeDocument, document_id) is None

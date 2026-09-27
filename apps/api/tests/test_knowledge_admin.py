@@ -221,3 +221,15 @@ def test_only_ready_documents_feed_retrieval(client, admin, db_session):
     payload = second.as_engine_chunk()
     assert set(payload) == {"id", "service", "title", "text", "keywords", "escalation_team"}
     assert company_knowledge_chunks(db_session) == chunks, "order is stable"
+
+
+def test_processing_the_same_document_again_gives_the_same_chunks(client, admin):
+    first = upload(client, "vpn.md", VPN_RULES).json()
+    before = [(c["position"], c["text"], c["metadata"]) for c in client.get(f"{URL}/{first['id']}").json()["chunks"]]
+    client.delete(f"{URL}/{first['id']}")
+
+    second = upload(client, "vpn.md", VPN_RULES).json()
+    after = [(c["position"], c["text"], c["metadata"]) for c in client.get(f"{URL}/{second['id']}").json()["chunks"]]
+
+    assert second["id"] != first["id"]
+    assert after == before
