@@ -8,7 +8,7 @@ from app.db.base import Base
 from app.db.session import get_db
 from app.main import app
 from app.api.dependencies.auth import require_employee, require_operator
-from app.models import Conversation, Message
+from app.models import Conversation, Incident, Message
 from app.models.auth import User
 from app.repositories.incidents import IncidentRepository
 from app.services.incidents import IncidentService
@@ -109,3 +109,33 @@ def candidate(db_session, incident_service, crm_failure_factory):
 @pytest.fixture
 def seeded_crm_candidate(candidate):
     return candidate
+
+
+@pytest.fixture
+def incident_factory(db_session):
+    def create(status="CANDIDATE", members=3):
+        incident = Incident(
+            status=status,
+            service="crm",
+            title=f"CRM {status}",
+            signature_tokens=["crm", "502"],
+            similarity_threshold=0.55,
+        )
+        db_session.add(incident)
+        db_session.flush()
+        for index in range(members):
+            db_session.add(Conversation(
+                workflow_version="triage-v1",
+                status="ESCALATED",
+                service="CRM",
+                incident_id=incident.id,
+                summary=f"CRM failure {index}",
+            ))
+        db_session.flush()
+        return incident
+    return create
+
+
+@pytest.fixture
+def resolved_incident(incident_factory):
+    return incident_factory(status="RESOLVED", members=3)

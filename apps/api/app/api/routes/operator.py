@@ -3,7 +3,11 @@ from typing import Annotated, Literal
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
+from app.core.config import get_settings
 from app.db.session import get_db
+from app.repositories.incidents import IncidentRepository
+from app.schemas.incident import IncidentBroadcastCreate, IncidentBroadcastResult, IncidentRead
+from app.services.incidents import IncidentConflict, IncidentNotFound, IncidentService
 from app.schemas.conversation import ConversationRead, OperatorMessageCreate, OperatorTicket, ResolveCreate
 from app.api.dependencies.auth import require_operator
 from app.models.auth import User
@@ -81,3 +85,39 @@ def resolve_ticket(
     user: OperatorDependency,
 ) -> OperatorTicket:
     return run(lambda: service.resolve(conversation_id, user, payload.summary))
+
+
+def get_incident_service(db: Annotated[Session, Depends(get_db)]) -> IncidentService:
+    settings = get_settings()
+    return IncidentService(
+        IncidentRepository(db),
+        threshold=settings.incident_similarity_threshold,
+        min_cluster_size=settings.incident_min_cluster_size,
+    )
+
+
+IncidentServiceDependency = Annotated[IncidentService, Depends(get_incident_service)]
+
+
+@router.get("/incidents", response_model=list[IncidentRead])
+def list_incidents(
+    service: IncidentServiceDependency,
+    _user: OperatorDependency,
+    include_resolved: bool = False,
+) -> list[IncidentRead]:
+    return service.list_incidents(include_resolved=include_resolved)
+
+
+@router.post("/incidents/{incident_id}/broadcast", response_model=IncidentBroadcastResult)
+def broadcast_incident(
+    incident_id: str,
+    payload: IncidentBroadcastCreate,
+    service: IncidentServiceDependency,
+    _user: OperatorDependency,
+) -> IncidentBroadcastResult:
+    try:
+        return service.broadcast(incident_id, payload.message, payload.request_key, payload.expected_revision)
+    except IncidentNotFound as error:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Incident not found") from error
+    except IncidentConflict as error:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(error)) from error

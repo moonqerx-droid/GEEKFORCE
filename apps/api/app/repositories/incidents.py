@@ -39,6 +39,12 @@ class IncidentRepository:
         )
         return list(self.session.scalars(statement).all())
 
+    def list_incidents(self, *, include_resolved: bool = False) -> list[Incident]:
+        statement = select(Incident).options(selectinload(Incident.updates))
+        if not include_resolved:
+            statement = statement.where(Incident.status.in_(("CANDIDATE", "ACTIVE")))
+        return list(self.session.scalars(statement).all())
+
     def list_unlinked_escalated(self, service: str, exclude_id: str) -> list[Conversation]:
         statement = (
             select(Conversation)
@@ -95,3 +101,26 @@ class IncidentRepository:
         self.session.add(incident)
         self.session.flush()
         return incident
+
+    def append_message(self, conversation: Conversation, message: str) -> None:
+        conversation.messages.append(Message(role="assistant", content=message))
+        conversation.updated_at = utc_now()
+
+    def find_update(self, incident_id: str, request_key: str) -> IncidentUpdate | None:
+        return self.session.scalar(
+            select(IncidentUpdate).where(
+                IncidentUpdate.incident_id == incident_id,
+                IncidentUpdate.request_key == request_key,
+            )
+        )
+
+    def create_update(
+        self, incident: Incident, *, message: str, request_key: str
+    ) -> IncidentUpdate:
+        update = IncidentUpdate(
+            incident=incident,
+            message=message,
+            request_key=request_key,
+        )
+        self.session.add(update)
+        return update

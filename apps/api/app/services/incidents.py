@@ -3,13 +3,13 @@ from __future__ import annotations
 import logging
 from dataclasses import dataclass
 
-from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
+from sqlalchemy.orm.exc import StaleDataError
 
 from app.models import Incident
 from app.models.conversation import utc_now
 from app.repositories.incidents import IncidentRepository
-from app.schemas.incident import IncidentRead, IncidentUpdateRead
+from app.schemas.incident import IncidentBroadcastResult, IncidentRead, IncidentUpdateRead
 from app.services.incident_detection import (
     IncidentFingerprint,
     build_fingerprint,
@@ -19,6 +19,14 @@ from app.services.incident_detection import (
 
 
 logger = logging.getLogger(__name__)
+
+
+class IncidentNotFound(LookupError):
+    pass
+
+
+class IncidentConflict(RuntimeError):
+    pass
 
 
 @dataclass(frozen=True)
@@ -56,13 +64,78 @@ class IncidentService:
             latest_update=IncidentUpdateRead.model_validate(latest) if latest else None,
         )
 
+    def list_incidents(self, *, include_resolved: bool = False) -> list[IncidentRead]:
+        incidents = self.repository.list_incidents(include_resolved=include_resolved)
+        status_order = {"CANDIDATE": 0, "ACTIVE": 1, "RESOLVED": 2}
+        items = [self.read(incident.id) for incident in incidents]
+        return sorted(
+            items,
+            key=lambda item: (
+                status_order[item.status.value],
+                -item.conversation_count,
+                -item.updated_at.timestamp(),
+                item.id,
+            ),
+        )
+
     def list_open(self) -> list[IncidentRead]:
-        incidents = self.repository.session.scalars(
-            select(Incident).where(
-                Incident.status.in_(("CANDIDATE", "ACTIVE"))
+        return self.list_incidents()
+
+    def broadcast(
+        self,
+        incident_id: str,
+        message: str,
+        request_key: str,
+        expected_revision: int,
+    ) -> IncidentBroadcastResult:
+        incident = self.repository.get(incident_id)
+        if incident is None:
+            raise IncidentNotFound(incident_id)
+        delivered_to = self.repository.conversation_ids(incident.id)
+        if self.repository.find_update(incident.id, request_key) is not None:
+            return IncidentBroadcastResult(
+                incident=self.read(incident.id),
+                delivered_to=delivered_to,
             )
-        ).all()
-        return [self.read(incident.id) for incident in incidents]
+        if incident.status == "RESOLVED":
+            raise IncidentConflict("resolved incident cannot receive broadcasts")
+        if incident.revision != expected_revision:
+            raise IncidentConflict("incident changed; reload it before broadcasting")
+
+        try:
+            for conversation in self.repository.conversations(incident.id):
+                self.repository.append_message(conversation, message)
+            self.repository.create_update(
+                incident,
+                message=message,
+                request_key=request_key,
+            )
+            if incident.status == "CANDIDATE":
+                incident.status = "ACTIVE"
+            incident.updated_at = utc_now()
+            self.repository.session.commit()
+        except (IntegrityError, StaleDataError) as error:
+            self.repository.session.rollback()
+            if self.repository.find_update(incident_id, request_key) is not None:
+                return IncidentBroadcastResult(
+                    incident=self.read(incident_id),
+                    delivered_to=self.repository.conversation_ids(incident_id),
+                )
+            raise IncidentConflict("incident changed; reload it before broadcasting") from error
+        except Exception:
+            self.repository.session.rollback()
+            raise
+
+        logger.info(
+            "incident.broadcast incident_id=%s request_key=%s delivery_count=%s",
+            incident_id,
+            request_key,
+            len(delivered_to),
+        )
+        return IncidentBroadcastResult(
+            incident=self.read(incident_id),
+            delivered_to=delivered_to,
+        )
 
     def match_first_turn(self, conversation_id: str) -> IncidentMatch | None:
         conversation = self.repository.get_conversation(conversation_id)
