@@ -2,7 +2,7 @@ import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
 import { HttpResponse, http } from "msw";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { server } from "../../test/server";
 import { AuthProvider } from "./AuthProvider";
 import { LoginPage } from "./LoginPage";
@@ -34,23 +34,36 @@ describe("auth pages", () => {
     expect(await screen.findByText(/вход выполнен/i)).toBeInTheDocument();
   });
 
-  it("registers an operator only with the invite token from the URL", async () => {
+  it("registers an invited operator with the token from the link and signs them in", async () => {
+    let registered: Record<string, unknown> | undefined;
+    let loggedIn = false;
     server.use(http.get("*/api/auth/me", () => HttpResponse.json({}, { status: 401 })));
-    server.use(http.post("*/api/auth/operator/register", () => HttpResponse.json({
-      id: "2", first_name: "Иван", last_name: "Петров", email: "operator@example.ru",
-      department: "it", role: "operator", email_verified_at: null,
-    }, { status: 201 })));
-    render(<MemoryRouter initialEntries={["/operator/register?invite=invite-token-value-12345"]}>
+    server.use(
+      http.post("*/api/auth/operator/register", async ({ request }) => {
+        registered = await request.json() as Record<string, unknown>;
+        return HttpResponse.json({
+          id: "2", first_name: "Иван", last_name: "Петров", email: "operator@example.ru",
+          department: "it", role: "operator", email_verified_at: "2026-09-27T00:00:00Z",
+        }, { status: 201 });
+      }),
+      http.post("*/api/auth/login", () => {
+        loggedIn = true;
+        return HttpResponse.json({
+          id: "2", first_name: "Иван", last_name: "Петров", email: "operator@example.ru",
+          department: "it", role: "operator", email_verified_at: "2026-09-27T00:00:00Z",
+        });
+      }),
+    );
+    render(<MemoryRouter initialEntries={["/operator/register?token=invite-token-value-12345&email=operator%40example.ru&first_name=%D0%98%D0%B2%D0%B0%D0%BD&last_name=%D0%9F%D0%B5%D1%82%D1%80%D0%BE%D0%B2"]}>
       <AuthProvider><OperatorRegisterPage /></AuthProvider>
     </MemoryRouter>);
-    await userEvent.type(screen.getByLabelText("Имя"), "Иван");
-    await userEvent.type(screen.getByLabelText("Фамилия"), "Петров");
-    await userEvent.type(screen.getByLabelText("Рабочий email"), "operator@example.ru");
-    await userEvent.selectOptions(screen.getByLabelText("Отдел"), "it");
+    expect(screen.getByLabelText("Имя")).toHaveValue("Иван");
+    expect(screen.getByLabelText("Рабочий email")).toHaveValue("operator@example.ru");
     await userEvent.type(screen.getByLabelText("Пароль"), "StrongPass7");
     await userEvent.type(screen.getByLabelText("Повторите пароль"), "StrongPass7");
-    await userEvent.click(screen.getByRole("button", { name: "Создать аккаунт специалиста" }));
-    expect(await screen.findByText(/проверьте письмо/i)).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "Создать аккаунт и открыть очередь" }));
+    await vi.waitFor(() => expect(loggedIn).toBe(true));
+    expect(registered?.invite_token).toBe("invite-token-value-12345");
   });
 
   it("verifies an email with a six digit code", async () => {

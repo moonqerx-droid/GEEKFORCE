@@ -1,88 +1,83 @@
-import { useState } from "react";
+import { useState, type FormEvent, type KeyboardEvent } from "react";
 import { Button } from "../../components/Button";
 import "./WelcomeScreen.css";
 
 const EXAMPLES = [
-  "Не могу войти в CRM с ноутбука, но с телефона работает. Через 20 минут встреча.",
-  "Не открывается корпоративная почта, пишет ошибку авторизации.",
-  "Не подключается VPN из дома, вчера всё работало.",
-  "Пришла подозрительная ссылка в письме, боюсь что это фишинг.",
+  "Вчера всё работало, сегодня не могу зайти в рабочую систему с ноутбука, а с телефона открывается. Через 20 минут встреча",
+  "Не подключается VPN из дома",
+  "Забыл пароль от почты",
+  "Нужен доступ к папке отдела на общем диске",
 ];
 
-interface WelcomeScreenProps {
+export function WelcomeScreen({
+  busy,
+  onSubmit,
+  firstName,
+}: {
   busy: boolean;
-  onSubmit: (content: string) => void;
-}
-
-export function WelcomeScreen({ busy, onSubmit }: WelcomeScreenProps) {
+  onSubmit: (content: string) => Promise<void>;
+  firstName?: string;
+}) {
   const [value, setValue] = useState("");
 
-  const submit = () => {
+  const submit = async (event?: FormEvent) => {
+    event?.preventDefault();
     const trimmed = value.trim();
     if (!trimmed || busy) return;
-    onSubmit(trimmed);
+    await onSubmit(trimmed);
+  };
+
+  const onKeyDown = (event: KeyboardEvent<HTMLTextAreaElement>) => {
+    if (event.key === "Enter" && !event.shiftKey && !event.nativeEvent.isComposing) {
+      event.preventDefault();
+      void submit();
+    }
   };
 
   return (
-    <div className="welcome">
-      <div className="welcome-intro">
-        <p className="welcome-product-line">IT-помощник вашей команды</p>
-        <h1 className="welcome-title">Расскажите, что сломалось. Дальше разберёмся вместе.</h1>
-        <p className="welcome-subtitle">
-          HelpFlow уточнит детали, предложит безопасные шаги и подключит специалиста,
-          если автоматической помощи окажется недостаточно.
-        </p>
-        <div className="welcome-promises" aria-label="Как работает HelpFlow">
-          <span>Понимает контекст</span>
-          <span>Ведёт по шагам</span>
-          <span>Не теряет историю</span>
-        </div>
-      </div>
+    <section className="welcome" aria-labelledby="welcome-title">
+      <p className="welcome-greeting">{firstName ? `${firstName}, привет!` : "Привет!"}</p>
+      <h1 id="welcome-title" className="welcome-title">Что случилось?</h1>
+      <p className="welcome-lead">
+        Расскажите своими словами, как коллеге. Названия систем и категории знать не нужно — разберёмся вместе.
+      </p>
 
-      <form
-        className="welcome-form"
-        onSubmit={(event) => {
-          event.preventDefault();
-          submit();
-        }}
-      >
+      <form className="welcome-form" onSubmit={submit}>
+        <label htmlFor="welcome-input" className="visually-hidden">Опишите проблему</label>
         <textarea
-          className="welcome-textarea"
-          placeholder="Например: не могу войти в CRM с ноутбука…"
+          id="welcome-input"
+          className="welcome-input"
           value={value}
           onChange={(event) => setValue(event.target.value)}
+          onKeyDown={onKeyDown}
+          placeholder="Например: не открывается почта, пишет «нет подключения»…"
           rows={4}
           maxLength={4000}
-          onKeyDown={(event) => {
-            if (event.key === "Enter" && !event.shiftKey && !event.nativeEvent.isComposing) {
-              event.preventDefault();
-              submit();
-            }
-          }}
-          disabled={busy}
-          aria-label="Описание проблемы"
+          autoFocus
         />
-        <Button type="submit" variant="primary" size="lg" busy={busy} disabled={!value.trim()}>
-          Начать диалог
-        </Button>
+        <div className="welcome-form-bar">
+          <span className="welcome-form-hint">Enter — отправить, Shift+Enter — новая строка</span>
+          <Button type="submit" variant="primary" busy={busy} disabled={!value.trim()}>
+            Отправить
+          </Button>
+        </div>
       </form>
 
       <div className="welcome-examples">
-        <p className="welcome-examples-label">Можно начать с готового примера</p>
-        <div className="welcome-examples-list">
+        <p className="welcome-examples-title">Или начните с похожей ситуации</p>
+        <div className="welcome-chips">
           {EXAMPLES.map((example) => (
-            <button
-              key={example}
-              type="button"
-              className="welcome-example-chip"
-              onClick={() => onSubmit(example)}
-              disabled={busy}
-            >
+            <button key={example} type="button" className="welcome-chip" onClick={() => setValue(example)}>
               {example}
             </button>
           ))}
         </div>
       </div>
-    </div>
+
+      <p className="welcome-promise">
+        Если сами не справимся, обращение уйдёт специалисту вместе со всем, что вы уже рассказали.
+        Повторять ничего не придётся.
+      </p>
+    </section>
   );
 }

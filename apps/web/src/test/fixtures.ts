@@ -31,7 +31,7 @@ export function makeConversation(overrides: Partial<Conversation> = {}): Convers
   };
 }
 
-export function makeMessage(role: "user" | "assistant" | "system", content: string) {
+export function makeMessage(role: "user" | "assistant" | "system" | "operator", content: string) {
   return {
     id: nextMessageId++,
     role,

@@ -1,127 +1,116 @@
 .welcome {
-  max-width: 920px;
-  margin: 0 auto;
-  padding: clamp(40px, 7vw, 86px) var(--space-4) var(--space-7);
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(320px, 420px);
-  gap: clamp(34px, 6vw, 72px);
-  align-items: center;
+  align-content: start;
+  gap: var(--space-4);
+  padding-top: var(--space-5);
 }
 
-.welcome-intro {
-  min-width: 0;
-}
-
-.welcome-product-line {
-  margin: 0 0 var(--space-3);
-  color: var(--color-accent-ink);
-  font-weight: 700;
+.welcome-greeting {
+  color: var(--coral-deep);
+  font-weight: 600;
 }
 
 .welcome-title {
-  max-width: 620px;
-  font-size: clamp(34px, 5vw, 54px);
-  line-height: 1.07;
-  margin: 0 0 var(--space-4);
-  letter-spacing: -0.045em;
+  font-size: var(--font-size-display);
+  font-weight: 700;
+  letter-spacing: -0.035em;
+  line-height: 1;
 }
 
-.welcome-subtitle {
-  color: var(--color-text-muted);
-  max-width: 590px;
-  margin: 0 0 var(--space-5);
-  font-size: 17px;
-  line-height: 1.65;
-}
-
-.welcome-promises {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px 18px;
-  color: var(--color-text-muted);
-  font-size: var(--font-size-sm);
-  font-weight: 650;
-}
-
-.welcome-promises span::before {
-  content: "✓";
-  color: var(--color-success);
-  margin-right: 7px;
+.welcome-lead {
+  max-width: 52ch;
+  color: var(--ink-soft);
+  font-size: var(--font-size-md);
 }
 
 .welcome-form {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-3);
-  background: var(--color-surface);
-  border: 1px solid var(--color-border);
+  margin-top: var(--space-3);
+  padding: var(--space-3);
+  border: 1.5px solid var(--color-border);
   border-radius: var(--radius-xl);
-  padding: 10px;
+  background: var(--color-surface);
   box-shadow: var(--shadow-md);
+  transition: border-color 160ms ease, box-shadow 160ms ease;
 }
 
-.welcome-textarea {
-  resize: vertical;
-  min-height: 132px;
+.welcome-form:focus-within {
+  border-color: var(--coral);
+  box-shadow: var(--shadow-lift);
+}
+
+.welcome-input {
+  display: block;
+  width: 100%;
+  min-height: 112px;
+  padding: var(--space-3);
   border: 0;
-  border-radius: 15px;
-  padding: var(--space-4);
-  background: var(--color-surface-raised);
-  outline: none;
+  background: transparent;
+  font-size: var(--font-size-md);
+  line-height: 1.5;
+  resize: vertical;
 }
 
-.welcome-textarea:focus {
-  box-shadow: inset 0 0 0 2px var(--color-accent);
+.welcome-input:focus-visible {
+  box-shadow: none;
+}
+
+.welcome-form-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding: 0 var(--space-2) var(--space-1) var(--space-3);
+}
+
+.welcome-form-hint {
+  color: var(--ink-faint);
+  font-size: var(--font-size-xs);
 }
 
 .welcome-examples {
-  grid-column: 1 / -1;
-  margin-top: 0;
-}
-
-.welcome-examples-label {
-  color: var(--color-text-muted);
-  font-size: var(--font-size-sm);
-  margin: 0 0 var(--space-2);
-}
-
-.welcome-examples-list {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-2);
+  margin-top: var(--space-2);
+}
+
+.welcome-examples-title {
+  color: var(--ink-soft);
+  font-size: var(--font-size-sm);
+}
+
+.welcome-chips {
+  display: flex;
+  flex-wrap: wrap;
   gap: var(--space-2);
 }
 
-.welcome-example-chip {
-  text-align: left;
-  background: var(--color-surface);
+.welcome-chip {
+  max-width: 100%;
+  padding: 8px 14px;
   border: 1px solid var(--color-border);
-  border-radius: var(--radius-md);
-  padding: 12px 14px;
+  border-radius: var(--radius-pill);
+  background: var(--paper);
+  color: var(--ink);
   font-size: var(--font-size-sm);
-  color: var(--color-text);
+  text-align: left;
 }
 
-@media (max-width: 760px) {
-  .welcome {
-    grid-template-columns: 1fr;
-    padding-top: 40px;
-    gap: 28px;
-  }
-  .welcome-examples {
-    grid-column: auto;
-  }
+.welcome-chip:hover {
+  border-color: var(--coral);
+  background: var(--coral-wash);
 }
 
-@media (max-width: 520px) {
-  .welcome-title {
-    font-size: 36px;
-  }
-  .welcome-examples-list {
-    grid-template-columns: 1fr;
-  }
+.welcome-promise {
+  max-width: 56ch;
+  margin-top: var(--space-3);
+  padding-left: var(--space-3);
+  border-left: 3px solid var(--sea);
+  color: var(--ink-soft);
+  font-size: var(--font-size-sm);
 }
 
-.welcome-example-chip:hover:not(:disabled) {
-  border-color: var(--color-accent);
-  background: var(--color-accent-soft);
+@media (max-width: 640px) {
+  .welcome-form-hint {
+    display: none;
+  }
 }

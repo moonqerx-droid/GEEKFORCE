@@ -1,26 +1,46 @@
-import { useState } from "react";
-import { Spinner, ErrorState } from "../../components/primitives";
+import { useEffect, useMemo, useState } from "react";
+import { Spinner, ErrorState, Badge } from "../../components/primitives";
 import { Button } from "../../components/Button";
-import { STATUS_LABEL } from "../../lib/labels";
+import { CasePassport } from "../../components/CasePassport";
+import { DebugPanel } from "../../components/DebugPanel";
+import { STATUS_LABEL, STATUS_TONE } from "../../lib/labels";
+import { useAuth } from "../auth/AuthProvider";
 import { useConversation } from "./useConversation";
 import { WelcomeScreen } from "./WelcomeScreen";
 import { MessageThread } from "./MessageThread";
-import { UrgencyCard } from "./UrgencyCard";
+import { stepMarkers } from "./steps";
 import { StepCard } from "./StepCard";
 import { Composer } from "./Composer";
-import { VerifyingBanner, ResolvedPanel, EscalatedPanel } from "./StatusPanels";
-import { DebugPanel } from "../../components/DebugPanel";
+import { VerifyingPanel, ResolvedPanel, WaitingPanel } from "./StatusPanels";
 import "./ConversationPage.css";
 
-const MESSAGE_INPUT_STATUSES = new Set(["NEW", "ANALYZING", "CLARIFYING", "VERIFYING"]);
+const COMPOSER_PLACEHOLDER: Record<string, string> = {
+  NEW: "Опишите, что случилось…",
+  CLARIFYING: "Ответьте своими словами…",
+  VERIFYING: "Или напишите, как сейчас…",
+  ESCALATED: "Дописать детали для специалиста…",
+  IN_PROGRESS: "Написать специалисту…",
+};
 
 export function ConversationPage() {
   const conv = useConversation();
+  const { user } = useAuth();
   const [draft, setDraft] = useState("");
+  const steps = useMemo(() => stepMarkers(conv.conversation), [conv.conversation]);
+  const messageCount = conv.conversation?.messages.length ?? 0;
+  const status = conv.conversation?.status;
+
+  // Keep the newest thing — message, step card or status panel — in view.
+  useEffect(() => {
+    if (!messageCount) return;
+    window.requestAnimationFrame(() => {
+      window.scrollTo?.({ top: document.body.scrollHeight, behavior: "smooth" });
+    });
+  }, [messageCount, status]);
 
   if (conv.phase === "loading") {
     return (
-      <div className="conversation-page conversation-page-center">
+      <div className="conv-page conv-page-center">
         <Spinner label="Загружаем обращение…" />
       </div>
     );
@@ -28,7 +48,7 @@ export function ConversationPage() {
 
   if (conv.phase === "error" && !conv.conversation) {
     return (
-      <div className="conversation-page conversation-page-center">
+      <div className="conv-page conv-page-center">
         <ErrorState
           title="Не удалось загрузить обращение"
           description={conv.error ?? undefined}
@@ -40,114 +60,109 @@ export function ConversationPage() {
 
   if (!conv.conversation) {
     return (
-      <div className="conversation-page">
-        {conv.pendingMessage ? (
-          <div className="conversation-shell">
-            <div className="conversation-statusbar">
-              <span className="conversation-status-label">Создаём обращение</span>
+      <div className="conv-page">
+        <div className="conv-main">
+          {conv.pendingMessage ? (
+            <div className="conv-chat">
+              <MessageThread messages={[]} pendingMessage={conv.pendingMessage} thinkingLabel="Помощник разбирается в ситуации" />
             </div>
-            <MessageThread messages={[]} pendingMessage={conv.pendingMessage} />
+          ) : null}
+          {/* Stays mounted while sending so a failed first message keeps its text. */}
+          <div hidden={Boolean(conv.pendingMessage)}>
+            <WelcomeScreen busy={conv.sending} onSubmit={conv.startWithMessage} firstName={user?.first_name} />
           </div>
-        ) : null}
-        {conv.error ? <div role="alert" className="conversation-error">{conv.error}</div> : null}
-        <div hidden={Boolean(conv.pendingMessage)}>
-          <WelcomeScreen
-            busy={conv.sending}
-            onSubmit={conv.startWithMessage}
-          />
+          {conv.error ? <div role="alert" className="conv-alert">{conv.error}</div> : null}
         </div>
+        <CasePassport conversation={null} audience="employee" />
       </div>
     );
   }
 
   const c = conv.conversation;
-  const showComposer = MESSAGE_INPUT_STATUSES.has(c.status);
-  const showEscalateButton = c.status !== "RESOLVED" && c.status !== "ESCALATED";
+  const live = c.status === "ESCALATED" || c.status === "IN_PROGRESS";
+  const showComposer = c.status in COMPOSER_PLACEHOLDER;
+  const canCallSpecialist = !live && c.status !== "RESOLVED";
 
   return (
-    <div className="conversation-page">
-      <div className="conversation-shell">
-        <div className="conversation-statusbar">
-          <span className="conversation-status-label">{STATUS_LABEL[c.status]}</span>
-          {showEscalateButton ? (
-            <Button variant="ghost" size="md" busy={conv.sending} onClick={conv.escalateNow}>
-              Передать специалисту
-            </Button>
-          ) : null}
+    <div className="conv-page">
+      <div className="conv-main">
+        <div className="conv-bar">
+          <Badge tone={STATUS_TONE[c.status]}>{STATUS_LABEL[c.status]}</Badge>
+          <div className="conv-bar-actions">
+            {canCallSpecialist ? (
+              <Button variant="ghost" busy={conv.sending} onClick={conv.escalateNow}>
+                Позвать специалиста
+              </Button>
+            ) : null}
+            {c.status !== "RESOLVED" ? (
+              <Button variant="ghost" disabled={conv.sending} onClick={conv.restartFresh}>
+                Новое обращение
+              </Button>
+            ) : null}
+          </div>
         </div>
 
         {conv.notice ? (
-          <div className="conversation-notice" role="alert">
+          <div className="conv-notice" role="alert">
             {conv.notice}
-            <button
-              type="button"
-              className="conversation-notice-dismiss"
-              onClick={conv.dismissNotice}
-              aria-label="Скрыть уведомление"
-            >
-              ×
-            </button>
+            <button type="button" onClick={conv.dismissNotice} aria-label="Скрыть уведомление">×</button>
           </div>
         ) : null}
+        {conv.error ? <div className="conv-alert" role="alert">{conv.error}</div> : null}
 
-        {conv.error ? (
-          <div className="conversation-error" role="alert">
-            {conv.error}
-          </div>
-        ) : null}
+        <div className="conv-chat">
+          <MessageThread
+            messages={c.messages}
+            pendingMessage={conv.pendingMessage}
+            failedMessages={conv.failedMessages}
+            onRetryFailed={(id) => void conv.retryFailedMessage(id)}
+            thinkingLabel={live ? "Отправляем специалисту" : "Помощник думает"}
+            steps={steps}
+          />
 
-        <UrgencyCard urgency={c.urgency} reason={c.urgency_reason} summary={c.summary} />
+          {c.status === "TROUBLESHOOTING" && c.current_step ? (
+            <StepCard
+              step={c.current_step}
+              number={c.completed_steps.length + 1}
+              busy={conv.sending}
+              onResult={conv.sendStepResult}
+            />
+          ) : null}
 
-        <MessageThread
-          messages={c.messages}
-          pendingMessage={conv.pendingMessage}
-          failedMessages={conv.failedMessages}
-          onRetryFailed={(id) => void conv.retryFailedMessage(id)}
-        />
+          {c.status === "VERIFYING" ? (
+            <VerifyingPanel busy={conv.sending} onAnswer={(text) => void conv.sendMessage(text).catch(() => undefined)} />
+          ) : null}
 
-        {c.status === "TROUBLESHOOTING" && c.current_step ? (
-          <StepCard step={c.current_step} busy={conv.sending} onResult={conv.sendStepResult} />
-        ) : null}
+          {c.status === "ESCALATED" ? <WaitingPanel conversation={c} /> : null}
 
-        {c.status === "VERIFYING" ? <VerifyingBanner /> : null}
-
-        {c.status === "RESOLVED" ? (
-          <ResolvedPanel conversation={c} onRestart={conv.restartFresh} />
-        ) : null}
-
-        {c.status === "ESCALATED" ? (
-          <EscalatedPanel conversation={c} onRestart={conv.restartFresh} />
-        ) : null}
+          {c.status === "RESOLVED" ? (
+            <ResolvedPanel conversation={c} onRate={conv.rate} onRestart={conv.restartFresh} />
+          ) : null}
+        </div>
 
         {showComposer ? (
           <Composer
             busy={conv.sending}
             value={draft}
             onValueChange={setDraft}
-            placeholder={
-              c.status === "VERIFYING"
-                ? "Например: да, всё заработало"
-                : "Напишите сообщение…"
-            }
+            tone={live ? "human" : "assistant"}
+            placeholder={COMPOSER_PLACEHOLDER[c.status]}
             onSend={conv.sendMessage}
           />
         ) : null}
 
         {!showComposer && draft ? (
-          <div className="conversation-saved-draft" role="status">
+          <div className="conv-draft" role="status">
             <strong>Черновик сохранён</strong>
             <p>{draft}</p>
           </div>
         ) : null}
-
-        {c.status !== "RESOLVED" && c.status !== "ESCALATED" ? (
-          <button type="button" disabled={conv.sending} className="conversation-restart-link" onClick={conv.restartFresh}>
-            Начать заново
-          </button>
-        ) : null}
       </div>
 
-      <DebugPanel conversation={c} />
+      <div className="conv-side">
+        <CasePassport conversation={c} audience="employee" />
+        <DebugPanel conversation={c} />
+      </div>
     </div>
   );
 }

@@ -1,90 +1,84 @@
-import { useMemo, useState } from "react";
-import { Spinner, ErrorState, EmptyState } from "../../components/primitives";
-import { useOperatorTickets } from "./useOperatorTickets";
-import { TicketFilters } from "./TicketFilters";
-import type { TicketFiltersState } from "./TicketFilters";
-import { TicketList } from "./TicketList";
-import { TicketDetail } from "./TicketDetail";
-import { IncidentsSection } from "./IncidentsSection";
+import { useCallback, useState } from "react";
+import { useSearchParams } from "react-router-dom";
+import type { TicketScope } from "../../api/types";
+import { CasePassport } from "../../components/CasePassport";
+import { useAuth } from "../auth/AuthProvider";
+import { TicketQueue } from "./TicketQueue";
+import { TicketWorkspace } from "./TicketWorkspace";
+import { useTicket, useTicketQueue } from "./useTickets";
 import "./OperatorPage.css";
 
+const FALLBACK_LABEL: Record<string, string> = {
+  low_confidence: "модель не была уверена",
+  llm_error: "модель не ответила",
+  unknown_source: "модель сослалась на неутверждённый источник",
+};
+
 export function OperatorPage() {
-  const { phase, tickets, incidents, error, reload } = useOperatorTickets();
-  const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [filters, setFilters] = useState<TicketFiltersState>({
-    search: "",
-    urgency: "all",
-    service: "all",
+  const { user } = useAuth();
+  const [params, setParams] = useSearchParams();
+  const [scope, setScope] = useState<TicketScope>("queue");
+  const selectedId = params.get("ticket");
+  const queue = useTicketQueue(scope);
+  const reloadQueue = queue.reload;
+  const onChanged = useCallback(() => { void reloadQueue(); }, [reloadQueue]);
+  const current = useTicket(selectedId, onChanged);
+  const currentUserId = user?.id ?? "";
+
+  const select = (id: string) => setParams((prev) => {
+    const next = new URLSearchParams(prev);
+    next.set("ticket", id);
+    return next;
   });
 
-  const services = useMemo(
-    () => Array.from(new Set(tickets.map((t) => t.service).filter((s): s is string => !!s))),
-    [tickets],
-  );
-
-  const filtered = useMemo(() => {
-    return tickets.filter((ticket) => {
-      if (filters.urgency !== "all" && ticket.urgency !== filters.urgency) return false;
-      if (filters.service !== "all" && ticket.service !== filters.service) return false;
-      if (filters.search.trim()) {
-        const haystack = `${ticket.original_request} ${ticket.summary ?? ""}`.toLowerCase();
-        if (!haystack.includes(filters.search.trim().toLowerCase())) return false;
-      }
-      return true;
-    });
-  }, [tickets, filters]);
-
-  const selected = filtered.find((t) => t.id === selectedId) ?? null;
-
-  if (phase === "loading") {
-    return (
-      <div className="operator-page operator-page-center">
-        <Spinner label="Загружаем очередь…" />
-      </div>
-    );
-  }
-
-  if (phase === "error") {
-    return (
-      <div className="operator-page operator-page-center">
-        <ErrorState title="Не удалось загрузить очередь" description={error ?? undefined} onRetry={reload} />
-      </div>
-    );
-  }
+  const ticket = current.ticket;
 
   return (
-    <div className="operator-page">
-      <header className="operator-heading">
-        <div>
-          <h1>Очередь поддержки</h1>
-          <p>Обращения, которые HelpFlow передал специалистам</p>
-        </div>
-        <div className="operator-heading-count" aria-label={`${filtered.length} обращений в очереди`}>
-          <strong>{filtered.length}</strong>
-          <span>в очереди</span>
-        </div>
-      </header>
-      <IncidentsSection incidents={incidents} />
-      <div className="operator-layout">
-        <div className={`operator-list-pane${selected ? " operator-list-pane-hide-mobile" : ""}`}>
-          <TicketFilters state={filters} services={services} onChange={setFilters} />
-          {filtered.length === 0 ? (
-            <EmptyState
-              title="Нет обращений"
-              description="Эскалированные обращения появятся здесь."
-            />
-          ) : (
-            <TicketList tickets={filtered} selectedId={selectedId} onSelect={setSelectedId} />
-          )}
-        </div>
-        <div className={`operator-detail-pane${selected ? "" : " operator-detail-pane-hide-mobile"}`}>
-          {selected ? (
-            <button type="button" className="operator-back-link" onClick={() => setSelectedId(null)}>
-              ← К списку
-            </button>
-          ) : null}
-          <TicketDetail ticket={selected} />
-        </div>
+    <div className="operator">
+      <TicketQueue
+        scope={scope}
+        onScopeChange={setScope}
+        tickets={queue.tickets}
+        status={queue.status}
+        selectedId={selectedId}
+        onSelect={select}
+        currentUserId={currentUserId}
+        onRetry={() => void queue.reload()}
+      />
+      <TicketWorkspace
+        key={selectedId ?? "none"}
+        ticket={ticket}
+        loading={Boolean(selectedId)}
+        busy={current.busy}
+        error={current.error}
+        currentUserId={currentUserId}
+        onAssign={current.assign}
+        onReply={current.reply}
+        onResolve={current.resolve}
+      />
+      <div className="operator-side">
+        {ticket ? (
+          <>
+            <CasePassport conversation={ticket} audience="operator" />
+            {ticket.rag_source_ids.length || ticket.ai_fallback_reason ? (
+              <details className="operator-provenance">
+                <summary>Откуда помощник брал ответы</summary>
+                {ticket.rag_source_ids.length ? (
+                  <>
+                    <p>Источники ответа из базы знаний:</p>
+                    <ul>{ticket.rag_source_ids.map((source) => <li key={source}><code>{source}</code></li>)}</ul>
+                  </>
+                ) : null}
+                {ticket.ai_fallback_reason ? (
+                  <p>
+                    Использован безопасный ответ по правилам
+                    {FALLBACK_LABEL[ticket.ai_fallback_reason] ? `: ${FALLBACK_LABEL[ticket.ai_fallback_reason]}` : ""}.
+                  </p>
+                ) : null}
+              </details>
+            ) : null}
+          </>
+        ) : null}
       </div>
     </div>
   );

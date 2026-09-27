@@ -1,10 +1,11 @@
 import { useState } from "react";
-import { useNavigate, useSearchParams } from "react-router-dom";
+import { useSearchParams } from "react-router-dom";
 import { api } from "../../api/client";
 import type { Department, RegistrationPayload } from "../../api/types";
 import { AuthLayout } from "./AuthLayout";
 import { Field } from "./Field";
 import { validateRegistration, type RegistrationErrors } from "./validation";
+import { useAuth } from "./AuthProvider";
 
 type OperatorForm = Omit<RegistrationPayload, "accepted_terms">;
 
@@ -19,9 +20,15 @@ const initial: OperatorForm = {
 
 export function OperatorRegisterPage() {
   const [searchParams] = useSearchParams();
-  const navigate = useNavigate();
-  const inviteToken = searchParams.get("invite") ?? "";
-  const [value, setValue] = useState(initial);
+  const { login } = useAuth();
+  const inviteToken = searchParams.get("token") ?? searchParams.get("invite") ?? "";
+  const [value, setValue] = useState<OperatorForm>(() => ({
+    ...initial,
+    first_name: searchParams.get("first_name") ?? "",
+    last_name: searchParams.get("last_name") ?? "",
+    email: searchParams.get("email") ?? "",
+    department: "it",
+  }));
   const [errors, setErrors] = useState<RegistrationErrors>({});
   const [message, setMessage] = useState("");
   const [busy, setBusy] = useState(false);
@@ -29,7 +36,7 @@ export function OperatorRegisterPage() {
     setValue((current) => ({ ...current, [key]: next }));
   };
 
-  return <AuthLayout title="Регистрация специалиста" subtitle="Создайте отдельный аккаунт специалиста по персональному приглашению.">
+  return <AuthLayout title="Добро пожаловать в команду" subtitle="Вас пригласили специалистом поддержки. Проверьте данные и придумайте пароль.">
     {!inviteToken ? <div className="auth-message" role="alert">Ссылка приглашения недействительна: в ней отсутствует токен.</div> : null}
     <form className="auth-form" noValidate onSubmit={async (event) => {
       event.preventDefault();
@@ -41,8 +48,8 @@ export function OperatorRegisterPage() {
       setMessage("");
       try {
         await api.registerOperator({ ...value, invite_token: inviteToken });
-        setMessage("Аккаунт специалиста создан. Проверьте письмо: мы отправили код подтверждения.");
-        navigate(`/verify-email?email=${encodeURIComponent(value.email)}`);
+        // The invite already proved the mailbox, so the specialist goes straight to the queue.
+        await login({ email: value.email, password: value.password });
       } catch {
         setMessage("Не удалось завершить регистрацию. Проверьте приглашение и введённые данные.");
       } finally {
@@ -60,7 +67,7 @@ export function OperatorRegisterPage() {
       </select>{errors.department ? <small className="auth-field-error">{errors.department}</small> : null}</label>
       <Field label="Пароль" name="operator_password" type="password" value={value.password} error={errors.password} onChange={(event) => change("password", event.target.value)} />
       <Field label="Повторите пароль" name="operator_password_confirmation" type="password" value={value.password_confirmation} error={errors.password_confirmation} onChange={(event) => change("password_confirmation", event.target.value)} />
-      <button className="auth-submit" disabled={busy || !inviteToken}>{busy ? "Создаём…" : "Создать аккаунт специалиста"}</button>
+      <button className="auth-submit" disabled={busy || !inviteToken}>{busy ? "Создаём…" : "Создать аккаунт и открыть очередь"}</button>
     </form>
   </AuthLayout>;
 }

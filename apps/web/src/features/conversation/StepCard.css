@@ -1,23 +1,43 @@
 .step-card {
-  background: var(--color-accent-soft);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-lg);
-  padding: var(--space-4);
-  margin: var(--space-3) 0;
+  display: grid;
+  gap: var(--space-3);
+  padding: var(--space-5);
+  border: 1.5px solid var(--coral);
+  border-radius: var(--radius-xl);
+  background: var(--color-surface);
+  box-shadow: var(--shadow-md);
+  animation: bubble-in 300ms var(--ease) both;
 }
 
-.step-card-label {
-  margin: 0 0 var(--space-1);
-  font-size: var(--font-size-sm);
+.step-card-head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.step-card-number {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  background: var(--coral);
+  color: #fff;
   font-weight: 700;
-  color: var(--color-accent);
-  text-transform: uppercase;
-  letter-spacing: 0.03em;
+}
+
+.step-card-title {
+  font-size: var(--font-size-md);
 }
 
 .step-card-instruction {
-  margin: 0 0 var(--space-4);
   font-size: var(--font-size-md);
+  line-height: 1.5;
+}
+
+.step-card-ask {
+  color: var(--ink-soft);
+  font-size: var(--font-size-sm);
 }
 
 .step-card-actions {
@@ -26,11 +46,8 @@
   gap: var(--space-2);
 }
 
-@media (max-width: 480px) {
-  .step-card-actions {
-    flex-direction: column;
-  }
+@media (max-width: 520px) {
   .step-card-actions .btn {
-    width: 100%;
+    flex: 1 1 100%;
   }
 }

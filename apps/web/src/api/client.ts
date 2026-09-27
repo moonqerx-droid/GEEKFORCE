@@ -5,7 +5,11 @@ import type {
   MessageCreatePayload,
   OperatorTicket,
   AuthUser,
+  InviteResult,
   LoginPayload,
+  Metrics,
+  TeamMember,
+  TicketScope,
   OperatorRegistrationPayload,
   RegistrationPayload,
   StepResultPayload,
@@ -129,8 +133,50 @@ export const api = {
     );
   },
 
-  listTickets(signal?: AbortSignal): Promise<OperatorTicket[]> {
-    return request("/api/operator/tickets", {}, signal);
+  rateConversation(id: string, rating: number, comment?: string): Promise<Conversation> {
+    return request(`/api/conversations/${id}/rating`, {
+      method: "POST", body: JSON.stringify({ rating, comment }),
+    });
+  },
+
+  listTickets(scope: TicketScope = "queue", signal?: AbortSignal): Promise<OperatorTicket[]> {
+    return request(`/api/operator/tickets?scope=${scope}`, {}, signal);
+  },
+
+  getTicket(id: string, signal?: AbortSignal): Promise<OperatorTicket> {
+    return request(`/api/operator/tickets/${id}`, {}, signal);
+  },
+
+  assignTicket(id: string): Promise<OperatorTicket> {
+    return request(`/api/operator/tickets/${id}/assign`, { method: "POST" });
+  },
+
+  replyToTicket(id: string, content: string): Promise<OperatorTicket> {
+    return request(`/api/operator/tickets/${id}/messages`, {
+      method: "POST", body: JSON.stringify({ content }),
+    });
+  },
+
+  resolveTicket(id: string, summary: string): Promise<OperatorTicket> {
+    return request(`/api/operator/tickets/${id}/resolve`, {
+      method: "POST", body: JSON.stringify({ summary }),
+    });
+  },
+
+  metrics(days: number, signal?: AbortSignal): Promise<Metrics> {
+    return request(`/api/admin/metrics?days=${days}`, {}, signal);
+  },
+
+  listTeam(signal?: AbortSignal): Promise<TeamMember[]> {
+    return request("/api/admin/operators", {}, signal);
+  },
+
+  inviteOperator(payload: { email: string; first_name: string; last_name: string }): Promise<InviteResult> {
+    return request("/api/admin/operators/invite", { method: "POST", body: JSON.stringify(payload) });
+  },
+
+  setMemberActive(id: string, is_active: boolean): Promise<TeamMember> {
+    return request(`/api/admin/operators/${id}`, { method: "PATCH", body: JSON.stringify({ is_active }) });
   },
 
   /**

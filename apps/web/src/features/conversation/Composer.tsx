@@ -8,7 +8,11 @@ export function Composer({
   onSend,
   value,
   onValueChange,
+  tone = "assistant",
+  label = "Ваше сообщение",
 }: {
+  tone?: "assistant" | "human";
+  label?: string;
   busy: boolean;
   placeholder: string;
   onSend: (content: string) => Promise<void>;
@@ -36,18 +40,18 @@ export function Composer({
   };
 
   return (
-    <form className="composer" onSubmit={submit}>
+    <form className={`composer ${tone === "human" ? "composer-human" : ""}`} onSubmit={submit}>
       <textarea
         className="composer-textarea"
         value={value}
         onChange={(event) => onValueChange(event.target.value)}
         onKeyDown={onKeyDown}
         placeholder={placeholder}
-        rows={2}
+        rows={1}
         maxLength={4000}
-        aria-label="Ваше сообщение"
+        aria-label={label}
       />
-      <Button type="submit" variant="primary" busy={busy} disabled={!value.trim()}>
+      <Button type="submit" variant={tone === "human" ? "human" : "primary"} busy={busy} disabled={!value.trim()}>
         Отправить
       </Button>
     </form>

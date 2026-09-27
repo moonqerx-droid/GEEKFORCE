@@ -27,7 +27,20 @@ export interface ConversationState {
   sendStepResult: (outcome: StepOutcome) => Promise<void>;
   escalateNow: () => Promise<void>;
   retryFailedMessage: (id: number) => Promise<void>;
+  rate: (rating: number, comment?: string) => Promise<void>;
   dismissNotice: () => void;
+}
+
+/** While a specialist owns the conversation, their replies arrive by polling. */
+export const LIVE_STATUSES = new Set(["ESCALATED", "IN_PROGRESS"]);
+export const POLL_INTERVAL_MS = 3000;
+
+function readRequestedId(): string | null {
+  try {
+    return new URLSearchParams(window.location.search).get("conversation");
+  } catch {
+    return null;
+  }
 }
 
 function readStoredId(): string | null {
@@ -80,7 +93,9 @@ export function useConversation(): ConversationState {
   }, []);
 
   const restore = useCallback(async () => {
-    const storedId = readStoredId();
+    const requestedId = readRequestedId();
+    if (requestedId) storeId(requestedId);
+    const storedId = requestedId ?? readStoredId();
     if (!storedId) {
       setPhase("ready");
       return;
@@ -161,11 +176,17 @@ export function useConversation(): ConversationState {
   const restartFresh = useCallback(async () => {
     if (mutationRef.current) return;
     storeId(null);
+    try {
+      if (readRequestedId()) window.history.replaceState(null, "", window.location.pathname);
+    } catch {
+      // History API unavailable — the stale query only matters on reload.
+    }
     createdRef.current = null;
     setFailedMessages([]);
+    setError(null);
     setConversation(null);
-    await start();
-  }, [start]);
+    setPhase("ready");
+  }, []);
 
   const reloadAfterConflict = useCallback(async (id: string) => {
     try {
@@ -275,6 +296,39 @@ export function useConversation(): ConversationState {
 
   const dismissNotice = useCallback(() => setNotice(null), []);
 
+  const liveId = conversation && LIVE_STATUSES.has(conversation.status) ? conversation.id : null;
+  useEffect(() => {
+    if (!liveId) return;
+    const controller = new AbortController();
+    const timer = window.setInterval(() => {
+      if (mutationRef.current) return;
+      api.getConversation(liveId, controller.signal)
+        .then((fresh) => {
+          setConversation((current) => (
+            current && current.id === fresh.id && current.revision === fresh.revision
+              && current.messages.length === fresh.messages.length
+              ? current
+              : fresh
+          ));
+        })
+        .catch(() => undefined);
+    }, POLL_INTERVAL_MS);
+    return () => {
+      controller.abort();
+      window.clearInterval(timer);
+    };
+  }, [liveId]);
+
+  const rate = useCallback(async (rating: number, comment?: string) => {
+    if (!conversation) return;
+    setError(null);
+    try {
+      setConversation(await api.rateConversation(conversation.id, rating, comment));
+    } catch (err) {
+      setError(describeError(err));
+    }
+  }, [conversation]);
+
   return {
     phase,
     conversation,
@@ -290,6 +344,7 @@ export function useConversation(): ConversationState {
     sendStepResult,
     escalateNow,
     retryFailedMessage,
+    rate,
     dismissNotice,
   };
 }

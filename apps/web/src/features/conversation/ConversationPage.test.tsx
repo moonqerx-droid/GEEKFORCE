@@ -1,10 +1,13 @@
-import { render, screen, within } from "@testing-library/react";
+import { screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { HttpResponse, http } from "msw";
 import { describe, expect, it } from "vitest";
 import { server } from "../../test/server";
 import { makeConversation, makeMessage } from "../../test/fixtures";
+import { renderAs } from "../../test/render";
 import { ConversationPage } from "./ConversationPage";
+
+const render = (ui: React.ReactNode) => renderAs(ui);
 
 function withStoredConversation(conversation: ReturnType<typeof makeConversation>) {
   window.localStorage.setItem("helpflow.conversationId", conversation.id);
@@ -41,7 +44,7 @@ describe("ConversationPage status gating", () => {
     await user.click(screen.getByRole("button", { name: "Отправить" }));
 
     expect(within(screen.getByRole("log", { name: "Ход диалога" })).getByText("Не работает VPN")).toBeInTheDocument();
-    expect(screen.getByRole("status", { name: "HelpFlow готовит ответ" })).toBeInTheDocument();
+    expect(screen.getByRole("status", { name: "Помощник думает" })).toBeInTheDocument();
     expect(textarea).toBeEnabled();
     expect(textarea).toHaveValue("");
 
@@ -70,12 +73,12 @@ describe("ConversationPage status gating", () => {
     await user.type(textarea, "Следующий черновик");
     releaseFailure?.();
 
-    expect(await screen.findByRole("button", { name: "Повторить отправку" })).toBeInTheDocument();
+    expect(await screen.findByRole("button", { name: "Отправить ещё раз" })).toBeInTheDocument();
     expect(within(screen.getByRole("log", { name: "Ход диалога" })).getByText("Первое сообщение")).toBeInTheDocument();
     expect(textarea).toHaveValue("Следующий черновик");
 
     await user.click(screen.getByRole("button", { name: "Отправить" }));
-    expect(await screen.findAllByRole("button", { name: "Повторить отправку" })).toHaveLength(2);
+    expect(await screen.findAllByRole("button", { name: "Отправить ещё раз" })).toHaveLength(2);
     const log = screen.getByRole("log", { name: "Ход диалога" });
     expect(within(log).getByText("Первое сообщение")).toBeInTheDocument();
     expect(within(log).getByText("Следующий черновик")).toBeInTheDocument();
@@ -133,11 +136,11 @@ describe("ConversationPage status gating", () => {
     );
     const user = userEvent.setup();
     render(<ConversationPage />);
-    await user.type(await screen.findByLabelText("Описание проблемы"), "Не работает VPN");
-    await user.click(screen.getByRole("button", { name: "Начать диалог" }));
+    await user.type(await screen.findByLabelText("Опишите проблему"), "Не работает VPN");
+    await user.click(screen.getByRole("button", { name: "Отправить" }));
     expect(await screen.findByRole("alert")).toHaveTextContent("сервер");
-    expect(screen.getByLabelText("Описание проблемы")).toHaveValue("Не работает VPN");
-    await user.click(screen.getByRole("button", { name: "Начать диалог" }));
+    expect(screen.getByLabelText("Опишите проблему")).toHaveValue("Не работает VPN");
+    await user.click(screen.getByRole("button", { name: "Отправить" }));
     expect(await screen.findByText("Какая ошибка?")).toBeInTheDocument();
     expect(screen.getByText("Не работает VPN")).toBeInTheDocument();
     expect(creates).toBe(1);
@@ -157,7 +160,7 @@ describe("ConversationPage status gating", () => {
     expect(await screen.findByText("Очистите куки браузера")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Помогло" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Не помогло" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Не могу выполнить" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Не получается выполнить" })).toBeInTheDocument();
     expect(screen.queryByLabelText("Ваше сообщение")).not.toBeInTheDocument();
   });
 
@@ -173,10 +176,10 @@ describe("ConversationPage status gating", () => {
     );
     render(<ConversationPage />);
 
-    expect(await screen.findByText("Проблема решена")).toBeInTheDocument();
+    expect(await screen.findByText("Готово, проблема решена")).toBeInTheDocument();
     expect(screen.queryByLabelText("Ваше сообщение")).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Помогло" })).not.toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "Передать специалисту" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Позвать специалиста" })).not.toBeInTheDocument();
   });
 
   it("shows the escalation panel with completed steps once ESCALATED", async () => {
@@ -184,6 +187,7 @@ describe("ConversationPage status gating", () => {
       makeConversation({
         id: "c4",
         status: "ESCALATED",
+        summary: "Не удаётся войти в CRM",
         escalation_summary: "Пользователь не смог войти в CRM после трёх попыток",
         completed_steps: [
           {
@@ -199,8 +203,47 @@ describe("ConversationPage status gating", () => {
     );
     render(<ConversationPage />);
 
-    expect(await screen.findByText("Обращение передано специалисту")).toBeInTheDocument();
+    expect(await screen.findByText("Передали специалисту")).toBeInTheDocument();
     expect(screen.getByText("Очистить куки")).toBeInTheDocument();
     expect(screen.getByText("Не помогло")).toBeInTheDocument();
+    expect(screen.getByLabelText("Ваше сообщение")).toBeInTheDocument();
+  });
+
+  it("shows the specialist's reply as it arrives while the conversation is live", async () => {
+    const base = { id: "live", status: "IN_PROGRESS" as const, summary: "Не удаётся войти в CRM", assignee_name: "Анна Смирнова" };
+    let polls = 0;
+    window.localStorage.setItem("helpflow.conversationId", "live");
+    server.use(http.get("*/api/conversations/live", () => {
+      polls++;
+      return HttpResponse.json(makeConversation({
+        ...base,
+        revision: polls > 1 ? 3 : 2,
+        messages: polls > 1
+          ? [{ ...makeMessage("operator", "Сбросила сессию, попробуйте снова"), author_name: "Анна Смирнова" }]
+          : [],
+      }));
+    }));
+
+    renderAs(<ConversationPage />);
+
+    expect(await screen.findByText("Сбросила сессию, попробуйте снова", {}, { timeout: 5000 })).toBeInTheDocument();
+    expect(screen.getByText(/Анна Смирнова подключается к обращению/)).toBeInTheDocument();
+  });
+
+  it("lets the employee rate a resolved conversation", async () => {
+    let rated: unknown;
+    withStoredConversation(makeConversation({ id: "rate-me", status: "RESOLVED", resolved_by: "assistant" }));
+    server.use(http.post("*/api/conversations/rate-me/rating", async ({ request }) => {
+      rated = await request.json();
+      return HttpResponse.json(makeConversation({ id: "rate-me", status: "RESOLVED", rating: 5 }));
+    }));
+    const user = userEvent.setup();
+
+    render(<ConversationPage />);
+    await user.click(await screen.findByRole("radio", { name: "5 из 5" }));
+    await user.click(screen.getByRole("button", { name: "Отправить оценку" }));
+
+    expect(await screen.findByText("Спасибо за оценку: 5 из 5.")).toBeInTheDocument();
+    expect(rated).toEqual({ rating: 5 });
   });
 });

@@ -3,7 +3,7 @@
   align-items: center;
   justify-content: center;
   gap: var(--space-2);
-  border-radius: 10px;
+  border-radius: var(--radius-pill);
   border: 1px solid transparent;
   font-weight: 600;
   transition: background-color 120ms ease, border-color 120ms ease, opacity 120ms ease, transform 120ms ease;
@@ -11,7 +11,8 @@
 }
 
 .btn-md {
-  padding: 10px 16px;
+  min-height: 40px;
+  padding: 9px 18px;
   font-size: var(--font-size-base);
 }
 
@@ -32,7 +33,6 @@
 
 .btn-primary:hover:not(:disabled) {
   background: var(--color-accent-hover);
-  transform: translateY(-1px);
 }
 
 .btn-secondary {
@@ -62,4 +62,17 @@
 
 .btn-ghost:hover:not(:disabled) {
   background: var(--color-surface-muted);
+}
+
+.btn-human {
+  background: var(--sea);
+  color: #fff;
+}
+
+.btn-human:hover:not(:disabled) {
+  background: #173946;
+}
+
+.btn[aria-busy="true"] {
+  cursor: progress;
 }

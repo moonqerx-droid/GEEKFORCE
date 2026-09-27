@@ -8,11 +8,12 @@ export type ConversationStatus =
   | "TROUBLESHOOTING"
   | "VERIFYING"
   | "RESOLVED"
-  | "ESCALATED";
+  | "ESCALATED"
+  | "IN_PROGRESS";
 
 export type Urgency = "low" | "normal" | "high" | "critical";
 
-export type MessageRole = "user" | "assistant" | "system";
+export type MessageRole = "user" | "assistant" | "system" | "operator";
 
 export type StepOutcome = "helped" | "not_helped" | "cannot_perform";
 
@@ -21,6 +22,7 @@ export interface Message {
   role: MessageRole;
   content: string;
   created_at: string;
+  author_name?: string | null;
 }
 
 export interface CompletedStep {
@@ -61,10 +63,98 @@ export interface Conversation {
   rag_source_ids: string[];
   ai_fallback_reason: string | null;
   ai_latency_ms: number | null;
+  assignee_id?: string | null;
+  assignee_name?: string | null;
+  escalated_at?: string | null;
+  assigned_at?: string | null;
+  first_operator_reply_at?: string | null;
+  resolved_at?: string | null;
+  resolved_by?: "assistant" | "operator" | null;
+  rating?: number | null;
+  rating_comment?: string | null;
 }
 
 export interface OperatorTicket extends Conversation {
   original_request: string;
+  owner_name?: string | null;
+  owner_department?: Department | null;
+}
+
+export type TicketScope = "queue" | "mine" | "resolved";
+
+/** Mirrors helpflow_ai.schemas.EscalationCard. */
+export interface EscalationCard {
+  original_request: string;
+  summary: string;
+  service: string;
+  urgency: string;
+  urgency_reason: string;
+  known_facts: Record<string, string>;
+  questions_and_answers: { question?: string; answer?: string }[];
+  performed_steps: { step_id?: string; step?: string; result?: string }[];
+  current_result: string;
+  escalation_reason: string;
+  recommended_team: string;
+  ai_summary: string;
+}
+
+export interface TeamMember {
+  id: string;
+  email: string;
+  name: string;
+  role: "operator" | "admin";
+  status: "active" | "disabled" | "invited";
+  created_at: string;
+  last_login_at: string | null;
+}
+
+export interface InviteResult {
+  invite_url: string;
+  expires_at: string;
+  email_sent: boolean;
+}
+
+export interface DailyMetric {
+  date: string;
+  assistant: number;
+  operator: number;
+  open: number;
+  total: number;
+}
+
+export interface ProblemMetric {
+  playbook_id: string;
+  service: string | null;
+  count: number;
+  escalation_rate: number;
+}
+
+export interface OperatorLoad {
+  id: string;
+  name: string;
+  is_active: boolean;
+  in_progress: number;
+  resolved: number;
+  median_resolution_minutes: number | null;
+  average_rating: number | null;
+}
+
+export interface Metrics {
+  days: number;
+  total: number;
+  resolved_by_assistant: number;
+  resolved_by_operator: number;
+  open: number;
+  waiting: number;
+  self_service_rate: number | null;
+  median_resolution_minutes: number | null;
+  median_first_reply_minutes: number | null;
+  average_rating: number | null;
+  ratings_count: number;
+  daily: DailyMetric[];
+  top_problems: ProblemMetric[];
+  urgency: Record<Urgency, number>;
+  operators: OperatorLoad[];
 }
 
 export interface MessageCreatePayload {
@@ -90,7 +180,7 @@ export interface Incident {
   summary: string | null;
 }
 
-export type UserRole = "employee" | "operator";
+export type UserRole = "employee" | "operator" | "admin";
 export type Department = "it" | "sales" | "marketing" | "finance" | "hr" | "operations" | "other";
 
 export interface AuthUser {

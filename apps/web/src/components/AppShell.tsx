@@ -11,6 +11,6 @@ export function AppShell() {
       await logout();
       navigate("/login", { replace: true });
     }} />
-    <main><Outlet /></main>
+    <main className="app-main"><Outlet /></main>
   </>;
 }

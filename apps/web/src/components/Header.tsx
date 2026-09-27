@@ -1,31 +1,46 @@
 import { useEffect, useState } from "react";
 import { Link, NavLink } from "react-router-dom";
-import { Headphones, LogOut, MessageCircleMore } from "lucide-react";
+import { LogOut } from "lucide-react";
 import { api } from "../api/client";
+import type { UserRole } from "../api/types";
+import { homePathFor } from "../lib/labels";
+import { Avatar } from "./primitives";
 import "./Header.css";
 
-type ApiState = "checking" | "online" | "offline";
+const NAV: Record<UserRole, { to: string; label: string; end?: boolean }[]> = {
+  employee: [
+    { to: "/employee", label: "Новое обращение", end: true },
+    { to: "/employee/history", label: "Мои обращения" },
+  ],
+  operator: [{ to: "/operator", label: "Обращения" }],
+  admin: [
+    { to: "/admin", label: "Обзор", end: true },
+    { to: "/operator", label: "Обращения" },
+    { to: "/admin/team", label: "Команда" },
+  ],
+};
+
+const ROLE_LABEL: Record<UserRole, string> = {
+  employee: "Сотрудник",
+  operator: "Специалист поддержки",
+  admin: "Руководитель поддержки",
+};
 
 interface HeaderProps {
-  role: "employee" | "operator";
+  role: UserRole;
   name: string;
   onLogout: () => void | Promise<void>;
 }
 
 export function Header({ role, name, onLogout }: HeaderProps) {
-  const [apiState, setApiState] = useState<ApiState>("checking");
+  const [offline, setOffline] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
     const check = () => {
-      api
-        .health()
-        .then(() => {
-          if (!cancelled) setApiState("online");
-        })
-        .catch(() => {
-          if (!cancelled) setApiState("offline");
-        });
+      api.health()
+        .then(() => { if (!cancelled) setOffline(false); })
+        .catch(() => { if (!cancelled) setOffline(true); });
     };
     check();
     const interval = window.setInterval(check, 20000);
@@ -37,35 +52,26 @@ export function Header({ role, name, onLogout }: HeaderProps) {
 
   return (
     <header className="app-header">
-      <Link to="/" className="app-header-brand">
+      <Link to={homePathFor(role)} className="app-header-brand">
         <img className="app-header-logo" src="/brand/helpflow-logo-512.png" alt="" aria-hidden="true" />
         <span>HelpFlow</span>
       </Link>
       <nav className="app-header-nav" aria-label="Разделы">
-        {role === "employee" ? <>
-          <NavLink to="/employee" end className={({ isActive }) => (isActive ? "active" : undefined)}>
-            <MessageCircleMore size={16} aria-hidden="true" />Мои обращения
+        {NAV[role].map((item) => (
+          <NavLink key={item.to} to={item.to} end={item.end}
+            className={({ isActive }) => (isActive ? "active" : undefined)}>
+            {item.label}
           </NavLink>
-          <NavLink to="/employee/history" className={({ isActive }) => (isActive ? "active" : undefined)}>История</NavLink>
-        </> : <NavLink to="/operator" className={({ isActive }) => (isActive ? "active" : undefined)}>
-          <Headphones size={16} aria-hidden="true" />Очередь
-        </NavLink>}
+        ))}
       </nav>
-      <span
-        className={`api-indicator api-indicator-${apiState}`}
-        role="status"
-        title={
-          apiState === "online"
-            ? "Сервер доступен"
-            : apiState === "offline"
-              ? "Сервер недоступен"
-              : "Проверка соединения"
-        }
-      >
-        <span className="api-indicator-dot" aria-hidden="true" />
-        {apiState === "online" ? "Онлайн" : apiState === "offline" ? "Нет связи" : "Проверка…"}
-      </span>
-      <span className="app-header-user">{name}</span>
+      {offline ? <span className="app-header-offline" role="status">Нет связи с сервером</span> : null}
+      <div className="app-header-user">
+        <Avatar kind={role === "employee" ? "employee" : "human"} name={name} size={30} />
+        <span className="app-header-user-text">
+          <span className="app-header-user-name">{name}</span>
+          <span className="app-header-user-role">{ROLE_LABEL[role]}</span>
+        </span>
+      </div>
       <button type="button" className="app-header-logout" onClick={() => void onLogout()} aria-label="Выйти">
         <LogOut size={17} aria-hidden="true" />
       </button>

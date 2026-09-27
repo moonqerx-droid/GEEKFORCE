@@ -7,7 +7,7 @@
 html,
 body,
 #root {
-  height: 100%;
+  min-height: 100%;
 }
 
 body {
@@ -17,13 +17,30 @@ body {
   font-family: var(--font-sans);
   font-size: var(--font-size-base);
   line-height: 1.5;
+  font-feature-settings: "ss01";
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
 }
 
+h1,
+h2,
+h3,
+p {
+  margin: 0;
+}
+
+h1,
+h2,
+h3 {
+  line-height: 1.15;
+  letter-spacing: -0.02em;
+  font-weight: 650;
+}
+
 button,
 input,
-textarea {
+textarea,
+select {
   font: inherit;
   color: inherit;
 }
@@ -32,23 +49,28 @@ button {
   cursor: pointer;
 }
 
-::selection {
-  color: var(--color-text);
-  background: #cddfff;
-}
-
 button:disabled {
   cursor: not-allowed;
 }
 
+::selection {
+  color: var(--ink);
+  background: #ffd3c2;
+}
+
 a {
-  color: var(--color-accent);
+  color: var(--coral-deep);
+  text-underline-offset: 3px;
 }
 
 :focus-visible {
   outline: none;
   box-shadow: var(--focus-ring);
   border-radius: var(--radius-sm);
+}
+
+.num {
+  font-variant-numeric: tabular-nums;
 }
 
 .visually-hidden {
