@@ -15,6 +15,8 @@ STOP_WORDS = frozenset({
     "a", "an", "and", "for", "from", "in", "is", "not", "of", "on", "or", "the", "to",
     "http", "https", "меня", "отвечает", "ошибка", "ошибку", "проблема", "работает",
     "сервис", "сервера",
+    # Filler that says nothing about the failure itself.
+    "пишет", "выдает", "показывает", "опять", "снова", "делать", "помогите", "пожалуйста",
 })
 EXCLUDED_SERVICES = frozenset({"", "не определен", "не определено", "unknown"})
 

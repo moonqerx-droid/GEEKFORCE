@@ -123,3 +123,14 @@ def test_first_turn_fields_match_existing_candidate(
     assert match is not None
     assert match.incident_id == candidate.id
     assert match.score >= 0.55
+
+
+def test_signature_is_filled_when_the_session_does_not_autoflush(db_session, incident_service, crm_failure_factory):
+    # The application's SessionLocal runs with autoflush=False.
+    db_session.autoflush = False
+    created = None
+    for _ in range(3):
+        created = incident_service.observe_escalated(crm_failure_factory(code="502").id) or created
+
+    assert created is not None
+    assert {"crm", "502"} <= set(created.signature_tokens)
