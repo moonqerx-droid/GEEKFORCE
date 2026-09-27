@@ -16,6 +16,27 @@ def test_default_configuration_uses_mock_ai_and_sqlite():
     assert settings.app_public_url == "http://localhost:5174"
 
 
+def test_incident_settings_have_safe_defaults():
+    settings = Settings(_env_file=None)
+
+    assert settings.incident_similarity_threshold == 0.55
+    assert settings.incident_min_cluster_size == 3
+
+
+@pytest.mark.parametrize(
+    ("field", "value"),
+    [
+        ("incident_similarity_threshold", -0.01),
+        ("incident_similarity_threshold", 1.01),
+        ("incident_min_cluster_size", 1),
+        ("incident_min_cluster_size", 21),
+    ],
+)
+def test_incident_settings_reject_unsafe_bounds(field, value):
+    with pytest.raises(ValidationError):
+        Settings(_env_file=None, **{field: value})
+
+
 def test_configuration_rejects_unknown_ai_provider():
     with pytest.raises(ValidationError):
         Settings(_env_file=None, ai_provider="mystery")

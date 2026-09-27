@@ -35,7 +35,7 @@ def test_initial_migration_adopts_pre_alembic_database(tmp_path):
 
     assert inspect(engine).has_table("alembic_version")
     with engine.connect() as connection:
-        assert connection.scalar(text("SELECT version_num FROM alembic_version")) == "20260927_0006"
+        assert connection.scalar(text("SELECT version_num FROM alembic_version")) == "20260927_0007"
         assert connection.scalar(text("SELECT id FROM conversations WHERE id='preserved'")) == "preserved"
     inspector = inspect(engine)
     assert {"users", "auth_sessions", "email_tokens", "operator_invites"}.issubset(
@@ -112,3 +112,17 @@ def test_ai_provenance_migration_roundtrip(tmp_path):
     command.downgrade(config, "20260926_0003")
     downgraded = {column["name"] for column in inspect(engine).get_columns("conversations")}
     assert {"rag_source_ids", "ai_fallback_reason", "ai_latency_ms"}.isdisjoint(downgraded)
+
+
+def test_incident_radar_migration_roundtrip(tmp_path):
+    database_url = f"sqlite:///{tmp_path / 'incident.db'}"
+    config = Config("alembic.ini")
+    config.set_main_option("sqlalchemy.url", database_url)
+    command.upgrade(config, "20260927_0006")
+    engine = create_engine(database_url)
+
+    command.upgrade(config, "head")
+    assert {"incidents", "incident_updates"} <= set(inspect(engine).get_table_names())
+
+    command.downgrade(config, "20260927_0006")
+    assert {"incidents", "incident_updates"}.isdisjoint(inspect(engine).get_table_names())
