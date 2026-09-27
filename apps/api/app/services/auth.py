@@ -147,12 +147,13 @@ class AuthService:
         settings = get_settings()
         raw_token = new_token()
         ttl = timedelta(days=settings.remembered_session_ttl_days) if payload.remember_me else timedelta(hours=settings.session_ttl_hours)
-        session = AuthSession(user_id=user.id, token_hash=hash_token(raw_token), expires_at=utc_now() + ttl,
+        expires_at = utc_now() + ttl
+        session = AuthSession(user_id=user.id, token_hash=hash_token(raw_token), expires_at=expires_at,
                               user_agent=user_agent, ip_hash=ip_hash)
         self.repository.add_session(session)
         user.last_login_at = utc_now()
         self.repository.session.commit()
-        return user, raw_token, session.expires_at
+        return user, raw_token, expires_at
 
     def logout(self, raw_token: str) -> None:
         session = self.repository.get_session_by_token_hash(hash_token(raw_token))

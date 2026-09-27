@@ -1,0 +1,36 @@
+from app.core.security import hash_password, utc_now
+from app.models.auth import User
+
+
+def verified_user(db_session, *, role="employee"):
+    user = User(first_name="Анна", last_name="Иванова", email=f"{role}@example.ru",
+                department="it", password_hash=hash_password("StrongPass7"), role=role,
+                email_verified_at=utc_now())
+    db_session.add(user)
+    db_session.commit()
+    return user
+
+
+def test_login_sets_hardened_cookie_and_me_returns_identity(client, db_session):
+    user = verified_user(db_session)
+    response = client.post("/api/auth/login", json={
+        "email": user.email, "password": "StrongPass7", "remember_me": False,
+    })
+
+    assert response.status_code == 200
+    cookie = response.headers["set-cookie"]
+    assert "HttpOnly" in cookie and "SameSite=lax" in cookie and "Path=/" in cookie
+    assert client.get("/api/auth/me").json()["role"] == "employee"
+
+
+def test_logout_revokes_cookie(client, db_session):
+    user = verified_user(db_session)
+    client.post("/api/auth/login", json={"email": user.email, "password": "StrongPass7"})
+    assert client.post("/api/auth/logout").status_code == 204
+    assert client.get("/api/auth/me").status_code == 401
+
+
+def test_forgot_password_is_neutral_for_unknown_email(client):
+    response = client.post("/api/auth/forgot-password", json={"email": "missing@example.ru"})
+    assert response.status_code == 202
+    assert response.json()["code"] == "password_reset_requested"
