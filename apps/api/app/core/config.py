@@ -6,7 +6,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 class Settings(BaseSettings):
     database_url: str = "sqlite:///./helpflow.db"
-    ai_provider: Literal["mock", "openai", "ollama"] = "mock"
+    ai_provider: Literal["mock", "rules", "openai", "ollama"] = "mock"
     cors_origins: list[str] = [
         "http://localhost:3000",
         "http://localhost:5173",

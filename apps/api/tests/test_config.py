@@ -24,6 +24,12 @@ def test_configuration_accepts_ollama_without_an_external_api_key():
     assert settings.ai_provider == "ollama"
 
 
+def test_configuration_accepts_rules_only_fallback():
+    settings = Settings(_env_file=None, ai_provider="rules")
+
+    assert settings.ai_provider == "rules"
+
+
 def test_compose_uses_healthy_postgres_before_starting_api():
     compose_path = Path(__file__).parents[3] / "docker-compose.yml"
     compose = yaml.safe_load(compose_path.read_text(encoding="utf-8"))
