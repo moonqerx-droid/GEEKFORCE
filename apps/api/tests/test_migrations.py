@@ -35,7 +35,7 @@ def test_initial_migration_adopts_pre_alembic_database(tmp_path):
 
     assert inspect(engine).has_table("alembic_version")
     with engine.connect() as connection:
-        assert connection.scalar(text("SELECT version_num FROM alembic_version")) == "20260928_0009"
+        assert connection.scalar(text("SELECT version_num FROM alembic_version")) == "20260928_0010"
         assert connection.scalar(text("SELECT id FROM conversations WHERE id='preserved'")) == "preserved"
     inspector = inspect(engine)
     assert {"users", "auth_sessions", "email_tokens", "operator_invites"}.issubset(
@@ -134,8 +134,51 @@ def test_incident_radar_migration_roundtrip(tmp_path):
     command.upgrade(config, "20260928_0007")
     engine = create_engine(database_url)
 
-    command.upgrade(config, "head")
+    command.upgrade(config, "20260928_0008")
     assert {"incidents", "incident_updates"} <= set(inspect(engine).get_table_names())
 
     command.downgrade(config, "20260928_0007")
     assert {"incidents", "incident_updates"}.isdisjoint(inspect(engine).get_table_names())
+
+
+def test_knowledge_migration_roundtrip_and_integrity(tmp_path):
+    database_url = f"sqlite:///{tmp_path / 'knowledge.db'}"
+    config = Config("alembic.ini")
+    config.set_main_option("sqlalchemy.url", database_url)
+    command.upgrade(config, "20260928_0009")
+    engine = create_engine(database_url)
+
+    command.upgrade(config, "head")
+    inspector = inspect(engine)
+    assert {"knowledge_documents", "knowledge_chunks"} <= set(inspector.get_table_names())
+    chunk_columns = {column["name"] for column in inspector.get_columns("knowledge_chunks")}
+    assert {"id", "document_id", "position", "text", "char_count", "token_count", "metadata", "created_at"} <= chunk_columns
+    document_indexes = {index["name"] for index in inspector.get_indexes("knowledge_documents")}
+    assert {"ix_knowledge_documents_sha256", "ix_knowledge_documents_status"} <= document_indexes
+    unique = inspector.get_unique_constraints("knowledge_chunks")
+    assert any(set(item["column_names"]) == {"document_id", "position"} for item in unique)
+
+    with engine.begin() as connection:
+        connection.execute(text(
+            "INSERT INTO knowledge_documents (id, title, original_filename, media_type, size_bytes, sha256,"
+            " status, created_at, updated_at, revision)"
+            " VALUES ('d1', 't', 'f.txt', 'text/plain', 1, 'x', 'ready', '2026-09-28', '2026-09-28', 1)"
+        ))
+        connection.execute(text(
+            "INSERT INTO knowledge_chunks (id, document_id, position, text, char_count, token_count,"
+            " metadata, created_at) VALUES ('c1', 'd1', 0, 'a', 1, 1, '{}', '2026-09-28')"
+        ))
+    with pytest.raises(Exception), engine.begin() as connection:
+        connection.execute(text(
+            "INSERT INTO knowledge_chunks (id, document_id, position, text, char_count, token_count,"
+            " metadata, created_at) VALUES ('c2', 'd1', 0, 'b', 1, 1, '{}', '2026-09-28')"
+        ))
+    with pytest.raises(Exception), engine.begin() as connection:
+        connection.execute(text(
+            "INSERT INTO knowledge_documents (id, title, original_filename, media_type, size_bytes, sha256,"
+            " status, created_at, updated_at, revision)"
+            " VALUES ('d2', 't', 'f.txt', 'text/plain', 1, 'y', 'archived', '2026-09-28', '2026-09-28', 1)"
+        ))
+
+    command.downgrade(config, "20260928_0009")
+    assert {"knowledge_documents", "knowledge_chunks"}.isdisjoint(inspect(engine).get_table_names())

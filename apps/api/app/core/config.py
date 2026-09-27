@@ -35,6 +35,12 @@ class Settings(BaseSettings):
     admin_email: str = ""
     admin_password: str = ""
     support_first_reply_sla_minutes: int = 15
+    # Company documents uploaded by the admin (PDF, DOCX, TXT, MD).
+    knowledge_max_upload_bytes: int = Field(default=10 * 1024 * 1024, ge=1024, le=100 * 1024 * 1024)
+    knowledge_max_extracted_chars: int = Field(default=500_000, ge=1000)
+    knowledge_max_pdf_pages: int = Field(default=200, ge=1, le=2000)
+    knowledge_chunk_chars: int = Field(default=1200, ge=200, le=8000)
+    knowledge_chunk_overlap: int = Field(default=150, ge=0, le=1000)
 
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 

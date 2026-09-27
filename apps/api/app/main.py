@@ -15,6 +15,7 @@ from app.api.routes.auth import router as auth_router
 from app.api.routes.admin import router as admin_router
 from app.api.routes.attachments import router as attachments_router
 from app.api.routes.profile import router as profile_router
+from app.api.routes.knowledge_admin import router as knowledge_admin_router
 from app.db.base import Base
 from app.db.session import SessionLocal, engine
 from app.core.config import get_settings
@@ -50,6 +51,7 @@ app.include_router(auth_router)
 app.include_router(admin_router)
 app.include_router(attachments_router)
 app.include_router(profile_router)
+app.include_router(knowledge_admin_router)
 
 
 def asset_versions(*names: str) -> dict[str, str]:
