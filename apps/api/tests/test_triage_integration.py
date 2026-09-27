@@ -189,3 +189,50 @@ def test_natural_operator_request_escalates_from_active_dialogue(client):
     assert result["status"] == "ESCALATED"
     assert result["escalation_card"]["escalation_reason"] == "пользователь запросил специалиста"
     assert "передано специалисту" in result["messages"][-1]["content"].lower()
+
+
+def test_ai_provenance_survives_database_reload(client, db_session, monkeypatch):
+    from app.api.routes.conversations import get_triage_engine
+
+    engine = get_triage_engine()
+    original = engine.decide
+
+    def grounded(context):
+        return original(context).model_copy(update={
+            "source_ids": ["vpn.authentication"],
+            "fallback_reason": None,
+            "llm_latency_ms": 321,
+        })
+
+    monkeypatch.setattr(engine, "decide", grounded)
+    cid = client.post("/api/conversations").json()["id"]
+    state = send(client, cid, "Не работает VPN")
+    db_session.expunge_all()
+    reloaded = client.get(f"/api/conversations/{cid}").json()
+
+    assert reloaded["rag_source_ids"] == ["vpn.authentication"]
+    assert reloaded["ai_fallback_reason"] is None
+    assert reloaded["ai_latency_ms"] == 321
+    assert reloaded["revision"] == state["revision"]
+
+
+def test_ai_fallback_reason_is_persisted(client, monkeypatch):
+    from app.api.routes.conversations import get_triage_engine
+
+    engine = get_triage_engine()
+    original = engine.decide
+
+    def fallback(context):
+        return original(context).model_copy(update={
+            "source_ids": [],
+            "fallback_reason": "low_confidence",
+            "llm_latency_ms": 87,
+        })
+
+    monkeypatch.setattr(engine, "decide", fallback)
+    cid = client.post("/api/conversations").json()["id"]
+    state = send(client, cid, "Не работает VPN")
+
+    assert state["rag_source_ids"] == []
+    assert state["ai_fallback_reason"] == "low_confidence"
+    assert state["ai_latency_ms"] == 87

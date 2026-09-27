@@ -25,6 +25,9 @@ export function TicketDetail({ ticket }: { ticket: OperatorTicket | null }) {
           {ticket.incident_id ? (
             <Badge tone="accent">Массовый инцидент: {ticket.incident_id}</Badge>
           ) : null}
+          {ticket.ai_fallback_reason ? (
+            <Badge tone="warning">Использован безопасный fallback</Badge>
+          ) : null}
         </div>
         <p className="ticket-detail-updated">Обновлено: {formatDateTime(ticket.updated_at)}</p>
       </header>
@@ -38,6 +41,17 @@ export function TicketDetail({ ticket }: { ticket: OperatorTicket | null }) {
         <section className="ticket-detail-section">
           <h3>Причина срочности</h3>
           <p>{ticket.urgency_reason}</p>
+        </section>
+      ) : null}
+
+      {ticket.rag_source_ids.length > 0 ? (
+        <section className="ticket-detail-section">
+          <h3>Источники ответа</h3>
+          <ul className="ticket-detail-sources">
+            {ticket.rag_source_ids.map((sourceId) => (
+              <li key={sourceId}>{sourceId}</li>
+            ))}
+          </ul>
         </section>
       ) : null}
 

@@ -24,6 +24,9 @@ export function makeConversation(overrides: Partial<Conversation> = {}): Convers
     escalation_summary: null,
     escalation_card: null,
     incident_id: null,
+    rag_source_ids: [],
+    ai_fallback_reason: null,
+    ai_latency_ms: null,
     ...overrides,
   };
 }

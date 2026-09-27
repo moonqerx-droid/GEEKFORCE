@@ -168,6 +168,9 @@ class TriageDialogueService(DialogueService):
 
     def _advance(self, conversation):
         decision = self.engine.decide(self._context(conversation))
+        conversation.rag_source_ids = list(decision.source_ids)
+        conversation.ai_fallback_reason = decision.fallback_reason
+        conversation.ai_latency_ms = decision.llm_latency_ms
         conversation.current_step_code = None
         conversation.current_step_instruction = None
         playbook = self.engine.kb.get(conversation.playbook_id)

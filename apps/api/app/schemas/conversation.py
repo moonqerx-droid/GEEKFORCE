@@ -100,6 +100,9 @@ class ConversationRead(BaseModel):
     escalation_summary: str | None
     incident_id: str | None
     escalation_card: dict | None = None
+    rag_source_ids: list[str] = Field(default_factory=list)
+    ai_fallback_reason: str | None = None
+    ai_latency_ms: int | None = None
 
     @classmethod
     def from_model(cls, model) -> "ConversationRead":

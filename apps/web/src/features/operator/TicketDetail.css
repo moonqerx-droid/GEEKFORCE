@@ -82,9 +82,18 @@
 }
 
 .ticket-detail-list,
-.ticket-detail-steps {
+.ticket-detail-steps,
+.ticket-detail-sources {
   margin: 0;
   padding-left: 18px;
+}
+
+.ticket-detail-sources li {
+  margin: 4px 0;
+  color: var(--color-text-muted);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 12px;
+  overflow-wrap: anywhere;
 }
 
 .ticket-detail-steps li {

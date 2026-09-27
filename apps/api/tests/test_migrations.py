@@ -35,7 +35,7 @@ def test_initial_migration_adopts_pre_alembic_database(tmp_path):
 
     assert inspect(engine).has_table("alembic_version")
     with engine.connect() as connection:
-        assert connection.scalar(text("SELECT version_num FROM alembic_version")) == "20260926_0003"
+        assert connection.scalar(text("SELECT version_num FROM alembic_version")) == "20260926_0004"
         assert connection.scalar(text("SELECT id FROM conversations WHERE id='preserved'")) == "preserved"
 
 
@@ -87,6 +87,23 @@ def test_triage_migration_upgrades_original_schema_without_losing_data(tmp_path)
     command.upgrade(config, "head")
     with engine.connect() as connection:
         row = connection.execute(text(
-            "SELECT id,workflow_version,asked_facts,verification_failed,revision FROM conversations"
+            "SELECT id,workflow_version,asked_facts,verification_failed,revision,rag_source_ids,"
+            "ai_fallback_reason,ai_latency_ms FROM conversations"
         )).one()
-        assert tuple(row) == ("old", "legacy", "[]", 0, 1)
+        assert tuple(row) == ("old", "legacy", "[]", 0, 1, "[]", None, None)
+
+
+def test_ai_provenance_migration_roundtrip(tmp_path):
+    database_url = f"sqlite:///{tmp_path / 'provenance.db'}"
+    config = Config("alembic.ini")
+    config.set_main_option("sqlalchemy.url", database_url)
+    command.upgrade(config, "20260926_0003")
+    engine = create_engine(database_url)
+
+    command.upgrade(config, "head")
+    upgraded = {column["name"] for column in inspect(engine).get_columns("conversations")}
+    assert {"rag_source_ids", "ai_fallback_reason", "ai_latency_ms"} <= upgraded
+
+    command.downgrade(config, "20260926_0003")
+    downgraded = {column["name"] for column in inspect(engine).get_columns("conversations")}
+    assert {"rag_source_ids", "ai_fallback_reason", "ai_latency_ms"}.isdisjoint(downgraded)

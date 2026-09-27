@@ -37,6 +37,9 @@ class Conversation(Base):
     asked_facts: Mapped[list[str]] = mapped_column(JSON, default=list, server_default="[]")
     verification_failed: Mapped[bool] = mapped_column(Boolean, default=False, server_default="0")
     escalation_card: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+    rag_source_ids: Mapped[list[str]] = mapped_column(JSON, default=list, server_default="[]")
+    ai_fallback_reason: Mapped[str | None] = mapped_column(String(80), nullable=True)
+    ai_latency_ms: Mapped[int | None] = mapped_column(Integer, nullable=True)
     revision: Mapped[int] = mapped_column(Integer, nullable=False, default=1, server_default="1")
 
     __mapper_args__ = {"version_id_col": revision}

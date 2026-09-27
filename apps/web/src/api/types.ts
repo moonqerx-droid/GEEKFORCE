@@ -58,6 +58,9 @@ export interface Conversation {
   escalation_summary: string | null;
   escalation_card: Record<string, unknown> | null;
   incident_id: string | null;
+  rag_source_ids: string[];
+  ai_fallback_reason: string | null;
+  ai_latency_ms: number | null;
 }
 
 export interface OperatorTicket extends Conversation {
