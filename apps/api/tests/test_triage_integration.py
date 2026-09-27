@@ -85,7 +85,7 @@ def test_decision_failure_rolls_back_entire_turn(client, monkeypatch):
 def test_legacy_conversation_can_continue_after_upgrade(client, db_session):
     from app.models import Conversation
 
-    legacy = Conversation()
+    legacy = Conversation(owner_id="test-employee")
     db_session.add(legacy)
     db_session.commit()
     cid = legacy.id
