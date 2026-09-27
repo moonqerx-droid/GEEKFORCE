@@ -375,6 +375,32 @@ def test_grounded_reply_accepts_only_prompt_sources(kb):
     assert result.message_source == "llm"
 
 
+def test_grounded_claim_allows_supported_rewording(kb):
+    ctx = ConversationContext(original_request="Не работает VPN", playbook_id="vpn_connection")
+    match = KnowledgeRetriever(kb.chunks).search(
+        ctx.original_request, ctx.playbook_id
+    )[0]
+    reworded = "Проверьте, пожалуйста: без VPN открываются обычные сайты?"
+    reply = {
+        "answer": reworded,
+        "claims": [{
+            "text": reworded,
+            "source_id": match.chunk.id,
+            "quote": match.chunk.text,
+        }],
+        "source_ids": [match.chunk.id],
+        "confidence": 0.91,
+        "needs_operator": False,
+        "reason": "Вопрос подтверждён сценарием VPN",
+    }
+
+    result = TriageEngine(kb, fake_llm([reply])).decide(ctx)
+
+    assert result.message == reworded
+    assert result.message_source == "llm"
+    assert result.source_ids == [match.chunk.id]
+
+
 def test_grounded_unknown_source_falls_back_to_rule_message(kb):
     ctx = ConversationContext(original_request="Не работает VPN", playbook_id="vpn_connection")
     expected = TriageEngine(kb).decide(ctx)

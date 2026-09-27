@@ -15,6 +15,7 @@ from typing import Any
 from pydantic import ValidationError
 
 from . import prompts, rules
+from .evidence import EvidenceValidator
 from .knowledge import KnowledgeBase
 from .llm import LLMClient, LLMError, LLMSettings
 from .retrieval import KnowledgeRetriever
@@ -188,28 +189,22 @@ class TriageEngine:
             )
             answer = GroundedAnswer.model_validate(raw)
             elapsed = _elapsed_ms(started)
-            allowed = {match.chunk.id for match in matches}
-            if not set(answer.source_ids) <= allowed:
-                return decision.model_copy(update={
-                    "fallback_reason": "unknown_source",
-                    "llm_latency_ms": elapsed,
-                })
-            if answer.confidence < 0.65:
-                return decision.model_copy(update={
-                    "fallback_reason": "low_confidence",
-                    "llm_latency_ms": elapsed,
-                })
             if answer.needs_operator != (decision.action == DecisionAction.ESCALATE):
                 return decision.model_copy(update={
                     "fallback_reason": "action_mismatch",
                     "llm_latency_ms": elapsed,
                 })
-            message = answer.answer.strip()
-            if not _same_prepared_message(message, decision.message):
+            validation = EvidenceValidator().validate(
+                answer,
+                matches,
+                prepared_message=decision.message,
+            )
+            if not validation.accepted:
                 return decision.model_copy(update={
-                    "fallback_reason": "content_mismatch",
+                    "fallback_reason": validation.reason,
                     "llm_latency_ms": elapsed,
                 })
+            message = answer.answer.strip()
             notice = playbook.safety_notice
             if notice and notice in decision.message and notice not in message:
                 message = f"{notice} {message}"
@@ -221,7 +216,7 @@ class TriageEngine:
             return decision.model_copy(update={
                 "message": message,
                 "message_source": "llm",
-                "source_ids": answer.source_ids,
+                "source_ids": validation.source_ids,
                 "llm_latency_ms": elapsed,
             })
         except ValidationError as error:
@@ -605,12 +600,6 @@ def _first_user_message(ctx: ConversationContext) -> str:
 
 def _elapsed_ms(started: float) -> int:
     return max(0, round((time.monotonic() - started) * 1000))
-
-
-def _same_prepared_message(candidate: str, prepared: str) -> bool:
-    """Allow presentation-only differences, never new model-authored instructions."""
-    normalize = lambda value: " ".join(re.findall(r"[\w]+", value.casefold()))
-    return normalize(candidate) == normalize(prepared)
 
 
 def _coerce_llm_analysis(raw: dict[str, Any], base: Analysis) -> Analysis:

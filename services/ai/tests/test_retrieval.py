@@ -6,6 +6,7 @@ import pytest
 
 from helpflow_ai.knowledge import KnowledgeBase, KnowledgeBaseError
 from helpflow_ai.retrieval import KnowledgeRetriever
+from helpflow_ai.schemas import KnowledgeChunk
 
 
 def test_vpn_query_returns_only_approved_chunks(kb):
@@ -34,6 +35,52 @@ def test_limit_and_ids_are_deterministic(kb):
 
     assert [match.chunk.id for match in first] == [match.chunk.id for match in second]
     assert len(first) <= 3
+
+
+def test_exact_title_and_phrase_outrank_noisy_token_overlap():
+    chunks = [
+        KnowledgeChunk(
+            id="noise",
+            service="Browser",
+            title="Общие проблемы браузера",
+            text="кэш браузера ошибка очистить данные обновить страницу браузера",
+            keywords=["браузер", "кэш", "ошибка"],
+            escalation_team="Service Desk L1",
+        ),
+        KnowledgeChunk(
+            id="exact",
+            service="Browser",
+            title="Как очистить кэш браузера",
+            text="Откройте настройки и очистите кэш браузера.",
+            keywords=["очистить кэш браузера"],
+            escalation_team="Service Desk L1",
+        ),
+    ]
+
+    matches = KnowledgeRetriever(chunks).search("как очистить кэш браузера", None)
+
+    assert [match.chunk.id for match in matches][:2] == ["exact", "noise"]
+
+
+def test_title_match_beats_same_overlap_in_body():
+    chunks = [
+        KnowledgeChunk(
+            id="body",
+            service="VPN",
+            title="Сетевая инструкция",
+            text="VPN authentication failed",
+            escalation_team="Service Desk L1",
+        ),
+        KnowledgeChunk(
+            id="title",
+            service="VPN",
+            title="VPN authentication failed",
+            text="Проверьте подключение.",
+            escalation_team="Service Desk L1",
+        ),
+    ]
+
+    assert KnowledgeRetriever(chunks).search("VPN authentication failed", None)[0].chunk.id == "title"
 
 
 def test_duplicate_article_ids_fail_closed(tmp_path: Path):

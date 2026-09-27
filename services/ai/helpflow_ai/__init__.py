@@ -1,6 +1,8 @@
 """GEEKFORCE HelpFlow AI triage service."""
 
 from .engine import TriageEngine
+from .answer_policy import AnswerPolicy, AnswerRoute
+from .evidence import EvidenceValidation, EvidenceValidator
 from .knowledge import KnowledgeBase, KnowledgeBaseError
 from .llm import LLMClient, LLMError, LLMSettings
 from .retrieval import KnowledgeRetriever
@@ -10,6 +12,8 @@ from .schemas import (
     Decision,
     DecisionAction,
     EscalationCard,
+    EvidenceAnswer,
+    EvidenceClaim,
     GroundedAnswer,
     KnowledgeChunk,
     KnowledgeMatch,
@@ -23,10 +27,16 @@ from .schemas import (
 
 __all__ = [
     "Analysis",
+    "AnswerPolicy",
+    "AnswerRoute",
     "ConversationContext",
     "Decision",
     "DecisionAction",
     "EscalationCard",
+    "EvidenceAnswer",
+    "EvidenceClaim",
+    "EvidenceValidation",
+    "EvidenceValidator",
     "GroundedAnswer",
     "KnowledgeBase",
     "KnowledgeBaseError",

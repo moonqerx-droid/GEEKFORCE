@@ -123,16 +123,33 @@ class KnowledgeMatch(BaseModel):
     score: float = Field(ge=0.0, le=1.0)
 
 
-class GroundedAnswer(BaseModel):
-    """Strict model output that can be checked against retrieved sources."""
+class EvidenceClaim(BaseModel):
+    """One visible assertion and the exact source fragment supporting it."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    text: str = Field(min_length=1, max_length=600)
+    source_id: str = Field(min_length=1, max_length=300)
+    quote: str = Field(min_length=1, max_length=1200)
+
+
+class EvidenceAnswer(BaseModel):
+    """Structured model output accepted only after evidence validation."""
 
     model_config = ConfigDict(extra="forbid")
 
     answer: str = Field(min_length=1, max_length=1200)
-    source_ids: list[str] = Field(min_length=1, max_length=4)
+    claims: list[EvidenceClaim] = Field(default_factory=list, max_length=8)
+    # Kept for compatibility with older providers. Validated source ids are
+    # ultimately derived from claims by EvidenceValidator.
+    source_ids: list[str] = Field(default_factory=list, max_length=4)
     confidence: float = Field(ge=0.0, le=1.0)
     needs_operator: bool
     reason: str = Field(min_length=1, max_length=300)
+
+
+class GroundedAnswer(EvidenceAnswer):
+    """Backward-compatible name for the grounded response contract."""
 
 
 class DetectedIssue(BaseModel):
