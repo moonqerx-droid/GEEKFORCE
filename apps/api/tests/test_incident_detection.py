@@ -65,12 +65,12 @@ def test_threshold_boundary_is_inclusive():
 
 def test_signature_keeps_service_codes_and_majority_tokens():
     fingerprints = [
-        fingerprint("crm", {"crm": 3, "502": 3, "недоступна": 2, "офис": 1}),
-        fingerprint("crm", {"crm": 3, "502": 3, "недоступна": 2, "дом": 1}),
-        fingerprint("crm", {"crm": 3, "503": 3, "недоступна": 2, "дом": 1}),
+        fingerprint("crm", {"crm": 3, "502": 3, "недоступен": 2, "офис": 1}),
+        fingerprint("crm", {"crm": 3, "502": 3, "недоступен": 2, "дом": 1}),
+        fingerprint("crm", {"crm": 3, "503": 3, "недоступен": 2, "дом": 1}),
     ]
 
-    assert recompute_signature(fingerprints) == ["502", "503", "crm", "недоступна", "дом"]
+    assert recompute_signature(fingerprints) == ["502", "503", "crm", "недоступен", "дом"]
 
 
 def test_similarity_is_deterministic_across_repeated_calls():

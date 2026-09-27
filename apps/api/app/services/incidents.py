@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+from dataclasses import dataclass
 
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
@@ -18,6 +19,13 @@ from app.services.incident_detection import (
 
 
 logger = logging.getLogger(__name__)
+
+
+@dataclass(frozen=True)
+class IncidentMatch:
+    incident_id: str
+    score: float
+    evidence_tokens: list[str]
 
 
 class IncidentService:
@@ -55,6 +63,29 @@ class IncidentService:
             )
         ).all()
         return [self.read(incident.id) for incident in incidents]
+
+    def match_first_turn(self, conversation_id: str) -> IncidentMatch | None:
+        conversation = self.repository.get_conversation(conversation_id)
+        if conversation is None or conversation.incident_id is not None:
+            return None
+        fingerprint = build_fingerprint(conversation)
+        if fingerprint is None:
+            return None
+        match = self._best_open_result(fingerprint)
+        if match is None:
+            return None
+        incident, score, evidence = match
+        self.repository.link(conversation, incident)
+        self._recompute_signature(incident)
+        self.repository.session.flush()
+        logger.info(
+            "incident.conversation_linked incident_id=%s conversation_id=%s score=%s evidence=%s",
+            incident.id,
+            conversation.id,
+            score,
+            evidence,
+        )
+        return IncidentMatch(incident_id=incident.id, score=score, evidence_tokens=evidence)
 
     def observe_escalated(self, conversation_id: str) -> Incident | None:
         conversation = self.repository.get_conversation(conversation_id)
@@ -108,13 +139,22 @@ class IncidentService:
         return incident
 
     def _best_open(self, fingerprint: IncidentFingerprint) -> Incident | None:
+        result = self._best_open_result(fingerprint)
+        return result[0] if result else None
+
+    def _best_open_result(
+        self, fingerprint: IncidentFingerprint
+    ) -> tuple[Incident, float, list[str]] | None:
         scored = []
         for incident in self.repository.list_open(fingerprint.service):
             representative = self._incident_fingerprint(incident)
             result = similarity(fingerprint, representative)
             if result.score >= incident.similarity_threshold:
-                scored.append((result.score, incident.id, incident))
-        return max(scored, key=lambda item: (item[0], item[1]))[2] if scored else None
+                scored.append((result.score, incident.id, incident, result.evidence_tokens))
+        if not scored:
+            return None
+        score, _, incident, evidence = max(scored, key=lambda item: (item[0], item[1]))
+        return incident, score, evidence
 
     def _incident_fingerprint(self, incident: Incident) -> IncidentFingerprint:
         fingerprints = [
