@@ -38,6 +38,9 @@ MAX_QUESTIONS = 3
 MAX_QUESTIONS_URGENT = 1
 MAX_RENDERED_MESSAGE_LENGTH = 1200
 URGENT_LEVELS = (Urgency.HIGH, Urgency.CRITICAL)
+URGENT_WORKAROUND_INTRO = "Чтобы успеть, начнём с самого быстрого обходного пути."
+AFTER_WORKAROUND_INTRO = ("Хорошо, так вы не выпадете из работы. Когда будет пара минут, "
+                          "давайте разберёмся с причиной, чтобы это не повторилось.")
 OUTCOME_LABELS = {
     StepOutcome.HELPED: "помогло",
     StepOutcome.NOT_HELPED: "не помогло",
@@ -108,12 +111,19 @@ class TriageEngine:
         context = context.model_copy(update={"known_facts": {**stated, **context.known_facts}})
         playbook = self.kb.get(context.playbook_id)
         last = context.completed_steps[-1] if context.completed_steps else None
-        if last and last.outcome == StepOutcome.HELPED and not context.verification_failed:
+        after_workaround = bool(last and self._is_workaround(last.step_id))
+        if (last and last.outcome == StepOutcome.HELPED and not context.verification_failed
+                and not after_workaround):
             return Decision(
                 action=DecisionAction.VERIFY,
                 message=playbook.verify_question,
                 reason="пользователь сообщил, что шаг помог",
             )
+        if context.urgency in URGENT_LEVELS:
+            workaround = next((s for s in _open_steps(playbook, context) if s.workaround), None)
+            if workaround is not None:
+                return _step_decision(workaround, URGENT_WORKAROUND_INTRO,
+                                      "срочно: сначала быстрый обходной путь")
         question = self.next_question(playbook, context)
         if question is not None:
             return Decision(action=DecisionAction.ASK, message=question.text, question=question,
@@ -128,8 +138,9 @@ class TriageEngine:
                 described & set(playbook.escalate_on_symptoms))), context.known_facts)
         step = self.next_step(playbook, context)
         if step is not None:
-            return Decision(action=DecisionAction.STEP, message=f"{step.title}. {step.instruction}",
-                            step=step, reason="следующий подходящий шаг сценария")
+            helped = after_workaround and last.outcome == StepOutcome.HELPED
+            return _step_decision(step, AFTER_WORKAROUND_INTRO if helped else "",
+                                  "следующий подходящий шаг сценария")
         tried = len(context.completed_steps)
         return self._escalate(playbook, f"выполнено шагов: {tried}, проблема не решена")
 
@@ -207,18 +218,10 @@ class TriageEngine:
 
     @staticmethod
     def next_step(playbook: Playbook, context: ConversationContext) -> Step | None:
-        done = {record.step_id for record in context.completed_steps}
-        facts = context.known_facts
-        described = _described_symptoms(playbook, context)
-        for step in playbook.steps:
-            if step.id in done or not _symptoms_allow(step, described):
-                continue
-            if any(facts.get(key) not in values for key, values in step.when.items()):
-                continue
-            if any(facts.get(key) in values for key, values in step.unless.items()):
-                continue
-            return step
-        return None
+        return next(_open_steps(playbook, context), None)
+
+    def _is_workaround(self, step_id: str) -> bool:
+        return any(step.id == step_id and step.workaround for pb in self.kb.playbooks for step in pb.steps)
 
     # --- escalation ---------------------------------------------------------
 
@@ -389,7 +392,31 @@ def _symptoms_allow(item: Question | Step, described: set[str]) -> bool:
 
 def _applicable_questions(playbook: Playbook, ctx: ConversationContext) -> list[Question]:
     described = _described_symptoms(playbook, ctx)
-    return [q for q in playbook.questions if _symptoms_allow(q, described)]
+    return [
+        q for q in playbook.questions
+        if _symptoms_allow(q, described) and not (q.only_without_symptoms and described)
+    ]
+
+
+def _open_steps(playbook: Playbook, ctx: ConversationContext):
+    """Steps not tried yet whose fact and symptom conditions hold, in playbook order."""
+    done = {record.step_id for record in ctx.completed_steps}
+    facts = ctx.known_facts
+    described = _described_symptoms(playbook, ctx)
+    for step in playbook.steps:
+        if step.id in done or not _symptoms_allow(step, described):
+            continue
+        if any(facts.get(key) not in values for key, values in step.when.items()):
+            continue
+        if any(facts.get(key) in values for key, values in step.unless.items()):
+            continue
+        yield step
+
+
+def _step_decision(step: Step, intro: str, reason: str) -> Decision:
+    text = f"{step.title}. {step.instruction}"
+    return Decision(action=DecisionAction.STEP, message=f"{intro} {text}" if intro else text,
+                    step=step, reason=reason)
 
 
 def _summary(playbook: Playbook, service: str, symptoms: list[str]) -> str:

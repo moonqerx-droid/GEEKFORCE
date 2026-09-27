@@ -54,6 +54,8 @@ class Question(BaseModel):
     when_symptoms: list[str] = Field(default_factory=list)
     # Skipped when one of these symptoms was described.
     unless_symptoms: list[str] = Field(default_factory=list)
+    # Asked only while no symptom of the playbook is known: "what exactly is wrong?"
+    only_without_symptoms: bool = False
 
 
 class Step(BaseModel):
@@ -72,6 +74,9 @@ class Step(BaseModel):
     when_symptoms: list[str] = Field(default_factory=list)
     unless_symptoms: list[str] = Field(default_factory=list)
     requires_admin: bool = False
+    # Quick way around the problem (phone, web version). Offered first when urgent;
+    # "helped" does not close the problem, the diagnosis continues.
+    workaround: bool = False
 
 
 class Playbook(BaseModel):

@@ -62,3 +62,90 @@ def test_lost_access_still_troubleshoots(simulate):
     assert sim.analysis.recommended_playbook == "access_rights"
     assert "resource" not in first_question_facts(sim)
     assert sim.decision.action == DecisionAction.STEP
+
+
+# --- urgent: the fastest workaround first, questions depend on the symptom --
+
+TEAMS_URGENT = "Через 5 минут звонок с клиентом, не запускается Teams, горит!"
+
+
+def test_urgent_app_start_failure_is_understood(engine):
+    analysis = engine.analyze(TEAMS_URGENT)
+    assert analysis.recommended_playbook == "video_calls"
+    assert analysis.urgency.value == "high"
+    assert "приложение не запускается" in analysis.symptoms
+    assert analysis.known_facts["call_app"] == "teams"
+    assert analysis.next_question is None, "nothing to ask: the app and the symptom are known"
+
+
+def test_urgent_call_starts_with_workaround_not_questions(simulate):
+    sim = simulate(TEAMS_URGENT)
+    assert sim.decision.action == DecisionAction.STEP
+    assert sim.decision.step.workaround is True
+    assert "браузер" in sim.decision.message and "телефон" in sim.decision.message
+
+
+def test_app_start_failure_never_asks_about_headset(simulate):
+    sim = simulate(TEAMS_URGENT)
+    seen_steps = []
+    while sim.decision.action in (DecisionAction.STEP, DecisionAction.ASK):
+        assert sim.decision.action == DecisionAction.STEP, "no questions needed here"
+        seen_steps.append(sim.decision.step.id)
+        sim.step_result(StepOutcome.NOT_HELPED)
+    assert "reconnect_headset" not in seen_steps
+    assert "check_mute_and_device" not in seen_steps
+    assert "restart_call_app" in seen_steps
+    assert sim.decision.action == DecisionAction.ESCALATE
+
+
+def test_helpful_workaround_does_not_close_the_real_problem(simulate):
+    sim = simulate(TEAMS_URGENT)
+    sim.step_result(StepOutcome.HELPED)
+    assert sim.decision.action == DecisionAction.STEP
+    assert sim.decision.step.id == "restart_call_app"
+    assert "позже" in sim.decision.message or "минут" in sim.decision.message
+
+
+@pytest.mark.parametrize("message", [
+    "СРОЧНО через 10 мин созвон, зум не запускаеться!!!",
+    "тимс не открывается а у меня звонок через пару минут",
+    "Помогите быстрее, презентация через 3 минуты, Zoom вылетает при запуске",
+])
+def test_urgent_call_variations_start_with_workaround(simulate, message):
+    sim = simulate(message)
+    assert sim.analysis.urgency.value in ("high", "critical")
+    assert sim.decision.action == DecisionAction.STEP and sim.decision.step.workaround
+    sim.step_result(StepOutcome.NOT_HELPED)
+    assert "headset" not in first_question_facts(sim)
+
+
+def test_urgent_sound_problem_offers_phone_first(simulate):
+    sim = simulate("Меня не слышат в Zoom, через 5 минут презентация у клиента!")
+    assert sim.decision.action == DecisionAction.STEP and sim.decision.step.workaround
+
+
+def test_calm_sound_problem_asks_about_headset(simulate):
+    sim = simulate("Меня не слышат в Teams")
+    assert sim.decision.action == DecisionAction.ASK
+    assert sim.decision.question.fact == "headset"
+
+
+def test_vague_call_problem_asks_what_exactly_is_wrong(simulate):
+    sim = simulate("Проблемы с зумом, помогите")
+    assert sim.decision.action == DecisionAction.ASK
+    assert sim.decision.question.fact == "call_problem"
+    sim.answer("меня не слышат собеседники")
+    assert sim.decision.action == DecisionAction.ASK
+    assert sim.decision.question.fact == "headset"
+
+
+def test_urgent_lost_internet_offers_phone_hotspot_first(simulate):
+    sim = simulate("срочно!! интернет пропал, а через 10 минут созвон с клиентом")
+    assert sim.analysis.recommended_playbook == "network_wifi"
+    assert sim.decision.action == DecisionAction.STEP and sim.decision.step.workaround
+    assert "раздач" in sim.decision.message
+
+
+def test_calm_lost_internet_keeps_regular_order(simulate):
+    sim = simulate("Интернет пропал на ноутбуке")
+    assert sim.decision.action == DecisionAction.ASK
