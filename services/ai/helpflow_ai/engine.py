@@ -151,8 +151,8 @@ class TriageEngine:
         if subject:
             # No playbook for a named thing: extra questions would not change anything.
             decision = self._escalate(playbook, f"нет сценария в базе знаний для: {subject}")
-            note = (f"Для «{subject}» у меня нет готового решения, поэтому не буду мучить вас "
-                    "лишними вопросами.")
+            note = (f"Готового решения для такой проблемы у меня нет (тема: {subject}), поэтому "
+                    "не буду мучить вас лишними вопросами.")
             return decision.model_copy(update={"message": f"{note} {decision.message}"})
         question = self.next_question(playbook, context)
         if question is not None:

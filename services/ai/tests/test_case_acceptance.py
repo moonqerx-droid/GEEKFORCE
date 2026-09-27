@@ -209,7 +209,7 @@ def test_named_device_without_playbook_is_handed_off_at_once(simulate, engine, m
     assert sim.analysis.recommended_playbook == "unknown"
     assert sim.analysis.service == subject
     assert sim.decision.action == DecisionAction.ESCALATE, "no pointless 'which program?' question"
-    assert "готового решения" in sim.decision.message
+    assert "готового решения" in sim.decision.message.lower()
     card = engine.build_escalation_card(sim.ctx, sim.decision.reason)
     assert card.original_request == message
     assert card.service == subject
