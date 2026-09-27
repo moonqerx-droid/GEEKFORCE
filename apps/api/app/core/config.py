@@ -29,6 +29,7 @@ class Settings(BaseSettings):
     smtp_from_name: str = "HelpFlow"
     admin_email: str = ""
     admin_password: str = ""
+    support_first_reply_sla_minutes: int = 15
 
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 

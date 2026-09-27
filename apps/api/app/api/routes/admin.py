@@ -17,6 +17,7 @@ from app.schemas.admin_users import (
     AdminUserUpdate,
     TemporaryCredentialRead,
 )
+from app.schemas.profile import FullOperatorMetrics
 from app.services.admin import AdminService, SelfDeactivation, UserExists, UserNotFound
 from app.services.email import EmailPayload, EmailSender, MemoryEmailSender
 from app.services.user_admin import (
@@ -27,6 +28,7 @@ from app.services.user_admin import (
     StaleUserRevision,
     UserAdminService,
 )
+from app.services.operator_metrics import OperatorMetricsNotFound, OperatorMetricsService
 
 router = APIRouter(prefix="/api/admin", tags=["admin"])
 
@@ -168,3 +170,18 @@ def reset_user_password(user_id: str, service: UserAdminDependency, admin: Admin
     except ManagedUserNotFound as exc:
         raise HTTPException(status_code=404, detail="Пользователь не найден") from exc
     return {"user": user, "temporary_password": temporary_password}
+
+
+@router.get("/users/{user_id}/metrics", response_model=FullOperatorMetrics)
+def user_metrics(
+    user_id: str,
+    db: Annotated[Session, Depends(get_db)],
+    _admin: AdminDependency,
+    days: Annotated[int, Query(ge=1, le=90)] = 7,
+):
+    try:
+        return OperatorMetricsService(
+            db, first_reply_sla_minutes=get_settings().support_first_reply_sla_minutes,
+        ).for_operator(user_id, days)
+    except OperatorMetricsNotFound as exc:
+        raise HTTPException(status_code=404, detail="Специалист не найден") from exc
