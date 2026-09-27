@@ -35,6 +35,14 @@ export interface ConversationState {
 export const LIVE_STATUSES = new Set(["ESCALATED", "IN_PROGRESS"]);
 export const POLL_INTERVAL_MS = 3000;
 
+function readStartFresh(): boolean {
+  try {
+    return new URLSearchParams(window.location.search).has("new");
+  } catch {
+    return false;
+  }
+}
+
 function readRequestedId(): string | null {
   try {
     return new URLSearchParams(window.location.search).get("conversation");
@@ -93,6 +101,15 @@ export function useConversation(): ConversationState {
   }, []);
 
   const restore = useCallback(async () => {
+    if (readStartFresh()) {
+      storeId(null);
+      try {
+        // Drop the one-off flag so a reload keeps the conversation that starts next.
+        window.history.replaceState(window.history.state, "", window.location.pathname);
+      } catch {
+        // History API unavailable — the flag only matters on reload.
+      }
+    }
     const requestedId = readRequestedId();
     if (requestedId) storeId(requestedId);
     const storedId = requestedId ?? readStoredId();
@@ -106,6 +123,13 @@ export function useConversation(): ConversationState {
     try {
       const data = await api.getConversation(storedId, controller.signal);
       if (controller.signal.aborted) return;
+      // A finished, rated conversation is history; coming back to the page means a new problem.
+      // Unrated ones stay so the employee can still rate after a reload.
+      if (data.status === "RESOLVED" && data.rating != null && !requestedId) {
+        storeId(null);
+        setPhase("ready");
+        return;
+      }
       setConversation(data);
       setPhase("ready");
     } catch (err) {

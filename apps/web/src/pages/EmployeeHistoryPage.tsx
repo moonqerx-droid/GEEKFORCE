@@ -24,7 +24,7 @@ export function EmployeeHistoryPage() {
     <section className="history">
       <header className="history-head">
         <h1>Мои обращения</h1>
-        <Link to="/employee" className="history-new">Новое обращение</Link>
+        <Link to="/employee?new=1" className="history-new">Новое обращение</Link>
       </header>
       {failed ? <ErrorState title="Не удалось загрузить обращения" onRetry={() => window.location.reload()} /> : null}
       {!items && !failed ? <Spinner label="Загружаем…" /> : null}

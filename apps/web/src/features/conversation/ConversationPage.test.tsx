@@ -246,4 +246,11 @@ describe("ConversationPage status gating", () => {
     expect(await screen.findByText("Спасибо за оценку: 5 из 5.")).toBeInTheDocument();
     expect(rated).toEqual({ rating: 5 });
   });
+
+  it("starts a new request instead of reopening a rated one", async () => {
+    withStoredConversation(makeConversation({ id: "done", status: "RESOLVED", rating: 5 }));
+    render(<ConversationPage />);
+    expect(await screen.findByRole("heading", { name: "Что случилось?" })).toBeInTheDocument();
+    expect(window.localStorage.getItem("helpflow.conversationId")).toBeNull();
+  });
 });
