@@ -13,6 +13,18 @@ class Settings(BaseSettings):
         "http://127.0.0.1:3000",
         "http://127.0.0.1:5173",
     ]
+    app_public_url: str = "http://localhost:5173"
+    session_cookie_name: str = "helpflow_session"
+    session_ttl_hours: int = 12
+    remembered_session_ttl_days: int = 30
+    cookie_secure: bool = False
+    smtp_host: str = "smtp.yandex.ru"
+    smtp_port: int = 465
+    smtp_security: Literal["ssl", "starttls"] = "ssl"
+    smtp_username: str = ""
+    smtp_password: str = ""
+    smtp_from_email: str = ""
+    smtp_from_name: str = "HelpFlow"
 
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
