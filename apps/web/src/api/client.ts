@@ -85,6 +85,10 @@ export const api = {
     return request("/api/conversations", { method: "POST" }, signal);
   },
 
+  listConversations(signal?: AbortSignal): Promise<Conversation[]> {
+    return request("/api/conversations", {}, signal);
+  },
+
   getConversation(id: string, signal?: AbortSignal): Promise<Conversation> {
     return request(`/api/conversations/${id}`, {}, signal);
   },
