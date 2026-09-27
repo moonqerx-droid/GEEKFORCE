@@ -135,6 +135,20 @@ class GroundedAnswer(BaseModel):
     reason: str = Field(min_length=1, max_length=300)
 
 
+class DetectedIssue(BaseModel):
+    """One of several problems found in a single request."""
+
+    playbook_id: str
+    title: str
+    service: str
+    symptoms: list[str] = Field(default_factory=list)
+    # The part of the user's text this problem was found in, as written.
+    evidence: str = ""
+    # For the escalation card: pending = not handled yet, in_progress = being solved,
+    # resolved = a step helped or the user said it went away.
+    status: Literal["pending", "in_progress", "resolved"] = "pending"
+
+
 class Analysis(BaseModel):
     """Structured understanding of the user's request."""
 
@@ -150,6 +164,8 @@ class Analysis(BaseModel):
     recommended_playbook: str
     should_escalate: bool = False
     source: str = "rules"
+    # Other problems from the same message, in the order they will be handled.
+    additional_issues: list[DetectedIssue] = Field(default_factory=list)
 
     @field_validator("summary", "service", "recommended_playbook")
     @classmethod
@@ -194,6 +210,9 @@ class Decision(BaseModel):
     source_ids: list[str] = Field(default_factory=list)
     fallback_reason: str | None = None
     llm_latency_ms: int | None = Field(default=None, ge=0)
+    # Playbook of the problem this decision is about (differs from the dialogue's
+    # playbook_id once the next of several problems is being handled).
+    playbook_id: str | None = None
 
 
 class EscalationCard(BaseModel):
@@ -212,3 +231,5 @@ class EscalationCard(BaseModel):
     recommended_team: str
     ai_summary: str
     source: str = "rules"
+    # Every problem from the request with its status; the first one is the main one.
+    issues: list[DetectedIssue] = Field(default_factory=list)

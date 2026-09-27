@@ -227,3 +227,114 @@ def test_ambiguous_request_asks_what_is_broken_first(simulate, message):
     assert sim.decision.question.fact in ("service_name", "error_text")
     asked = first_question_facts(sim)
     assert len(asked) <= 3 and len(asked) == len(set(asked))
+
+
+# --- several symptoms: all found, root cause first, the rest follows --------
+
+MULTI = "Outlook не синхронизируется, а ещё в Zoom нет звука и интернет постоянно отваливается"
+
+
+def issue_ids(issues) -> set[str]:
+    return {issue.playbook_id for issue in issues}
+
+
+def test_all_problems_are_recognized_and_network_goes_first(engine):
+    analysis = engine.analyze(MULTI)
+    assert analysis.recommended_playbook == "network_wifi", "unstable internet breaks the rest"
+    assert issue_ids(analysis.additional_issues) == {"email_outlook", "video_calls"}
+    assert "частые разрывы" in analysis.symptoms
+    evidence = " ".join(issue.evidence for issue in analysis.additional_issues)
+    assert "Outlook" in evidence and "Zoom" in evidence
+    symptoms = {i.playbook_id: i.symptoms for i in analysis.additional_issues}
+    assert symptoms["email_outlook"] == ["почта не синхронизируется"]
+    assert symptoms["video_calls"] == ["не слышно собеседников"]
+
+
+def test_user_is_told_the_rest_comes_next(simulate):
+    sim = simulate(MULTI)
+    message = sim.decision.message
+    assert "Outlook" in message and "Zoom" in message and "следом" in message
+    assert sim.decision.playbook_id == "network_wifi"
+
+
+def test_problems_are_worked_through_one_by_one(simulate):
+    sim = simulate(MULTI)
+    while sim.decision.action == DecisionAction.ASK:
+        sim.answer("в офисе" if sim.decision.question.fact == "location" else "да")
+    assert sim.decision.action == DecisionAction.STEP
+    assert sim.decision.playbook_id == "network_wifi"
+
+    sim.step_result(StepOutcome.HELPED)  # internet is stable now
+    assert sim.decision.action == DecisionAction.ASK
+    assert "Outlook" in sim.decision.message
+    check = sim.decision.question.fact
+
+    sim.answer("нет, всё так же не синхронизируется")
+    assert sim.ctx.known_facts[check] == "no"
+    while sim.decision.action == DecisionAction.ASK:
+        sim.answer("никакой ошибки нет")
+    assert sim.decision.action == DecisionAction.STEP
+    assert sim.decision.playbook_id == "email_outlook"
+
+    sim.step_result(StepOutcome.HELPED)
+    assert sim.decision.action == DecisionAction.ASK
+    assert "Zoom" in sim.decision.message
+    sim.answer("да, звук появился")
+    assert sim.decision.action == DecisionAction.VERIFY
+    assert sim.verify("да, всё работает") is True
+
+
+def test_escalation_card_lists_every_problem(simulate, engine):
+    sim = simulate(MULTI)
+    while sim.decision.action == DecisionAction.ASK:
+        sim.answer("из дома")
+    while sim.decision.action == DecisionAction.STEP:
+        sim.step_result(StepOutcome.NOT_HELPED)
+    assert sim.decision.action == DecisionAction.ESCALATE
+
+    card = engine.build_escalation_card(sim.ctx, sim.decision.reason)
+    assert card.original_request == MULTI
+    assert issue_ids(card.issues) == {"network_wifi", "email_outlook", "video_calls"}
+    statuses = {issue.playbook_id: issue.status for issue in card.issues}
+    assert statuses == {"network_wifi": "in_progress", "email_outlook": "pending", "video_calls": "pending"}
+    assert card.recommended_team == "Сетевые администраторы"
+    assert "Outlook" in card.ai_summary and "Zoom" in card.ai_summary
+
+
+@pytest.mark.parametrize("message, primary, others", [
+    ("почта не открывается и впн отваливается постоянно", "vpn_connection", {"email_outlook"}),
+    ("задолбало: зум лагает, и аутлук не отправляет письма!!!", "email_outlook", {"video_calls"}),
+    ("Не работает почта и интернет", "network_wifi", {"email_outlook"}),
+])
+def test_multi_problem_variations(engine, message, primary, others):
+    analysis = engine.analyze(message)
+    assert analysis.recommended_playbook == primary
+    assert issue_ids(analysis.additional_issues) == others
+
+
+@pytest.mark.parametrize("message", [
+    CASE_EXAMPLE,
+    "Outlook постоянно просит пароль и письма не отправляются, застряли в исходящих",
+    "Не могу войти в CRM, VPN подключен, пишет «Сессия истекла»",
+    "В офисе нет интернета на ноутбуке, вай-фай подключен но без доступа к интернету",
+    "Меня не слышат в Zoom, через 5 минут презентация у клиента!",
+    "срочно!! интернет пропал, а через 10 минут созвон с клиентом",
+    TEAMS_URGENT, PRINTER, ACCESS,
+    "Ошибка 502 в CRM",
+    "CRM не работает, срочно. VPN подключен, ошибка 403",
+    "Zoom не запускается, пишет «ошибка 1001»",
+])
+def test_single_problem_is_not_split(engine, message):
+    assert engine.analyze(message).additional_issues == []
+
+
+# --- the case example must keep working ------------------------------------
+
+def test_case_example_is_unchanged(simulate):
+    sim = simulate(CASE_EXAMPLE)
+    assert sim.analysis.recommended_playbook == "crm_login_device_specific"
+    assert sim.analysis.urgency.value == "high"
+    assert "встреча через 20 минут" in sim.analysis.urgency_reason
+    assert sim.decision.action == DecisionAction.ASK
+    assert sim.decision.question.fact == "error_text"
+    assert "несколько" not in sim.decision.message
