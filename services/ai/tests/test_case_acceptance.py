@@ -305,6 +305,7 @@ def test_escalation_card_lists_every_problem(simulate, engine):
     ("почта не открывается и впн отваливается постоянно", "vpn_connection", {"email_outlook"}),
     ("задолбало: зум лагает, и аутлук не отправляет письма!!!", "email_outlook", {"video_calls"}),
     ("Не работает почта и интернет", "network_wifi", {"email_outlook"}),
+    ("Почта и интернет не работают с утра", "network_wifi", {"email_outlook"}),
 ])
 def test_multi_problem_variations(engine, message, primary, others):
     analysis = engine.analyze(message)
@@ -323,6 +324,7 @@ def test_multi_problem_variations(engine, message, primary, others):
     "Ошибка 502 в CRM",
     "CRM не работает, срочно. VPN подключен, ошибка 403",
     "Zoom не запускается, пишет «ошибка 1001»",
+    "VPN подключен и CRM всё равно не открывается",
 ])
 def test_single_problem_is_not_split(engine, message):
     assert engine.analyze(message).additional_issues == []

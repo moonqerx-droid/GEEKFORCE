@@ -22,7 +22,7 @@
 ```bash
 cd services/ai
 pip install -e ".[dev]"
-pytest -q                 # 44 теста, без сети
+pytest -q                 # 133 теста, без сети
 python -m helpflow_ai     # интерактивное демо в консоли
 ```
 
@@ -95,7 +95,40 @@ solved = engine.interpret_confirmation(text)  # True / False / None (непон�
 
 `original_request`, `summary`, `service`, `urgency`, `urgency_reason`, `known_facts`,
 `questions_and_answers[{question, answer}]`, `performed_steps[{step_id, step, result}]`,
-`current_result` (текущий результат), `escalation_reason`, `recommended_team`, `ai_summary`, `source` (`llm` или `rules`).
+`current_result` (текущий результат), `escalation_reason`, `recommended_team`, `ai_summary`, `source` (`llm` или `rules`),
+`issues` (все проблемы из обращения со статусами, см. ниже).
+
+## Изменения контракта
+
+Все изменения добавочные: новые поля опциональные, у них есть значения по умолчанию.
+Старые поля и методы не переименованы. Backend может ничего не менять, диалог работает и так.
+
+| Где | Поле | Что это |
+|---|---|---|
+| `Analysis` | `additional_issues: list[DetectedIssue]` | остальные проблемы из того же сообщения в порядке разбора. Главная проблема по-прежнему в `recommended_playbook`/`service`/`symptoms` |
+| `Decision` | `playbook_id: str \| None` | к какой проблеме относится этот ход. Отличается от `conversation.playbook_id`, когда разбираем вторую или третью проблему |
+| `EscalationCard` | `issues: list[DetectedIssue]` | все проблемы обращения, первая главная; у каждой `status` |
+| `Step` | `workaround: bool` | быстрый обходной путь (телефон, веб-версия, раздача интернета). Результат `helped` не закрывает проблему, диагностика продолжается |
+| `Question`, `Step`, `Playbook` | `when_symptoms`, `unless_symptoms`, `only_without_symptoms`, `escalate_on_symptoms`, `escalation_note` | поля YAML-сценариев, см. «База знаний» |
+
+`DetectedIssue`: `playbook_id`, `title`, `service`, `symptoms`, `evidence` (фрагмент текста
+пользователя, как он написан), `status`: `pending` (ещё не разбирали), `in_progress` (в работе),
+`resolved` (шаг помог или пользователь сказал, что проблема ушла).
+
+**Несколько проблем без нового состояния.** План разбора движок каждый раз заново строит из
+`original_request`, поэтому backend хранит только то, что хранил раньше. Порядок: сначала
+корневая причина (сеть, затем VPN), при срочности следом звонок, дальше в порядке текста.
+Когда шаг по одной проблеме помог, `decide()` вместо `verify` возвращает `ask` с фактом
+`issue_resolved.<playbook_id>` («Теперь следующая проблема — … Сейчас с этим всё в порядке?»).
+Backend обрабатывает его как обычный уточняющий вопрос: `asked_facts`, затем `absorb_answer`.
+`verify` приходит, только когда решены все проблемы.
+
+**Что стоит сделать в backend** (не обязательно):
+- при `escalate` показывать `decision.message`. Сейчас `_escalate` пишет свой текст, и
+  пояснение движка теряется («новый доступ выдают администраторы…», «готового решения нет…»);
+- показывать `escalation_card.issues` оператору списком со статусами;
+- `conversation.missing_facts` в `_advance` лучше брать из `Analysis`, а не из всех вопросов
+  сценария: часть вопросов теперь зависит от симптома.
 
 ## Для Incident Radar (участник 4)
 
@@ -105,10 +138,23 @@ solved = engine.interpret_confirmation(text)  # True / False / None (непон�
 
 ## База знаний
 
-`knowledge-base/playbooks/*.yaml`: 11 сценариев (CRM, пароль, VPN, почта, сеть/Wi-Fi,
-видеозвонки, права доступа, недоступность сервиса, массовый сбой, ИБ, неизвестная проблема).
+`knowledge-base/playbooks/*.yaml`: 12 сценариев (CRM, пароль, VPN, почта, сеть/Wi-Fi,
+видеозвонки, права доступа, принтер, недоступность сервиса, массовый сбой, ИБ, неизвестная проблема).
 Формат шага: `when` / `unless` задают условия по фактам, поэтому ответ на вопрос меняет
 следующий шаг. Опечатка в YAML сразу валит загрузку (Pydantic `extra=forbid`).
+
+Условия по симптомам (симптомы ищутся по `symptoms_hints` во всём, что написал пользователь):
+- `when_symptoms` / `unless_symptoms` у вопроса и шага: задавать или показывать только при этих
+  симптомах или только без них. Так «Teams не запускается» не получает вопрос про гарнитуру;
+- `only_without_symptoms: true` у вопроса: спросить «что именно не так?», только если симптом неизвестен;
+- `workaround: true` у шага: при срочности `high`/`critical` этот шаг идёт первым, до вопросов;
+- `escalate_on_symptoms` у сценария: после вопросов сразу передать специалисту. Например, новый
+  доступ пользователь сам не получит. `escalation_note` добавляется к сообщению, в нём можно
+  подставлять факты: `{resource}`.
+
+Если сценария нет, но пользователь назвал устройство или программу («мышка», «монитор»,
+«Excel»), движок не задаёт вопрос «какая программа не работает?», а сразу честно передаёт
+обращение специалисту. Факт `service_name` и `Analysis.service` при этом заполнены.
 
 `knowledge-base/test-cases/triage_cases.yaml`: контрольные обращения. Добавили кейс,
 запустили `pytest`, и он проверяется автоматически.

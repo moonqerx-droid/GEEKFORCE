@@ -163,23 +163,25 @@ def split_clauses(text: str) -> list[tuple[str, bool]]:
     """Split a message into clauses; the flag says whether the clause reports a failure.
 
     "Не работает почта и интернет": the bare "интернет" inherits the failure.
+    "Почта и интернет не работают": a single noun before the conjunction shares it too.
     Error texts and codes never count as a failure on their own.
     """
     clauses: list[tuple[str, bool]] = []
     for segment in _CLAUSE_SPLIT_RE.split(text):
-        previous_failing = False
+        parts: list[list] = []  # [text, failing, is_detail]
         for part in _CONJUNCTION_SPLIT_RE.split(f" {segment} "):
             part = part.strip()
             if not part:
                 continue
-            if _DETAIL_RE.search(normalize(part)):
-                clauses.append((part, False))
-                previous_failing = False
-                continue
-            failing = bool(_FAILURE_RE.search(normalize(part)))
-            failing = failing or (previous_failing and len(part.split()) <= 3)
-            clauses.append((part, failing))
-            previous_failing = failing
+            detail = bool(_DETAIL_RE.search(normalize(part)))
+            failing = not detail and bool(_FAILURE_RE.search(normalize(part)))
+            if parts and not detail and not failing and parts[-1][1] and len(part.split()) <= 3:
+                failing = True
+            parts.append([part, failing, detail])
+        for current, following in zip(parts, parts[1:]):
+            if not current[1] and not current[2] and following[1] and len(current[0].split()) == 1:
+                current[1] = True
+        clauses += [(part, failing) for part, failing, _ in parts]
     return clauses
 
 
