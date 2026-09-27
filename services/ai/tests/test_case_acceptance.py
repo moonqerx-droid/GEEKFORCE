@@ -338,3 +338,56 @@ def test_case_example_is_unchanged(simulate):
     assert sim.decision.action == DecisionAction.ASK
     assert sim.decision.question.fact == "error_text"
     assert "несколько" not in sim.decision.message
+
+
+# --- simple: start solving after at most one question -----------------------
+
+@pytest.mark.parametrize("message, first_step", [
+    ("Забыл пароль от учётки, не срочно", "self_service_reset"),
+    ("не могу зайти в винду, пароль не подходит((", "check_keyboard_layout"),
+    ("аааа учетку заблокировали, что делать", "check_keyboard_layout"),
+])
+def test_simple_requests_start_solving_quickly(simulate, message, first_step):
+    sim = simulate(message)
+    assert sim.analysis.recommended_playbook == "password_login"
+    asked = first_question_facts(sim)
+    assert len(asked) <= 1
+    assert "error_text" not in asked, "the symptom is already clear from the text"
+    assert sim.decision.action == DecisionAction.STEP
+    assert sim.decision.step.id == first_step
+
+
+def test_locked_account_waits_instead_of_resetting(simulate):
+    sim = simulate("аааа учетку заблокировали, что делать")
+    first_question_facts(sim)
+    sim.step_result(StepOutcome.NOT_HELPED)
+    assert sim.decision.step.id == "wait_lockout"
+
+
+# --- the general rule: never ask what is already known ----------------------
+
+ALL_MESSAGES = [
+    CASE_EXAMPLE, MULTI, TEAMS_URGENT, ACCESS, PRINTER,
+    "Не могу войти в CRM, VPN подключен, пишет «Сессия истекла»",
+    "Из дома не подключается VPN, пишет \"authentication failed\"",
+    "Outlook постоянно просит пароль и письма не отправляются, застряли в исходящих",
+    "Меня не слышат в Zoom, через 5 минут презентация у клиента!",
+    "почта не открывается и впн отваливается постоянно",
+    "Ничего не работает, помогите пожалуйста",
+]
+
+
+@pytest.mark.parametrize("message", ALL_MESSAGES)
+def test_no_question_about_a_known_fact(simulate, message):
+    sim = simulate(message)
+    for _ in range(12):
+        if sim.decision.action == DecisionAction.ASK:
+            fact = sim.decision.question.fact
+            assert fact not in sim.ctx.known_facts, (fact, sim.ctx.known_facts)
+            assert sim.ctx.asked_facts.count(fact) == 1, "questions never repeat"
+            sim.answer("не знаю")
+        elif sim.decision.action == DecisionAction.STEP:
+            sim.step_result(StepOutcome.NOT_HELPED)
+        else:
+            break
+    assert sim.decision.action in (DecisionAction.ESCALATE, DecisionAction.STEP)
