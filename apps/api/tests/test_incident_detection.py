@@ -83,3 +83,12 @@ def test_similarity_is_deterministic_across_repeated_calls():
     results = [similarity(left, right) for _ in range(10)]
 
     assert all(result == results[0] for result in results)
+
+
+def test_filler_words_do_not_count_as_evidence():
+    result = build_fingerprint(conversation(
+        messages=[SimpleNamespace(role="user", content="Опять пишет ошибку, что делать, помогите пожалуйста")],
+        known_facts={},
+    ))
+
+    assert {"опять", "пишет", "делать", "помогите", "пожалуйста"}.isdisjoint(result.weighted_tokens)

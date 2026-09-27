@@ -355,6 +355,8 @@ class IncidentService:
         )
 
     def _recompute_signature(self, incident: Incident) -> None:
+        # Members are read back from the database: new links must be there first.
+        self.repository.session.flush()
         fingerprints = [
             result for item in self.repository.conversations(incident.id)
             if (result := build_fingerprint(item)) is not None
