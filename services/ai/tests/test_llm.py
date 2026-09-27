@@ -154,6 +154,7 @@ def test_ollama_settings_need_no_api_key(monkeypatch):
     assert settings.num_predict == 320
     assert settings.num_ctx == 4096
     assert settings.temperature == 0.1
+    assert settings.sync_document_answers is False
     assert settings.max_retries == 0
 
 
@@ -165,6 +166,7 @@ def test_ollama_performance_settings_can_be_overridden(monkeypatch):
     monkeypatch.setenv("OLLAMA_NUM_PREDICT", "180")
     monkeypatch.setenv("OLLAMA_NUM_CTX", "3072")
     monkeypatch.setenv("OLLAMA_TEMPERATURE", "0.05")
+    monkeypatch.setenv("OLLAMA_SYNC_DOCUMENT_ANSWERS", "true")
 
     settings = LLMSettings.from_env()
 
@@ -175,6 +177,7 @@ def test_ollama_performance_settings_can_be_overridden(monkeypatch):
     assert settings.num_predict == 180
     assert settings.num_ctx == 3072
     assert settings.temperature == 0.05
+    assert settings.sync_document_answers is True
 
 
 def test_ollama_uses_native_chat_with_thinking_disabled():
@@ -288,6 +291,7 @@ def test_ollama_answers_once_when_company_document_is_relevant(kb):
             base_url="http://ollama.test:11434",
             model="qwen3.5:9b",
             timeout=20,
+            sync_document_answers=True,
         ),
         transport=httpx.MockTransport(handler),
     )
@@ -301,6 +305,43 @@ def test_ollama_answers_once_when_company_document_is_relevant(kb):
     assert decision.message_source == "llm"
     assert decision.source_ids == [document.id]
     assert len(calls) == 1
+
+
+def test_ollama_returns_company_excerpt_without_blocking_by_default(kb):
+    calls: list = []
+    document = KnowledgeChunk(
+        id="document:leave-policy:0",
+        service="HR",
+        title="Правила отпуска",
+        text="Ежегодный отпуск составляет 28 календарных дней.",
+        keywords=["отпуск", "дни отпуска"],
+        escalation_team="HR",
+    )
+    knowledge = KnowledgeBase(kb.playbooks, [*kb.chunks, document])
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        calls.append(request)
+        return httpx.Response(500)
+
+    client = LLMClient(
+        LLMSettings(
+            provider="ollama",
+            api_key="ollama",
+            base_url="http://ollama.test:11434",
+            model="qwen3.5:9b",
+        ),
+        transport=httpx.MockTransport(handler),
+    )
+
+    decision = TriageEngine(knowledge, client).decide(ConversationContext(
+        original_request="Сколько дней отпуска положено?",
+        playbook_id="unknown",
+    ))
+
+    assert decision.message_source == "rules"
+    assert decision.source_ids == [document.id]
+    assert "28 календарных дней" in decision.message
+    assert calls == []
 
 
 def test_ollama_escalation_does_not_wait_for_summary(kb):

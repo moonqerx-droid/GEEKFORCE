@@ -123,6 +123,8 @@ class TriageEngine:
             )
             if route != AnswerRoute.COMPANY:
                 return decision
+            if not self.llm.renders_company_answers_synchronously:
+                return decision
         return self._render_decision(decision, context)
 
     def _decide_rules(self, context: ConversationContext) -> Decision:

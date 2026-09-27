@@ -45,6 +45,7 @@ class LLMSettings:
     num_predict: int = DEFAULT_OLLAMA_NUM_PREDICT
     num_ctx: int = DEFAULT_OLLAMA_NUM_CTX
     temperature: float = DEFAULT_TEMPERATURE
+    sync_document_answers: bool = False
 
     @classmethod
     def from_env(cls) -> "LLMSettings | None":
@@ -67,6 +68,7 @@ class LLMSettings:
                 num_predict=int(os.getenv("OLLAMA_NUM_PREDICT", DEFAULT_OLLAMA_NUM_PREDICT)),
                 num_ctx=int(os.getenv("OLLAMA_NUM_CTX", DEFAULT_OLLAMA_NUM_CTX)),
                 temperature=float(os.getenv("OLLAMA_TEMPERATURE", DEFAULT_TEMPERATURE)),
+                sync_document_answers=_env_bool("OLLAMA_SYNC_DOCUMENT_ANSWERS", False),
             )
         api_key = os.getenv("AI_API_KEY", "").strip()
         if not api_key:
@@ -116,6 +118,11 @@ class LLMClient:
     def prefers_deterministic_playbooks(self) -> bool:
         """Local models are reserved for company-document answers, not UI polish."""
         return self._settings.provider == "ollama"
+
+    @property
+    def renders_company_answers_synchronously(self) -> bool:
+        """Large local models are opt-in on the latency-sensitive chat path."""
+        return self._settings.provider != "ollama" or self._settings.sync_document_answers
 
     def chat_json(self, system: str, user: str) -> dict[str, Any]:
         messages = [
@@ -182,3 +189,10 @@ def parse_json_object(content: str) -> dict[str, Any]:
     if not isinstance(data, dict):
         raise LLMError("Model returned JSON that is not an object")
     return data
+
+
+def _env_bool(name: str, default: bool) -> bool:
+    value = os.getenv(name)
+    if value is None:
+        return default
+    return value.strip().casefold() in {"1", "true", "yes", "on"}
