@@ -6,6 +6,7 @@ import type {
   OperatorTicket,
   AuthUser,
   LoginPayload,
+  OperatorRegistrationPayload,
   RegistrationPayload,
   StepResultPayload,
 } from "./types";
@@ -141,6 +142,10 @@ export const api = {
 
   register(payload: RegistrationPayload, signal?: AbortSignal): Promise<AuthUser> {
     return request("/api/auth/register", { method: "POST", body: JSON.stringify(payload) }, signal);
+  },
+
+  registerOperator(payload: OperatorRegistrationPayload, signal?: AbortSignal): Promise<AuthUser> {
+    return request("/api/auth/operator/register", { method: "POST", body: JSON.stringify(payload) }, signal);
   },
 
   verifyEmail(token: string, signal?: AbortSignal): Promise<void> {

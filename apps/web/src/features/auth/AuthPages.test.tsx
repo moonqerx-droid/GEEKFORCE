@@ -7,6 +7,7 @@ import { server } from "../../test/server";
 import { AuthProvider } from "./AuthProvider";
 import { LoginPage } from "./LoginPage";
 import { RegisterPage } from "./RegisterPage";
+import { OperatorRegisterPage } from "./OperatorRegisterPage";
 
 function renderPage(page: React.ReactNode) {
   server.use(http.get("*/api/auth/me", () => HttpResponse.json({}, { status: 401 })));
@@ -30,5 +31,24 @@ describe("auth pages", () => {
     await userEvent.type(screen.getByLabelText("Пароль"), "StrongPass7");
     await userEvent.click(screen.getByRole("button", { name: "Войти" }));
     expect(await screen.findByText(/вход выполнен/i)).toBeInTheDocument();
+  });
+
+  it("registers an operator only with the invite token from the URL", async () => {
+    server.use(http.get("*/api/auth/me", () => HttpResponse.json({}, { status: 401 })));
+    server.use(http.post("*/api/auth/operator/register", () => HttpResponse.json({
+      id: "2", first_name: "Иван", last_name: "Петров", email: "operator@example.ru",
+      department: "it", role: "operator", email_verified_at: null,
+    }, { status: 201 })));
+    render(<MemoryRouter initialEntries={["/operator/register?invite=invite-token-value-12345"]}>
+      <AuthProvider><OperatorRegisterPage /></AuthProvider>
+    </MemoryRouter>);
+    await userEvent.type(screen.getByLabelText("Имя"), "Иван");
+    await userEvent.type(screen.getByLabelText("Фамилия"), "Петров");
+    await userEvent.type(screen.getByLabelText("Рабочий email"), "operator@example.ru");
+    await userEvent.selectOptions(screen.getByLabelText("Отдел"), "it");
+    await userEvent.type(screen.getByLabelText("Пароль"), "StrongPass7");
+    await userEvent.type(screen.getByLabelText("Повторите пароль"), "StrongPass7");
+    await userEvent.click(screen.getByRole("button", { name: "Создать аккаунт специалиста" }));
+    expect(await screen.findByText(/проверьте письмо/i)).toBeInTheDocument();
   });
 });

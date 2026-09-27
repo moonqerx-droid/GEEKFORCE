@@ -1,3 +1,4 @@
+from datetime import timedelta
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
@@ -16,9 +17,23 @@ from app.services.auth import (
     InvalidInvite, InvalidOrExpiredToken,
 )
 from app.services.email import EmailSender, MemoryEmailSender, SmtpEmailSender
+from app.services.rate_limit import InMemoryRateLimiter, RateLimitExceeded
 
 
-router = APIRouter(prefix="/api/auth", tags=["auth"])
+def require_trusted_origin(request: Request) -> None:
+    if request.method not in {"POST", "PUT", "PATCH", "DELETE"}:
+        return
+    origin = request.headers.get("origin")
+    if origin and origin not in get_settings().cors_origins:
+        raise HTTPException(status_code=403, detail="Untrusted origin")
+
+
+router = APIRouter(
+    prefix="/api/auth",
+    tags=["auth"],
+    dependencies=[Depends(require_trusted_origin)],
+)
+_rate_limiter = InMemoryRateLimiter()
 
 
 def get_email_sender() -> EmailSender:
@@ -68,6 +83,16 @@ def register_operator(payload: OperatorRegister, service: AuthServiceDependency)
 
 @router.post("/login", response_model=CurrentUser)
 def login(payload: LoginRequest, request: Request, response: Response, service: AuthServiceDependency):
+    client_host = request.client.host if request.client else "unknown"
+    try:
+        _rate_limiter.check(
+            "login",
+            f"{client_host}:{payload.email}",
+            limit=5,
+            window=timedelta(minutes=10),
+        )
+    except RateLimitExceeded as exc:
+        raise error(429, "rate_limited", "Слишком много попыток. Повторите позже") from exc
     try:
         user, raw_token, expires_at = service.login(payload, user_agent=request.headers.get("user-agent"))
     except InvalidCredentials as exc:
