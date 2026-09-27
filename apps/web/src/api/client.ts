@@ -2,6 +2,7 @@ import { ApiError, ConflictError, NetworkError, NotFoundError, ValidationError }
 import type {
   Conversation,
   Incident,
+  IncidentBroadcastResult,
   MessageCreatePayload,
   OperatorTicket,
   AuthUser,
@@ -179,13 +180,28 @@ export const api = {
     return request(`/api/admin/operators/${id}`, { method: "PATCH", body: JSON.stringify({ is_active }) });
   },
 
-  /**
-   * Incident Radar backend is still being designed (see PROJECT_PLAN.md).
-   * Callers must treat a 404 as "feature not available yet" and hide the
-   * section silently — never fabricate incidents in production code.
-   */
   listIncidents(signal?: AbortSignal): Promise<Incident[]> {
     return request("/api/operator/incidents", {}, signal);
+  },
+
+  confirmIncident(id: string, expected_revision: number): Promise<Incident> {
+    return request(`/api/operator/incidents/${id}/confirm`, {
+      method: "POST", body: JSON.stringify({ expected_revision }),
+    });
+  },
+
+  broadcastIncident(id: string, message: string, expected_revision: number): Promise<IncidentBroadcastResult> {
+    // One key per click: a retried request is not delivered twice.
+    const request_key = `web-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
+    return request(`/api/operator/incidents/${id}/broadcast`, {
+      method: "POST", body: JSON.stringify({ message, request_key, expected_revision }),
+    });
+  },
+
+  resolveIncident(id: string, message: string, expected_revision: number): Promise<Incident> {
+    return request(`/api/operator/incidents/${id}/resolve`, {
+      method: "POST", body: JSON.stringify({ message, expected_revision }),
+    });
   },
 
   me(signal?: AbortSignal): Promise<AuthUser> {

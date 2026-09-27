@@ -1,4 +1,4 @@
-import type { Conversation, OperatorTicket } from "../api/types";
+import type { Conversation, Incident, OperatorTicket } from "../api/types";
 
 let nextMessageId = 1;
 
@@ -44,6 +44,38 @@ export function makeTicket(overrides: Partial<OperatorTicket> = {}): OperatorTic
   return {
     ...makeConversation({ status: "ESCALATED" }),
     original_request: "Не могу войти в CRM",
+    ...overrides,
+  };
+}
+
+export function makeIncident(overrides: Partial<Incident> = {}): Incident {
+  const minutesAgo = (minutes: number) => new Date(Date.now() - minutes * 60000).toISOString();
+  const people: [string, string, string, number][] = [
+    ["c1", "Иван Петров", "VPN не подключается, пишет ошибку 809", 28],
+    ["c2", "Елена Соколова", "Не могу подключиться к VPN из дома, ошибка 809", 22],
+    ["c3", "Дмитрий Волков", "VPN не подключается с утра, выдаёт ошибку 809", 16],
+    ["c4", "Ольга Морозова", "Не подключается VPN, ошибка 809, а у меня отчёт горит", 9],
+  ];
+  return {
+    id: "inc-1",
+    status: "CANDIDATE",
+    service: "vpn",
+    service_label: "VPN",
+    title: "Массовая недоступность VPN",
+    signature_tokens: ["809", "vpn", "подключается"],
+    evidence_tokens: ["809", "vpn", "подключается"],
+    similarity_threshold: 0.55,
+    revision: 3,
+    created_at: minutesAgo(16),
+    updated_at: minutesAgo(9),
+    conversation_count: people.length,
+    conversation_ids: people.map(([id]) => id),
+    latest_update: null,
+    affected_employees: people.length,
+    first_seen_at: minutesAgo(28),
+    members: people.map(([id, owner_name, original_request, minutes]) => ({
+      id, owner_name, owner_department: "sales", original_request, status: "ESCALATED", created_at: minutesAgo(minutes),
+    })),
     ...overrides,
   };
 }

@@ -34,6 +34,22 @@ export function WaitingPanel({ conversation }: { conversation: Conversation }) {
   );
 }
 
+/** The request matched a known outage: nothing to check on the employee's side. */
+export function OutagePanel({ conversation }: { conversation: Conversation }) {
+  return (
+    <section className="panel panel-outage" role="status" aria-labelledby="outage-title">
+      <span className="panel-pulse" aria-hidden="true" />
+      <div>
+        <h2 id="outage-title" className="panel-title">Похоже, это общий сбой</h2>
+        <p className="panel-text">
+          {conversation.service ?? "Сервис"} не работает у нескольких коллег, специалисты уже чинят.
+          Ничего проверять у себя не нужно: новости придут сюда, в этот чат.
+        </p>
+      </div>
+    </section>
+  );
+}
+
 function minutesBetween(from?: string | null, to?: string | null): number | null {
   if (!from || !to) return null;
   return (new Date(to).getTime() - new Date(from).getTime()) / 60000;

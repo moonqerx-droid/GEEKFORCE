@@ -25,7 +25,7 @@ export const handlers = [
 
   http.get("*/api/operator/tickets", () => HttpResponse.json([])),
 
-  http.get("*/api/operator/incidents", () => HttpResponse.json([], { status: 404 })),
+  http.get("*/api/operator/incidents", () => HttpResponse.json([])),
 ];
 
 export const server = setupServer(...handlers);

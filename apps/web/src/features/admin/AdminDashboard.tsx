@@ -3,7 +3,8 @@ import { Link } from "react-router-dom";
 import { api } from "../../api/client";
 import type { Metrics, Urgency } from "../../api/types";
 import { ErrorState, Spinner } from "../../components/primitives";
-import { URGENCY_SHORT, formatMinutes } from "../../lib/labels";
+import { URGENCY_SHORT, formatMinutes, plural } from "../../lib/labels";
+import { ActiveIncidents } from "./ActiveIncidents";
 import { DailyChart } from "./DailyChart";
 import "./Admin.css";
 
@@ -12,14 +13,6 @@ const URGENCY_ORDER: Urgency[] = ["critical", "high", "normal", "low"];
 
 function percent(value: number | null | undefined) {
   return value == null ? "—" : `${Math.round(value * 100)}%`;
-}
-
-function plural(count: number, one: string, few: string, many: string) {
-  const mod10 = count % 10;
-  const mod100 = count % 100;
-  if (mod10 === 1 && mod100 !== 11) return one;
-  if (mod10 >= 2 && mod10 <= 4 && (mod100 < 12 || mod100 > 14)) return few;
-  return many;
 }
 
 export function AdminDashboard() {
@@ -94,6 +87,8 @@ export function AdminDashboard() {
           <span className="admin-fact-label">ждут специалиста прямо сейчас</span>
         </Link>
       </section>
+
+      <ActiveIncidents />
 
       <section className="admin-block admin-block-wide">
         <h2>Обращения по дням</h2>

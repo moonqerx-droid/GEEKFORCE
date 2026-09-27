@@ -168,16 +168,47 @@ export interface StepResultPayload {
   step_code?: string;
 }
 
-// Incident Radar — backend endpoint is still being designed. The shape below
-// is a best-effort guess for local fixtures/tests only; production code must
-// never assume it is correct beyond checking that a 200 response is JSON.
+/** Mirrors apps/api/app/schemas/incident.py. */
+export type IncidentStatus = "CANDIDATE" | "ACTIVE" | "RESOLVED";
+
+export interface IncidentMember {
+  id: string;
+  status: ConversationStatus;
+  owner_name: string | null;
+  owner_department: Department | null;
+  original_request: string;
+  created_at: string;
+}
+
+export interface IncidentUpdate {
+  message: string;
+  request_key: string;
+  created_at: string;
+}
+
 export interface Incident {
   id: string;
+  status: IncidentStatus;
+  service: string;
   title: string;
-  service: string | null;
-  conversation_ids: string[];
+  signature_tokens: string[];
+  evidence_tokens: string[];
+  similarity_threshold: number;
+  revision: number;
   created_at: string;
-  summary: string | null;
+  updated_at: string;
+  conversation_count: number;
+  conversation_ids: string[];
+  latest_update: IncidentUpdate | null;
+  service_label?: string | null;
+  affected_employees?: number;
+  first_seen_at?: string | null;
+  members?: IncidentMember[];
+}
+
+export interface IncidentBroadcastResult {
+  incident: Incident;
+  delivered_to: string[];
 }
 
 export type UserRole = "employee" | "operator" | "admin";
