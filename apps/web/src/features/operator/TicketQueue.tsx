@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import type { OperatorTicket, TicketScope } from "../../api/types";
 import { EmptyState, ErrorState, Spinner } from "../../components/primitives";
 import { URGENCY_SHORT, formatAgo } from "../../lib/labels";
@@ -23,6 +24,7 @@ export function TicketQueue({
   onSelect,
   currentUserId,
   onRetry,
+  top,
 }: {
   scope: TicketScope;
   onScopeChange: (scope: TicketScope) => void;
@@ -32,9 +34,12 @@ export function TicketQueue({
   onSelect: (id: string) => void;
   currentUserId: string;
   onRetry: () => void;
+  /** Shown above the tabs: the mass-problem radar. */
+  top?: ReactNode;
 }) {
   return (
     <section className="queue" aria-label="Очередь обращений">
+      {top}
       <div className="queue-tabs" role="tablist">
         {TABS.map((tab) => (
           <button
@@ -76,6 +81,7 @@ export function TicketQueue({
                     {ticket.owner_name ?? "Сотрудник"}
                     {ticket.service ? `, ${ticket.service}` : ""}
                   </span>
+                  {ticket.incident_id ? <span className="queue-incident">Общий сбой</span> : null}
                   {ticket.status === "IN_PROGRESS" ? (
                     <span className={`queue-owner ${mine ? "queue-owner-mine" : ""}`}>
                       {mine ? "У вас в работе" : `В работе: ${ticket.assignee_name ?? "специалист"}`}

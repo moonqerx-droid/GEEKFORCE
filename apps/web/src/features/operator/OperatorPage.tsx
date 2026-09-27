@@ -2,7 +2,11 @@ import { useCallback, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import type { TicketScope } from "../../api/types";
 import { CasePassport } from "../../components/CasePassport";
+import { Spinner } from "../../components/primitives";
 import { useAuth } from "../auth/AuthProvider";
+import { useIncidents } from "../incidents/incidents";
+import { IncidentRadar } from "./IncidentRadar";
+import { IncidentWorkspace } from "./IncidentWorkspace";
 import { TicketQueue } from "./TicketQueue";
 import { TicketWorkspace } from "./TicketWorkspace";
 import { useTicket, useTicketQueue } from "./useTickets";
@@ -21,6 +25,8 @@ export function OperatorPage() {
   // On narrow screens the case card slides in over the chat instead of taking a column.
   const [cardOpen, setCardOpen] = useState(false);
   const selectedId = params.get("ticket");
+  const incidentId = params.get("incident");
+  const radar = useIncidents();
   const queue = useTicketQueue(scope);
   const reloadQueue = queue.reload;
   const onChanged = useCallback(() => { void reloadQueue(); }, [reloadQueue]);
@@ -29,9 +35,17 @@ export function OperatorPage() {
 
   const select = (id: string) => setParams((prev) => {
     const next = new URLSearchParams(prev);
+    next.delete("incident");
     next.set("ticket", id);
     return next;
   });
+  const selectIncident = (id: string) => setParams((prev) => {
+    const next = new URLSearchParams(prev);
+    next.delete("ticket");
+    next.set("incident", id);
+    return next;
+  });
+  const incident = incidentId ? radar.incidents?.find((item) => item.id === incidentId) ?? null : null;
 
   const ticket = current.ticket;
 
@@ -46,8 +60,23 @@ export function OperatorPage() {
         onSelect={select}
         currentUserId={currentUserId}
         onRetry={() => void queue.reload()}
+        top={radar.incidents ? (
+          <IncidentRadar incidents={radar.incidents} selectedId={incidentId} onSelect={selectIncident} />
+        ) : null}
       />
-      <TicketWorkspace
+      {incidentId && radar.incidents ? (
+        <IncidentWorkspace
+          key={incidentId}
+          incident={incident}
+          onChanged={(changed) => {
+            radar.replace(changed);
+            onChanged();
+          }}
+          onOpenTicket={select}
+        />
+      ) : incidentId ? (
+        <section className="workspace workspace-empty"><Spinner label="Открываем сбой…" /></section>
+      ) : <TicketWorkspace
         key={selectedId ?? "none"}
         ticket={ticket}
         loading={Boolean(selectedId)}
@@ -58,18 +87,23 @@ export function OperatorPage() {
         onReply={current.reply}
         onResolve={current.resolve}
         onShowCard={() => setCardOpen(true)}
-      />
+      />}
       {cardOpen ? <button type="button" className="operator-scrim" aria-label="Скрыть карточку" onClick={() => setCardOpen(false)} /> : null}
       <div className={`operator-side ${cardOpen ? "operator-side-open" : ""}`}>
-        {ticket ? (
+        {ticket && !incidentId ? (
           <button type="button" className="operator-side-close" onClick={() => setCardOpen(false)}>Скрыть карточку</button>
         ) : null}
-        {!ticket ? (
-          <p className="operator-side-hint">
-            Здесь появится карточка от помощника: что случилось, как сотрудник описал это своими словами, какие вопросы уже задали и что пробовали.
-          </p>
-        ) : null}
-        {ticket ? (
+        {incidentId ? (
+          <aside className="radar-explain">
+            <h2>Как радар находит сбой</h2>
+            <p>
+              Когда за два часа к специалистам попадают три похожих обращения про один сервис, радар
+              объединяет их. Следующие такие обращения присоединяются сразу: сотрудник видит, что это общий
+              сбой, и не тратит время на диагностику.
+            </p>
+            <p>Одно сообщение отсюда придёт в чат каждому затронутому. Когда сбой устранён, закройте его: обращения закроются вместе с ним.</p>
+          </aside>
+        ) : ticket ? (
           <>
             <CasePassport conversation={ticket} audience="operator" />
             {ticket.rag_source_ids.length || ticket.ai_fallback_reason ? (
@@ -90,7 +124,11 @@ export function OperatorPage() {
               </details>
             ) : null}
           </>
-        ) : null}
+        ) : (
+          <p className="operator-side-hint">
+            Здесь появится карточка от помощника: что случилось, как сотрудник описал это своими словами, какие вопросы уже задали и что пробовали.
+          </p>
+        )}
       </div>
     </div>
   );

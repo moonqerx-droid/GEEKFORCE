@@ -1,4 +1,4 @@
-import type { AdminUser, Conversation, OperatorTicket, PersonalMetrics, Profile, SpecialistMetrics } from "../api/types";
+import type { AdminUser, Conversation, Incident, OperatorTicket, PersonalMetrics, Profile, SpecialistMetrics } from "../api/types";
 
 let nextMessageId = 1;
 
@@ -110,6 +110,38 @@ export function makeProfile(overrides: Partial<Profile> = {}): Profile {
     revision: 2,
     created_at: "2026-09-01T09:00:00Z",
     last_login_at: "2026-09-28T08:00:00Z",
+    ...overrides,
+  };
+}
+
+export function makeIncident(overrides: Partial<Incident> = {}): Incident {
+  const minutesAgo = (minutes: number) => new Date(Date.now() - minutes * 60000).toISOString();
+  const people: [string, string, string, number][] = [
+    ["c1", "Иван Петров", "VPN не подключается, пишет ошибку 809", 28],
+    ["c2", "Елена Соколова", "Не могу подключиться к VPN из дома, ошибка 809", 22],
+    ["c3", "Дмитрий Волков", "VPN не подключается с утра, выдаёт ошибку 809", 16],
+    ["c4", "Ольга Морозова", "Не подключается VPN, ошибка 809, а у меня отчёт горит", 9],
+  ];
+  return {
+    id: "inc-1",
+    status: "CANDIDATE",
+    service: "vpn",
+    service_label: "VPN",
+    title: "Массовая недоступность VPN",
+    signature_tokens: ["809", "vpn", "подключается"],
+    evidence_tokens: ["809", "vpn", "подключается"],
+    similarity_threshold: 0.55,
+    revision: 3,
+    created_at: minutesAgo(16),
+    updated_at: minutesAgo(9),
+    conversation_count: people.length,
+    conversation_ids: people.map(([id]) => id),
+    latest_update: null,
+    affected_employees: people.length,
+    first_seen_at: minutesAgo(28),
+    members: people.map(([id, owner_name, original_request, minutes]) => ({
+      id, owner_name, owner_department: "sales", original_request, status: "ESCALATED", created_at: minutesAgo(minutes),
+    })),
     ...overrides,
   };
 }

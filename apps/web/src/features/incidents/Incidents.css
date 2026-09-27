@@ -1,0 +1,252 @@
+/* Incident Radar. Amber marks an outage nobody has confirmed yet; sea-green means
+   the support team has taken it on. */
+
+.incident-chip {
+  justify-self: start;
+  display: inline-block;
+  padding: 1px 9px;
+  border-radius: var(--radius-pill);
+  font-size: 11.5px;
+  font-weight: 650;
+}
+
+.incident-chip-candidate {
+  background: var(--color-warning-bg);
+  color: var(--color-warning);
+}
+
+.incident-chip-active {
+  background: var(--sea-wash);
+  color: var(--sea);
+}
+
+.incident-chip-resolved {
+  background: var(--color-success-bg);
+  color: var(--color-success);
+}
+
+/* Specialist: block above the queue */
+
+.radar {
+  display: grid;
+  gap: var(--space-2);
+  padding: var(--space-4) var(--space-3) var(--space-2);
+  border-bottom: 1px solid var(--color-border);
+}
+
+.radar-title {
+  padding: 0 var(--space-1);
+  font-size: var(--font-size-sm);
+  font-weight: 650;
+}
+
+.radar-list {
+  display: grid;
+  gap: var(--space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.radar-item {
+  display: grid;
+  gap: 3px;
+  width: 100%;
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--color-border);
+  border-left: 4px solid var(--color-warning);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+  text-align: left;
+}
+
+.radar-item-active { border-left-color: var(--sea); }
+
+.radar-item:hover,
+.radar-item[aria-current="true"] {
+  border-color: var(--sea);
+  box-shadow: var(--shadow-md);
+}
+
+.radar-item-candidate:hover,
+.radar-item-candidate[aria-current="true"] {
+  border-left-color: var(--color-warning);
+}
+
+.radar-headline {
+  font-weight: 650;
+  line-height: 1.3;
+}
+
+.radar-meta {
+  color: var(--ink-soft);
+  font-size: var(--font-size-xs);
+}
+
+.queue-incident {
+  justify-self: start;
+  margin-top: 2px;
+  padding: 1px 8px;
+  border-radius: var(--radius-pill);
+  background: var(--color-warning-bg);
+  color: var(--color-warning);
+  font-size: 11px;
+  font-weight: 600;
+}
+
+/* Specialist: the outage itself */
+
+.incident-body {
+  display: grid;
+  align-content: start;
+  gap: var(--space-3);
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+}
+
+.incident .workspace-title {
+  margin-top: var(--space-2);
+}
+
+.incident-state {
+  color: var(--ink-soft);
+}
+
+.incident-state strong {
+  color: var(--sea);
+}
+
+.incident-why {
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-md);
+  background: var(--paper-deep);
+  color: var(--ink-soft);
+  font-size: var(--font-size-sm);
+}
+
+.incident-subtitle {
+  margin-top: var(--space-2);
+  font-size: var(--font-size-md);
+}
+
+.incident-members {
+  display: grid;
+  gap: var(--space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.incident-member {
+  display: grid;
+  gap: 4px;
+  width: 100%;
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+  text-align: left;
+}
+
+.incident-member:hover {
+  border-color: var(--sea);
+}
+
+.incident-member-top {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+
+.incident-member-name {
+  font-weight: 650;
+}
+
+.incident-member-meta {
+  color: var(--ink-faint);
+  font-size: var(--font-size-xs);
+}
+
+.incident-member-words {
+  color: var(--ink-soft);
+  overflow-wrap: anywhere;
+}
+
+.incident-latest {
+  color: var(--sea);
+  font-size: var(--font-size-sm);
+}
+
+.incident-broadcast {
+  display: grid;
+  gap: var(--space-2);
+  padding: var(--space-4);
+  border: 1.5px solid var(--sea);
+  border-radius: var(--radius-lg);
+  background: var(--color-surface);
+}
+
+.radar-explain {
+  display: grid;
+  gap: var(--space-2);
+  padding: var(--space-4);
+  border-radius: var(--radius-lg);
+  background: var(--color-surface);
+  color: var(--ink-soft);
+  font-size: var(--font-size-sm);
+}
+
+.radar-explain h2 {
+  color: var(--ink);
+  font-size: var(--font-size-md);
+}
+
+/* Support lead: dashboard block */
+
+.admin-incident-list {
+  display: grid;
+  gap: var(--space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.admin-incident {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  align-items: baseline;
+  gap: 4px var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  border-left: 4px solid var(--color-warning);
+  border-radius: var(--radius-md);
+  background: var(--paper);
+  color: inherit;
+  text-decoration: none;
+}
+
+.admin-incident:hover .admin-incident-name {
+  text-decoration: underline;
+}
+
+.admin-incident-name {
+  font-weight: 650;
+}
+
+.admin-incident-meta {
+  grid-column: 1 / -1;
+  color: var(--ink-soft);
+  font-size: var(--font-size-sm);
+}
+
+@media (max-width: 760px) {
+  .admin-incident {
+    grid-template-columns: 1fr;
+  }
+
+  .incident-broadcast .workspace-resolve-actions,
+  .incident .workspace-resolve-actions {
+    flex-wrap: wrap;
+  }
+}

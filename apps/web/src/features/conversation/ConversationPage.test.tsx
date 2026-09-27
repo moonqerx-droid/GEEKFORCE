@@ -254,3 +254,18 @@ describe("ConversationPage status gating", () => {
     expect(window.localStorage.getItem("helpflow.conversationId")).toBeNull();
   });
 });
+
+describe("ConversationPage during a known outage", () => {
+  it("tells the employee it is a shared outage instead of the usual waiting panel", async () => {
+    withStoredConversation(makeConversation({
+      id: "outage", status: "ESCALATED", service: "VPN", incident_id: "inc-1",
+      messages: [makeMessage("user", "Не подключается VPN"), makeMessage("assistant", "Похоже, это общий сбой")],
+    }));
+    render(<ConversationPage />);
+
+    const banner = await screen.findByRole("status", { name: "Похоже, это общий сбой" });
+    expect(banner).toHaveTextContent("VPN не работает у нескольких коллег, специалисты уже чинят.");
+    expect(screen.queryByText("Передали специалисту")).not.toBeInTheDocument();
+  });
+});
+

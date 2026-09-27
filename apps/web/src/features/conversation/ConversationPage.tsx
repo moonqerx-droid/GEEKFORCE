@@ -11,7 +11,7 @@ import { MessageThread } from "./MessageThread";
 import { stepMarkers } from "./steps";
 import { StepCard } from "./StepCard";
 import { Composer } from "./Composer";
-import { VerifyingPanel, ResolvedPanel, WaitingPanel } from "./StatusPanels";
+import { OutagePanel, VerifyingPanel, ResolvedPanel, WaitingPanel } from "./StatusPanels";
 import "./ConversationPage.css";
 
 const COMPOSER_PLACEHOLDER: Record<string, string> = {
@@ -133,7 +133,8 @@ export function ConversationPage() {
             <VerifyingPanel busy={conv.sending} onAnswer={(text) => void conv.sendMessage(text).catch(() => undefined)} />
           ) : null}
 
-          {c.status === "ESCALATED" ? <WaitingPanel conversation={c} /> : null}
+          {live && c.incident_id ? <OutagePanel conversation={c} /> : null}
+          {c.status === "ESCALATED" && !c.incident_id ? <WaitingPanel conversation={c} /> : null}
 
           {c.status === "RESOLVED" ? (
             <ResolvedPanel conversation={c} onRate={conv.rate} onRestart={conv.restartFresh} />
