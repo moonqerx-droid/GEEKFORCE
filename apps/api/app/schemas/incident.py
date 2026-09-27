@@ -18,6 +18,17 @@ class IncidentUpdateRead(BaseModel):
     created_at: datetime
 
 
+class IncidentMember(BaseModel):
+    """One request of the incident: whose it is and what the employee wrote."""
+
+    id: str
+    status: str
+    owner_name: str | None = None
+    owner_department: str | None = None
+    original_request: str = ""
+    created_at: datetime
+
+
 class IncidentRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
@@ -34,6 +45,11 @@ class IncidentRead(BaseModel):
     conversation_ids: list[str]
     evidence_tokens: list[str]
     latest_update: IncidentUpdateRead | None = None
+    # Human-readable service name as the requests call it ("VPN", not the normalized "vpn").
+    service_label: str | None = None
+    affected_employees: int = 0
+    first_seen_at: datetime | None = None
+    members: list[IncidentMember] = Field(default_factory=list)
 
 
 class IncidentBroadcastCreate(BaseModel):
@@ -52,3 +68,19 @@ class IncidentBroadcastCreate(BaseModel):
 class IncidentBroadcastResult(BaseModel):
     incident: IncidentRead
     delivered_to: list[str]
+
+
+class IncidentConfirm(BaseModel):
+    expected_revision: int = Field(ge=1)
+
+
+class IncidentResolve(BaseModel):
+    message: str = Field(min_length=1, max_length=1000)
+    expected_revision: int = Field(ge=1)
+
+    @field_validator("message")
+    @classmethod
+    def trim_message(cls, value: str) -> str:
+        if not (trimmed := value.strip()):
+            raise ValueError("message must not be blank")
+        return trimmed

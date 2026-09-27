@@ -10,6 +10,8 @@ class Settings(BaseSettings):
     ai_provider: Literal["mock", "rules", "openai", "ollama"] = "mock"
     incident_similarity_threshold: float = Field(default=0.55, ge=0.0, le=1.0)
     incident_min_cluster_size: int = Field(default=3, ge=2, le=20)
+    # Only requests escalated this recently can start a new incident.
+    incident_window_minutes: int = Field(default=120, ge=5, le=24 * 60)
     cors_origins: list[str] = [
         "http://localhost:3000",
         "http://localhost:5173",

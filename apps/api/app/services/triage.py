@@ -43,6 +43,7 @@ class TriageDialogueService(DialogueService):
             IncidentRepository(repository.session),
             threshold=settings.incident_similarity_threshold,
             min_cluster_size=settings.incident_min_cluster_size,
+            window_minutes=settings.incident_window_minutes,
         )
 
     def create_conversation(self):
@@ -147,6 +148,7 @@ class TriageDialogueService(DialogueService):
                 if match is not None:
                     conversation.incident_id = match.incident_id
                     conversation.status = "ESCALATED"
+                    conversation.escalated_at = conversation.escalated_at or utc_now()
                     conversation.current_step_code = None
                     conversation.current_step_instruction = None
                     card = self.engine.build_escalation_card(
@@ -155,12 +157,7 @@ class TriageDialogueService(DialogueService):
                     )
                     conversation.escalation_card = card.model_dump(mode="json")
                     conversation.escalation_summary = card.ai_summary
-                    self._message(
-                        conversation,
-                        "assistant",
-                        "Похоже, проблема массовая. Команда поддержки уже расследует "
-                        "инцидент; обновления появятся в этом обращении.",
-                    )
+                    self._message(conversation, "assistant", self._outage_notice(conversation, match))
                     return self._commit(conversation)
                 if analysis.should_escalate:
                     self._escalate(conversation, "сценарий требует немедленного участия специалиста")
@@ -268,6 +265,13 @@ class TriageDialogueService(DialogueService):
                 conversation.id,
                 type(error).__name__,
             )
+
+    def _outage_notice(self, conversation, match) -> str:
+        service = conversation.service or "сервис"
+        text = (f"Похоже, это общий сбой: {service} не работает у нескольких коллег, "
+                "специалисты уже чинят. Проверять что-то у себя не нужно: новости придут сюда, в этот чат.")
+        latest = self.incident_service.latest_update_text(match.incident_id)
+        return f"{text} Последнее обновление: {latest}" if latest else text
 
     def escalate(self, conversation_id):
         conversation = self.get_conversation(conversation_id)

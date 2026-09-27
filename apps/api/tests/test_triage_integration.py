@@ -265,7 +265,7 @@ def test_fourth_matching_request_joins_before_diagnostics(client, seeded_crm_can
     assert state["incident_id"] == seeded_crm_candidate.id
     assert state["completed_steps"] == []
     assert len([message for message in state["messages"] if message["role"] == "assistant"]) == 1
-    assert "массов" in state["messages"][-1]["content"].casefold()
+    assert "общий сбой" in state["messages"][-1]["content"]
 
 
 def test_radar_failure_keeps_normal_first_turn_flow(client, monkeypatch):
