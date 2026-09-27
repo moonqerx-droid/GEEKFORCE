@@ -8,13 +8,13 @@ class ConversationRepository:
     def __init__(self, session: Session):
         self.session = session
 
-    def create(self) -> Conversation:
-        conversation = Conversation()
+    def create(self, owner_id: str | None = None) -> Conversation:
+        conversation = Conversation(owner_id=owner_id)
         self.session.add(conversation)
         self.session.commit()
         return self.get(conversation.id)
 
-    def get(self, conversation_id: str) -> Conversation | None:
+    def get(self, conversation_id: str, owner_id: str | None = None) -> Conversation | None:
         statement = (
             select(Conversation)
             .where(Conversation.id == conversation_id)
@@ -24,7 +24,18 @@ class ConversationRepository:
                 selectinload(Conversation.steps),
             )
         )
+        if owner_id is not None:
+            statement = statement.where(Conversation.owner_id == owner_id)
         return self.session.scalar(statement)
+
+    def list_by_owner(self, owner_id: str) -> list[Conversation]:
+        statement = (
+            select(Conversation)
+            .where(Conversation.owner_id == owner_id)
+            .order_by(Conversation.updated_at.desc())
+            .options(selectinload(Conversation.messages), selectinload(Conversation.steps))
+        )
+        return list(self.session.scalars(statement).all())
 
     def save(self, conversation: Conversation) -> Conversation:
         self.session.add(conversation)

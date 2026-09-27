@@ -12,6 +12,8 @@ from app.schemas.conversation import ConversationRead, MessageCreate, StepResult
 from app.services.ai import MockAIService
 from app.services.dialogue import ConversationNotFound, DialogueConflict, DialogueService
 from app.services.triage import TriageDialogueService
+from app.api.dependencies.auth import require_employee
+from app.models.auth import User
 
 router = APIRouter(prefix="/api/conversations", tags=["conversations"])
 
@@ -42,12 +44,37 @@ def not_found() -> HTTPException:
 
 
 @router.post("", response_model=ConversationRead, status_code=status.HTTP_201_CREATED)
-def create_conversation(service: DialogueDependency) -> ConversationRead:
-    return serialize(service.create_conversation())
+def create_conversation(
+    service: DialogueDependency,
+    user: Annotated[User, Depends(require_employee)],
+) -> ConversationRead:
+    conversation = service.create_conversation()
+    conversation.owner_id = user.id
+    service.repository.session.commit()
+    return serialize(conversation)
+
+
+@router.get("", response_model=list[ConversationRead])
+def list_conversations(
+    db: Annotated[Session, Depends(get_db)],
+    user: Annotated[User, Depends(require_employee)],
+) -> list[ConversationRead]:
+    return [serialize(item) for item in ConversationRepository(db).list_by_owner(user.id)]
+
+
+def ensure_owned(db: Session, conversation_id: str, user: User) -> None:
+    if ConversationRepository(db).get(conversation_id, owner_id=user.id) is None:
+        raise not_found()
 
 
 @router.get("/{conversation_id}", response_model=ConversationRead)
-def get_conversation(conversation_id: str, service: DialogueDependency) -> ConversationRead:
+def get_conversation(
+    conversation_id: str,
+    service: DialogueDependency,
+    db: Annotated[Session, Depends(get_db)],
+    user: Annotated[User, Depends(require_employee)],
+) -> ConversationRead:
+    ensure_owned(db, conversation_id, user)
     try:
         return serialize(service.get_conversation(conversation_id))
     except ConversationNotFound as exc:
@@ -59,7 +86,10 @@ def send_message(
     conversation_id: str,
     payload: MessageCreate,
     service: DialogueDependency,
+    db: Annotated[Session, Depends(get_db)],
+    user: Annotated[User, Depends(require_employee)],
 ) -> ConversationRead:
+    ensure_owned(db, conversation_id, user)
     try:
         return serialize(service.handle_message(conversation_id, payload.content,
                                                expected_revision=payload.expected_revision))
@@ -74,7 +104,10 @@ def record_step_result(
     conversation_id: str,
     payload: StepResultCreate,
     service: DialogueDependency,
+    db: Annotated[Session, Depends(get_db)],
+    user: Annotated[User, Depends(require_employee)],
 ) -> ConversationRead:
+    ensure_owned(db, conversation_id, user)
     try:
         return serialize(service.record_step_result(conversation_id, payload.outcome.value,
                                                     expected_revision=payload.expected_revision,
@@ -86,7 +119,13 @@ def record_step_result(
 
 
 @router.post("/{conversation_id}/escalate", response_model=ConversationRead)
-def escalate(conversation_id: str, service: DialogueDependency) -> ConversationRead:
+def escalate(
+    conversation_id: str,
+    service: DialogueDependency,
+    db: Annotated[Session, Depends(get_db)],
+    user: Annotated[User, Depends(require_employee)],
+) -> ConversationRead:
+    ensure_owned(db, conversation_id, user)
     try:
         return serialize(service.escalate(conversation_id))
     except ConversationNotFound as exc:
