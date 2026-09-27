@@ -7,6 +7,9 @@ import json
 
 from .schemas import ConversationContext, Decision, KnowledgeMatch, Playbook
 
+MAX_SOURCE_TEXT_CHARS = 1600
+MAX_TOTAL_SOURCE_CHARS = 4800
+
 ANALYSIS_SYSTEM = """Ты — модуль triage службы технической поддержки компании.
 Твоя задача — понять обращение сотрудника и вернуть ТОЛЬКО JSON-объект.
 
@@ -87,9 +90,27 @@ def build_grounded_response_user(
         "prepared_message": decision.message,
         "service": playbook.service,
         "safety_notice": playbook.safety_notice,
-        "sources": [
-            {"id": match.chunk.id, "title": match.chunk.title, "text": match.chunk.text}
-            for match in matches
-        ],
+        "sources": _bounded_sources(matches),
     }
     return f"<response_task>\n{json.dumps(payload, ensure_ascii=False, indent=2)}\n</response_task>"
+
+
+def _bounded_sources(matches: list[KnowledgeMatch]) -> list[dict[str, str]]:
+    sources: list[dict[str, str]] = []
+    remaining = MAX_TOTAL_SOURCE_CHARS
+    for match in matches:
+        if remaining <= 0:
+            break
+        text = match.chunk.text.strip()
+        allowed = min(MAX_SOURCE_TEXT_CHARS, remaining)
+        if len(text) > allowed:
+            text = text[:allowed].rsplit(" ", 1)[0].rstrip() or text[:allowed]
+        if not text:
+            continue
+        sources.append({
+            "id": match.chunk.id,
+            "title": match.chunk.title,
+            "text": text,
+        })
+        remaining -= len(text)
+    return sources

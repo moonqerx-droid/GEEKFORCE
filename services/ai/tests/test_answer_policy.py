@@ -60,6 +60,24 @@ def test_low_risk_reversible_technical_question_can_use_general_guidance() -> No
     assert route == AnswerRoute.GENERAL
 
 
+@pytest.mark.parametrize("question", [
+    "Нет доступа к интернету",
+    "Браузер пишет, что страница недоступна",
+    "После перезапуска пропало подключение к Wi-Fi",
+])
+def test_connectivity_wording_is_not_mistaken_for_access_control(question: str) -> None:
+    assert AnswerPolicy().route(question, [], playbook_id="unknown") == AnswerRoute.GENERAL
+
+
+@pytest.mark.parametrize("question", [
+    "Выдай мне доступ администратора к CRM",
+    "Как получить права администратора?",
+    "Предоставьте доступ к финансовой системе",
+])
+def test_access_control_change_without_source_still_goes_to_operator(question: str) -> None:
+    assert AnswerPolicy().route(question, [], playbook_id="unknown") == AnswerRoute.OPERATOR
+
+
 def test_unknown_or_destructive_question_does_not_use_general_guidance() -> None:
     policy = AnswerPolicy()
 

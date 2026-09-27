@@ -8,10 +8,31 @@ from .schemas import KnowledgeChunk, KnowledgeMatch
 
 TOKEN_RE = re.compile(r"[a-zа-яё0-9]+", re.IGNORECASE)
 MIN_SCORE = 0.18
+_RU_SUFFIXES = tuple(sorted({
+    "иями", "ями", "ами", "ого", "ему", "ому", "ыми", "ими", "его",
+    "иях", "ах", "ях", "ов", "ев", "ом", "ем", "ам", "ям", "ую", "юю",
+    "ая", "яя", "ое", "ее", "ые", "ие", "ый", "ий", "ой", "ей", "а", "я",
+    "ы", "и", "у", "ю", "е", "о",
+}, key=len, reverse=True))
 
 
 def _tokens(text: str) -> set[str]:
-    return {token.casefold() for token in TOKEN_RE.findall(text)}
+    return {_stem(token.casefold()) for token in TOKEN_RE.findall(text)}
+
+
+def _stem(token: str) -> str:
+    """Tiny conservative normalizer for common Russian case endings.
+
+    This is intentionally not a linguistic stemmer: it only joins obvious word
+    forms and keeps at least four characters, which avoids opaque dependencies
+    and keeps deterministic ranking suitable for an offline installation.
+    """
+    if not re.fullmatch(r"[а-яё]+", token) or len(token) < 6:
+        return token
+    for suffix in _RU_SUFFIXES:
+        if token.endswith(suffix) and len(token) - len(suffix) >= 4:
+            return token[:-len(suffix)]
+    return token
 
 
 def _normalized_phrase(text: str) -> str:

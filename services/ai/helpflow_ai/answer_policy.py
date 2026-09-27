@@ -18,7 +18,13 @@ class AnswerRoute(str, Enum):
 _SENSITIVE = re.compile(
     r"отпуск|зарплат|компенсац|командиров|кадров|hr\b|юрид|договор|финанс|"
     r"реквизит|персональн\w* данн|политик|регламент|безопасност|антивирус|"
-    r"доступ|прав[ао] администратор|уч[её]тн\w* запис|парол|токен|секрет",
+    r"уч[её]тн\w* запис|парол|токен|секрет",
+    re.IGNORECASE,
+)
+_ACCESS_CONTROL = re.compile(
+    r"(?:выда\w*|предостав\w*|получ\w*|измен\w*|расшир\w*|запрос\w*)"
+    r"[^.!?\n]{0,40}(?:доступ\w*|прав\w*)|"
+    r"(?:доступ\w*|прав\w*)[^.!?\n]{0,40}(?:администратор\w*|финансов\w*|crm\b)",
     re.IGNORECASE,
 )
 _DESTRUCTIVE = re.compile(
@@ -46,7 +52,7 @@ class AnswerPolicy:
             return AnswerRoute.COMPANY
         if matches and playbook_id and playbook_id != "unknown":
             return AnswerRoute.PLAYBOOK
-        if _SENSITIVE.search(query) or _DESTRUCTIVE.search(query):
+        if _SENSITIVE.search(query) or _ACCESS_CONTROL.search(query) or _DESTRUCTIVE.search(query):
             return AnswerRoute.OPERATOR
         if _LOW_RISK.search(query):
             return AnswerRoute.GENERAL
@@ -55,4 +61,8 @@ class AnswerPolicy:
     @staticmethod
     def requires_verified_source(query: str) -> bool:
         """Whether clarification cannot make an unsourced answer safe."""
-        return bool(_SENSITIVE.search(query) or _DESTRUCTIVE.search(query))
+        return bool(
+            _SENSITIVE.search(query)
+            or _ACCESS_CONTROL.search(query)
+            or _DESTRUCTIVE.search(query)
+        )

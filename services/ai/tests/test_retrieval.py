@@ -83,6 +83,25 @@ def test_title_match_beats_same_overlap_in_body():
     assert KnowledgeRetriever(chunks).search("VPN authentication failed", None)[0].chunk.id == "title"
 
 
+def test_russian_word_forms_match_the_same_concept():
+    chunks = [
+        KnowledgeChunk(
+            id="document:travel:0",
+            service="HR",
+            title="Регламент командировок",
+            text="Командировочные расходы согласуются с руководителем.",
+            keywords=["командировка"],
+            escalation_team="HR",
+        ),
+    ]
+
+    matches = KnowledgeRetriever(chunks).search(
+        "Как согласовать расходы в командировке?", None
+    )
+
+    assert matches and matches[0].chunk.id == "document:travel:0"
+
+
 def test_duplicate_article_ids_fail_closed(tmp_path: Path):
     _write_minimal_playbook(tmp_path)
     articles = tmp_path / "articles"

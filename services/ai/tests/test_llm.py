@@ -12,6 +12,7 @@ from helpflow_ai import (
     DecisionAction,
     KnowledgeBase,
     KnowledgeChunk,
+    KnowledgeMatch,
     KnowledgeRetriever,
     LLMClient,
     LLMSettings,
@@ -20,6 +21,8 @@ from helpflow_ai import (
     TriageEngine,
 )
 from helpflow_ai.llm import LLMError, parse_json_object
+from helpflow_ai.prompts import build_grounded_response_user
+from helpflow_ai.schemas import Decision, Playbook
 
 
 def fake_llm(responses: list, calls: list | None = None) -> LLMClient:
@@ -479,6 +482,39 @@ def test_response_prompt_does_not_resend_user_content(kb):
     assert "не меняй prepared_action" in system.casefold()
     assert "<response_task>" in user and "</response_task>" in user
     assert injection not in user
+
+
+def test_response_prompt_bounds_large_source_context():
+    playbook = Playbook(
+        id="unknown",
+        title="Unknown",
+        service="HR",
+        keywords=[],
+        escalation_team="HR",
+    )
+    decision = Decision(
+        action=DecisionAction.STEP,
+        message="Ответить по документу",
+    )
+    matches = [
+        KnowledgeMatch(
+            chunk=KnowledgeChunk(
+                id=f"document:large:{index}",
+                service="HR",
+                title=f"Документ {index}",
+                text=(f"начало-{index} " + "длинный текст " * 1000 + f" конец-{index}"),
+                escalation_team="HR",
+            ),
+            score=0.9 - index * 0.1,
+        )
+        for index in range(4)
+    ]
+
+    prompt = build_grounded_response_user(decision, playbook, matches)
+
+    assert len(prompt) < 7_000
+    assert "начало-0" in prompt
+    assert "конец-0" not in prompt
 
 
 def test_grounded_reply_accepts_only_prompt_sources(kb):
