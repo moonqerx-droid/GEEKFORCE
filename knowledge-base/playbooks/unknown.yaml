@@ -1,0 +1,18 @@
+id: unknown
+title: Проблема требует уточнения
+service: Не определён
+default_urgency: medium
+escalation_team: Service Desk L1
+escalate_immediately: false
+keywords: []
+questions:
+  - fact: service_name
+    text: Уточните, пожалуйста, какая программа или сервис не работает?
+    kind: text
+  - fact: error_text
+    text: Что именно происходит — есть ли сообщение об ошибке?
+    kind: text
+  - fact: since_when
+    text: Когда это началось и работало ли раньше?
+    kind: text
+verify_question: После этого всё работает как нужно?

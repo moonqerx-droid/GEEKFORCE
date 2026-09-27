@@ -1,0 +1,32 @@
+.ticket-filters {
+  display: flex;
+  gap: var(--space-2);
+  padding: var(--space-4);
+  border-bottom: 1px solid var(--color-border);
+  background: var(--color-surface);
+  flex-wrap: wrap;
+}
+
+.ticket-filters-search {
+  flex: 1;
+  min-width: 140px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  padding: 8px 10px;
+  background: var(--color-surface-raised);
+  outline: none;
+}
+
+.ticket-filters-select {
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  padding: 8px 10px;
+  background: var(--color-surface-raised);
+  outline: none;
+}
+
+.ticket-filters-search:focus,
+.ticket-filters-select:focus {
+  border-color: var(--color-accent);
+  box-shadow: var(--focus-ring);
+}

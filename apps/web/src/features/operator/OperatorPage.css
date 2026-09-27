@@ -1,0 +1,107 @@
+.operator-page {
+  display: flex;
+  flex-direction: column;
+  height: calc(100vh - 64px);
+  padding: 24px clamp(16px, 3vw, 36px) 30px;
+  gap: var(--space-4);
+  background: var(--color-bg);
+}
+
+.operator-page-center {
+  align-items: center;
+  justify-content: center;
+}
+
+.operator-heading {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: var(--space-4);
+}
+
+.operator-heading h1 {
+  margin: 0 0 4px;
+  font-size: clamp(24px, 3vw, 34px);
+  line-height: 1.15;
+  letter-spacing: -0.035em;
+}
+
+.operator-heading p {
+  margin: 0;
+  color: var(--color-text-muted);
+}
+
+.operator-heading-count {
+  display: flex;
+  align-items: baseline;
+  gap: 7px;
+  color: var(--color-text-muted);
+  white-space: nowrap;
+}
+
+.operator-heading-count strong {
+  color: var(--color-text);
+  font-size: 24px;
+}
+
+.operator-layout {
+  flex: 1;
+  display: grid;
+  grid-template-columns: minmax(320px, 390px) 1fr;
+  overflow: hidden;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-xl);
+  background: var(--color-surface);
+  box-shadow: var(--shadow-md);
+}
+
+.operator-list-pane {
+  display: flex;
+  flex-direction: column;
+  border-right: 1px solid var(--color-border);
+  overflow: hidden;
+  background: var(--color-surface);
+}
+
+.operator-detail-pane {
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  background: var(--color-surface-raised);
+}
+
+.operator-back-link {
+  display: none;
+  background: transparent;
+  border: none;
+  color: var(--color-accent);
+  font-weight: 600;
+  padding: var(--space-3) var(--space-4) 0;
+  text-align: left;
+}
+
+@media (max-width: 768px) {
+  .operator-page {
+    padding: var(--space-4);
+  }
+
+  .operator-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .operator-list-pane-hide-mobile,
+  .operator-detail-pane-hide-mobile {
+    display: none;
+  }
+
+  .operator-back-link {
+    display: block;
+  }
+}
+
+@media (max-width: 520px) {
+  .operator-heading p,
+  .operator-heading-count span {
+    display: none;
+  }
+}
