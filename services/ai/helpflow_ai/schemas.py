@@ -107,6 +107,18 @@ class KnowledgeMatch(BaseModel):
     score: float = Field(ge=0.0, le=1.0)
 
 
+class GroundedAnswer(BaseModel):
+    """Strict model output that can be checked against retrieved sources."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    answer: str = Field(min_length=1, max_length=1200)
+    source_ids: list[str] = Field(min_length=1, max_length=4)
+    confidence: float = Field(ge=0.0, le=1.0)
+    needs_operator: bool
+    reason: str = Field(min_length=1, max_length=300)
+
+
 class Analysis(BaseModel):
     """Structured understanding of the user's request."""
 
@@ -163,6 +175,9 @@ class Decision(BaseModel):
     reason: str = ""
     escalation_team: str | None = None
     message_source: Literal["rules", "llm"] = "rules"
+    source_ids: list[str] = Field(default_factory=list)
+    fallback_reason: str | None = None
+    llm_latency_ms: int | None = Field(default=None, ge=0)
 
 
 class EscalationCard(BaseModel):

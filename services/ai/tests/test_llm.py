@@ -7,7 +7,16 @@ import json
 import httpx
 import pytest
 
-from helpflow_ai import ConversationContext, DecisionAction, LLMClient, LLMSettings, StepOutcome, StepRecord, TriageEngine
+from helpflow_ai import (
+    ConversationContext,
+    DecisionAction,
+    KnowledgeRetriever,
+    LLMClient,
+    LLMSettings,
+    StepOutcome,
+    StepRecord,
+    TriageEngine,
+)
 from helpflow_ai.llm import LLMError, parse_json_object
 
 
@@ -164,13 +173,22 @@ def test_ollama_uses_native_chat_with_thinking_disabled():
     assert calls[0]["body"]["format"] == "json"
 
 
-def test_ollama_keeps_normal_dialogue_off_the_slow_model_path(kb):
+def test_ollama_uses_grounded_response_path_without_analysis_call(kb):
     calls: list = []
+    source_id = KnowledgeRetriever(kb.chunks).search(
+        "Не работает VPN", "vpn_connection"
+    )[0].chunk.id
 
     def handler(request: httpx.Request) -> httpx.Response:
         calls.append(json.loads(request.content))
         return httpx.Response(200, json={
-            "message": {"content": '{"message":"Уточните, пожалуйста, текст ошибки VPN."}'},
+            "message": {"content": json.dumps({
+                "answer": "Уточните, пожалуйста, текст ошибки VPN.",
+                "source_ids": [source_id],
+                "confidence": 0.9,
+                "needs_operator": False,
+                "reason": "Найден сценарий VPN",
+            }, ensure_ascii=False)},
         })
 
     client = LLMClient(
@@ -192,8 +210,9 @@ def test_ollama_keeps_normal_dialogue_off_the_slow_model_path(kb):
     ))
 
     assert analysis.source == "rules"
-    assert decision.message_source == "rules"
-    assert len(calls) == 0
+    assert decision.message_source == "llm"
+    assert decision.source_ids == [source_id]
+    assert len(calls) == 1
 
 
 def test_ollama_escalation_does_not_wait_for_summary(kb):
@@ -222,7 +241,16 @@ def test_llm_rewrites_only_the_visible_decision_message(kb):
         playbook_id="crm_login_device_specific",
     )
     rules_decision = TriageEngine(kb).decide(ctx)
-    rendered = TriageEngine(kb, fake_llm([{"message": "Понял. Подскажите, подключён ли сейчас VPN?"}])).decide(ctx)
+    source_id = KnowledgeRetriever(kb.chunks).search(
+        ctx.original_request, ctx.playbook_id
+    )[0].chunk.id
+    rendered = TriageEngine(kb, fake_llm([{
+        "answer": "Понял. Подскажите, подключён ли сейчас VPN?",
+        "source_ids": [source_id],
+        "confidence": 0.9,
+        "needs_operator": False,
+        "reason": "Найден сценарий CRM",
+    }])).decide(ctx)
 
     assert rendered.message_source == "llm"
     assert rendered.message.startswith("Понял")
@@ -265,8 +293,17 @@ def test_llm_cannot_remove_security_notice(kb):
         known_facts={"entered_credentials": "no"},
         playbook_id="security_incident",
     )
+    source_id = KnowledgeRetriever(kb.chunks).search(
+        ctx.original_request, ctx.playbook_id
+    )[0].chunk.id
 
-    rendered = TriageEngine(kb, fake_llm([{"message": "Я сразу передам обращение специалисту."}])).decide(ctx)
+    rendered = TriageEngine(kb, fake_llm([{
+        "answer": "Я сразу передам обращение специалисту.",
+        "source_ids": [source_id],
+        "confidence": 0.95,
+        "needs_operator": True,
+        "reason": "Инцидент требует оператора",
+    }])).decide(ctx)
 
     assert rendered.action == DecisionAction.ESCALATE
     assert rendered.message_source == "llm"
@@ -280,8 +317,17 @@ def test_security_notice_cannot_make_rendered_message_oversized(kb):
         playbook_id="security_incident",
     )
     expected = TriageEngine(kb).decide(ctx)
+    source_id = KnowledgeRetriever(kb.chunks).search(
+        ctx.original_request, ctx.playbook_id
+    )[0].chunk.id
 
-    rendered = TriageEngine(kb, fake_llm([{"message": "x" * 1150}])).decide(ctx)
+    rendered = TriageEngine(kb, fake_llm([{
+        "answer": "x" * 1150,
+        "source_ids": [source_id],
+        "confidence": 0.95,
+        "needs_operator": True,
+        "reason": "Инцидент требует оператора",
+    }])).decide(ctx)
 
     assert rendered.message == expected.message
     assert rendered.message_source == "rules"
@@ -300,6 +346,76 @@ def test_response_prompt_does_not_resend_user_content(kb):
 
     system = calls[0]["messages"][0]["content"]
     user = calls[0]["messages"][1]["content"]
-    assert "не меняй выбранное системой действие" in system.casefold()
+    assert "не меняй prepared_action" in system.casefold()
     assert "<response_task>" in user and "</response_task>" in user
     assert injection not in user
+
+
+def test_grounded_reply_accepts_only_prompt_sources(kb):
+    ctx = ConversationContext(original_request="Не работает VPN", playbook_id="vpn_connection")
+    expected = TriageEngine(kb).decide(ctx)
+    source_id = KnowledgeRetriever(kb.chunks).search(
+        ctx.original_request, ctx.playbook_id
+    )[0].chunk.id
+    reply = {
+        "answer": "Уточните, пожалуйста, точный текст ошибки VPN.",
+        "source_ids": [source_id],
+        "confidence": 0.91,
+        "needs_operator": False,
+        "reason": "Найден сценарий VPN",
+    }
+
+    result = TriageEngine(kb, fake_llm([reply])).decide(ctx)
+
+    assert result.action == expected.action
+    assert result.question == expected.question
+    assert result.step == expected.step
+    assert result.source_ids == [source_id]
+    assert result.message_source == "llm"
+
+
+def test_grounded_unknown_source_falls_back_to_rule_message(kb):
+    ctx = ConversationContext(original_request="Не работает VPN", playbook_id="vpn_connection")
+    expected = TriageEngine(kb).decide(ctx)
+    reply = {
+        "answer": "Перезагрузите сервер.",
+        "source_ids": ["invented.source"],
+        "confidence": 0.99,
+        "needs_operator": False,
+        "reason": "Источник якобы найден",
+    }
+
+    result = TriageEngine(kb, fake_llm([reply])).decide(ctx)
+
+    assert result.message == expected.message
+    assert result.message_source == "rules"
+    assert result.fallback_reason == "unknown_source"
+
+
+def test_grounded_low_confidence_falls_back_to_rules(kb):
+    ctx = ConversationContext(original_request="Не работает VPN", playbook_id="vpn_connection")
+    expected = TriageEngine(kb).decide(ctx)
+    source_id = KnowledgeRetriever(kb.chunks).search(
+        ctx.original_request, ctx.playbook_id
+    )[0].chunk.id
+    reply = {
+        "answer": "Попробуйте снова.",
+        "source_ids": [source_id],
+        "confidence": 0.20,
+        "needs_operator": False,
+        "reason": "Недостаточно совпадений",
+    }
+
+    result = TriageEngine(kb, fake_llm([reply])).decide(ctx)
+
+    assert result.message == expected.message
+    assert result.fallback_reason == "low_confidence"
+
+
+def test_grounded_smalltalk_intent_does_not_call_llm(kb):
+    calls = []
+    engine = TriageEngine(kb, fake_llm([], calls))
+
+    assert engine.conversation_intent("Привет") == "greeting"
+    assert engine.conversation_intent("Спасибо") == "thanks"
+    assert calls == []

@@ -8,6 +8,7 @@ the dialogue.
 from __future__ import annotations
 
 import logging
+import time
 from typing import Any
 
 from pydantic import ValidationError
@@ -15,12 +16,14 @@ from pydantic import ValidationError
 from . import prompts, rules
 from .knowledge import KnowledgeBase
 from .llm import LLMClient, LLMError, LLMSettings
+from .retrieval import KnowledgeRetriever
 from .schemas import (
     Analysis,
     ConversationContext,
     Decision,
     DecisionAction,
     EscalationCard,
+    GroundedAnswer,
     Playbook,
     Question,
     Step,
@@ -45,6 +48,7 @@ class TriageEngine:
     def __init__(self, knowledge: KnowledgeBase, llm: LLMClient | None = None):
         self.kb = knowledge
         self.llm = llm
+        self.retriever = KnowledgeRetriever(knowledge.chunks)
 
     @classmethod
     def from_env(cls) -> "TriageEngine":
@@ -121,28 +125,61 @@ class TriageEngine:
 
     def _render_decision(self, decision: Decision, context: ConversationContext) -> Decision:
         playbook = self.kb.get(context.playbook_id)
+        query = context.original_request or _first_user_message(context)
+        matches = self.retriever.search(query, playbook.id)
+        if not matches:
+            return decision.model_copy(update={"fallback_reason": "no_sources"})
+        started = time.monotonic()
         try:
             raw = self.llm.chat_json(
                 prompts.RESPONSE_SYSTEM,
-                prompts.build_response_user(decision, playbook),
+                prompts.build_grounded_response_user(decision, playbook, matches),
             )
-            if set(raw) != {"message"}:
-                return decision
-            candidate = raw.get("message")
-            if not isinstance(candidate, str):
-                return decision
-            message = candidate.strip()
-            if not message or len(message) > MAX_RENDERED_MESSAGE_LENGTH:
-                return decision
+            answer = GroundedAnswer.model_validate(raw)
+            elapsed = _elapsed_ms(started)
+            allowed = {match.chunk.id for match in matches}
+            if not set(answer.source_ids) <= allowed:
+                return decision.model_copy(update={
+                    "fallback_reason": "unknown_source",
+                    "llm_latency_ms": elapsed,
+                })
+            if answer.confidence < 0.65:
+                return decision.model_copy(update={
+                    "fallback_reason": "low_confidence",
+                    "llm_latency_ms": elapsed,
+                })
+            if answer.needs_operator != (decision.action == DecisionAction.ESCALATE):
+                return decision.model_copy(update={
+                    "fallback_reason": "action_mismatch",
+                    "llm_latency_ms": elapsed,
+                })
+            message = answer.answer.strip()
             notice = playbook.safety_notice
             if notice and notice in decision.message and notice not in message:
                 message = f"{notice} {message}"
             if len(message) > MAX_RENDERED_MESSAGE_LENGTH:
-                return decision
-            return decision.model_copy(update={"message": message, "message_source": "llm"})
+                return decision.model_copy(update={
+                    "fallback_reason": "message_too_long",
+                    "llm_latency_ms": elapsed,
+                })
+            return decision.model_copy(update={
+                "message": message,
+                "message_source": "llm",
+                "source_ids": answer.source_ids,
+                "llm_latency_ms": elapsed,
+            })
+        except ValidationError as error:
+            logger.warning("LLM response validation failed, using rules: %s", error)
+            return decision.model_copy(update={
+                "fallback_reason": "invalid_response",
+                "llm_latency_ms": _elapsed_ms(started),
+            })
         except (LLMError, ValueError, TypeError) as error:
             logger.warning("LLM response rendering failed, using rules: %s", error)
-            return decision
+            return decision.model_copy(update={
+                "fallback_reason": "llm_error",
+                "llm_latency_ms": _elapsed_ms(started),
+            })
 
     def next_question(self, playbook: Playbook, context: ConversationContext) -> Question | None:
         limit = MAX_QUESTIONS_URGENT if context.urgency in URGENT_LEVELS else MAX_QUESTIONS
@@ -297,7 +334,7 @@ class TriageEngine:
                 f"последний шаг «{title}» — {verdict}")
 
     def _ai_summary(self, card: EscalationCard) -> tuple[str, str]:
-        if self.llm is not None and self.llm.supports_response_rendering:
+        if self.llm is not None and self.llm.supports_summaries:
             try:
                 raw = self.llm.chat_json(prompts.SUMMARY_SYSTEM,
                                          prompts.build_summary_user(card.model_dump(mode="json")))
@@ -317,6 +354,10 @@ def _summary(playbook: Playbook, service: str, symptoms: list[str]) -> str:
 
 def _first_user_message(ctx: ConversationContext) -> str:
     return next((str(m.get("content", "")) for m in ctx.messages if m.get("role") == "user"), "")
+
+
+def _elapsed_ms(started: float) -> int:
+    return max(0, round((time.monotonic() - started) * 1000))
 
 
 def _coerce_llm_analysis(raw: dict[str, Any], base: Analysis) -> Analysis:

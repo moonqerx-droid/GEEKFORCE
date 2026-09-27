@@ -84,7 +84,12 @@ class LLMClient:
 
     @property
     def supports_response_rendering(self) -> bool:
-        """Local Ollama is too slow for cosmetic rewrites on the request path."""
+        """All configured providers may ground a reply in retrieved sources."""
+        return True
+
+    @property
+    def supports_summaries(self) -> bool:
+        """Avoid a second synchronous Ollama call when handing off a ticket."""
         return self._settings.provider != "ollama"
 
     def chat_json(self, system: str, user: str) -> dict[str, Any]:
