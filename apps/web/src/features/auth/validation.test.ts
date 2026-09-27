@@ -1,7 +1,8 @@
 import { describe, expect, it } from "vitest";
+import type { RegistrationPayload } from "../../api/types";
 import { validateRegistration } from "./validation";
 
-const valid = {
+const valid: RegistrationPayload = {
   first_name: "Анна-Мария",
   last_name: "Иванова",
   email: "anna@example.ru",
