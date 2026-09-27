@@ -18,7 +18,12 @@ DEFAULT_MODEL = "gpt-4o-mini"
 DEFAULT_OLLAMA_BASE_URL = "http://localhost:11434"
 DEFAULT_OLLAMA_MODEL = "qwen3.5:9b"
 DEFAULT_TIMEOUT_SECONDS = 15.0
-DEFAULT_OLLAMA_TIMEOUT_SECONDS = 90.0
+DEFAULT_OLLAMA_TIMEOUT_SECONDS = 20.0
+DEFAULT_CONNECT_TIMEOUT_SECONDS = 2.0
+DEFAULT_OLLAMA_KEEP_ALIVE = "15m"
+DEFAULT_OLLAMA_NUM_PREDICT = 320
+DEFAULT_OLLAMA_NUM_CTX = 4096
+DEFAULT_TEMPERATURE = 0.1
 DEFAULT_MAX_RETRIES = 1
 _FENCE_RE = re.compile(r"^```(?:json)?\s*|\s*```$", re.MULTILINE)
 
@@ -34,7 +39,12 @@ class LLMSettings:
     base_url: str = DEFAULT_BASE_URL
     model: str = DEFAULT_MODEL
     timeout: float = DEFAULT_TIMEOUT_SECONDS
+    connect_timeout: float = DEFAULT_CONNECT_TIMEOUT_SECONDS
     max_retries: int = DEFAULT_MAX_RETRIES
+    keep_alive: str = DEFAULT_OLLAMA_KEEP_ALIVE
+    num_predict: int = DEFAULT_OLLAMA_NUM_PREDICT
+    num_ctx: int = DEFAULT_OLLAMA_NUM_CTX
+    temperature: float = DEFAULT_TEMPERATURE
 
     @classmethod
     def from_env(cls) -> "LLMSettings | None":
@@ -49,7 +59,14 @@ class LLMSettings:
                 base_url=os.getenv("OLLAMA_BASE_URL", DEFAULT_OLLAMA_BASE_URL).rstrip("/"),
                 model=os.getenv("OLLAMA_MODEL", DEFAULT_OLLAMA_MODEL),
                 timeout=float(os.getenv("AI_TIMEOUT_SECONDS", DEFAULT_OLLAMA_TIMEOUT_SECONDS)),
+                connect_timeout=float(os.getenv(
+                    "AI_CONNECT_TIMEOUT_SECONDS", DEFAULT_CONNECT_TIMEOUT_SECONDS
+                )),
                 max_retries=0,
+                keep_alive=os.getenv("OLLAMA_KEEP_ALIVE", DEFAULT_OLLAMA_KEEP_ALIVE),
+                num_predict=int(os.getenv("OLLAMA_NUM_PREDICT", DEFAULT_OLLAMA_NUM_PREDICT)),
+                num_ctx=int(os.getenv("OLLAMA_NUM_CTX", DEFAULT_OLLAMA_NUM_CTX)),
+                temperature=float(os.getenv("OLLAMA_TEMPERATURE", DEFAULT_TEMPERATURE)),
             )
         api_key = os.getenv("AI_API_KEY", "").strip()
         if not api_key:
@@ -60,6 +77,9 @@ class LLMSettings:
             base_url=os.getenv("AI_BASE_URL", DEFAULT_BASE_URL).rstrip("/"),
             model=os.getenv("AI_MODEL", DEFAULT_MODEL),
             timeout=float(os.getenv("AI_TIMEOUT_SECONDS", DEFAULT_TIMEOUT_SECONDS)),
+            connect_timeout=float(os.getenv(
+                "AI_CONNECT_TIMEOUT_SECONDS", DEFAULT_CONNECT_TIMEOUT_SECONDS
+            )),
         )
 
 
@@ -68,7 +88,7 @@ class LLMClient:
         self._settings = settings
         self._http = httpx.Client(
             base_url=settings.base_url,
-            timeout=settings.timeout,
+            timeout=httpx.Timeout(settings.timeout, connect=settings.connect_timeout),
             transport=transport,
             headers={"Authorization": f"Bearer {settings.api_key}"},
         )
@@ -103,15 +123,19 @@ class LLMClient:
                 "stream": False,
                 "think": False,
                 "format": "json",
-                "keep_alive": "10m",
-                "options": {"temperature": 0.1, "num_predict": 800},
+                "keep_alive": self._settings.keep_alive,
+                "options": {
+                    "temperature": self._settings.temperature,
+                    "num_predict": self._settings.num_predict,
+                    "num_ctx": self._settings.num_ctx,
+                },
                 "messages": messages,
             }
             request = self._request_ollama
         else:
             payload = {
                 "model": self._settings.model,
-                "temperature": 0.1,
+                "temperature": self._settings.temperature,
                 "response_format": {"type": "json_object"},
                 "messages": messages,
             }

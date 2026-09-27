@@ -146,8 +146,33 @@ def test_ollama_settings_need_no_api_key(monkeypatch):
     assert settings.provider == "ollama"
     assert settings.base_url == "http://ollama.test:11434"
     assert settings.model == "qwen3.5:9b"
-    assert settings.timeout == 90
+    assert settings.timeout == 20
+    assert settings.connect_timeout == 2
+    assert settings.keep_alive == "15m"
+    assert settings.num_predict == 320
+    assert settings.num_ctx == 4096
+    assert settings.temperature == 0.1
     assert settings.max_retries == 0
+
+
+def test_ollama_performance_settings_can_be_overridden(monkeypatch):
+    monkeypatch.setenv("AI_PROVIDER", "ollama")
+    monkeypatch.setenv("AI_TIMEOUT_SECONDS", "12")
+    monkeypatch.setenv("AI_CONNECT_TIMEOUT_SECONDS", "1.5")
+    monkeypatch.setenv("OLLAMA_KEEP_ALIVE", "30m")
+    monkeypatch.setenv("OLLAMA_NUM_PREDICT", "180")
+    monkeypatch.setenv("OLLAMA_NUM_CTX", "3072")
+    monkeypatch.setenv("OLLAMA_TEMPERATURE", "0.05")
+
+    settings = LLMSettings.from_env()
+
+    assert settings is not None
+    assert settings.timeout == 12
+    assert settings.connect_timeout == 1.5
+    assert settings.keep_alive == "30m"
+    assert settings.num_predict == 180
+    assert settings.num_ctx == 3072
+    assert settings.temperature == 0.05
 
 
 def test_ollama_uses_native_chat_with_thinking_disabled():
@@ -162,6 +187,7 @@ def test_ollama_uses_native_chat_with_thinking_disabled():
         api_key="ollama",
         base_url="http://ollama.test:11434",
         model="qwen3.5:9b",
+        timeout=20,
     )
     client = LLMClient(settings, transport=httpx.MockTransport(handler))
 
@@ -171,6 +197,14 @@ def test_ollama_uses_native_chat_with_thinking_disabled():
     assert calls[0]["path"] == "/api/chat"
     assert calls[0]["body"]["think"] is False
     assert calls[0]["body"]["format"] == "json"
+    assert calls[0]["body"]["keep_alive"] == "15m"
+    assert calls[0]["body"]["options"] == {
+        "temperature": 0.1,
+        "num_predict": 320,
+        "num_ctx": 4096,
+    }
+    assert client._http.timeout.connect == 2
+    assert client._http.timeout.read == 20
 
 
 def test_ollama_uses_grounded_response_path_without_analysis_call(kb):

@@ -34,9 +34,14 @@ python -m helpflow_ai     # интерактивное демо в консол�
 | `AI_API_KEY` | — | нужен для `openai`; для `ollama` не требуется |
 | `AI_BASE_URL` | `https://api.openai.com/v1` | можно указать OpenRouter, YandexGPT-прокси, локальный vLLM/Ollama |
 | `AI_MODEL` | `gpt-4o-mini` | имя модели |
-| `AI_TIMEOUT_SECONDS` | `15` | таймаут запроса; при ошибке 1 повтор, затем fallback на правила |
+| `AI_TIMEOUT_SECONDS` | `20` для Ollama | общий таймаут; Ollama не делает повторный запрос и сразу использует безопасный fallback |
+| `AI_CONNECT_TIMEOUT_SECONDS` | `2` | отдельный быстрый таймаут подключения |
 | `OLLAMA_BASE_URL` | `http://localhost:11434` | нативный endpoint Ollama; в Docker используйте `http://host.docker.internal:11434` |
 | `OLLAMA_MODEL` | `qwen3.5:9b` | имя установленной локальной модели |
+| `OLLAMA_KEEP_ALIVE` | `15m` | сколько Ollama держит модель прогретой в памяти |
+| `OLLAMA_NUM_PREDICT` | `320` | верхняя граница длины ответа для снижения задержки |
+| `OLLAMA_NUM_CTX` | `4096` | размер контекста: достаточно для RAG без лишнего расхода памяти |
+| `OLLAMA_TEMPERATURE` | `0.1` | низкая вариативность ответа для устойчивой поддержки |
 | `HELPFLOW_KB_DIR` | `<repo>/knowledge-base` | путь к базе знаний (нужен в Docker) |
 
 ## Интеграция с backend (apps/api)
