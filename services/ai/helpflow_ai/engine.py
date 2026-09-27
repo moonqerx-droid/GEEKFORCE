@@ -114,6 +114,8 @@ class TriageEngine:
         if question is not None:
             return Decision(action=DecisionAction.ASK, message=question.text, question=question,
                             reason=f"не хватает факта: {question.fact}")
+        if playbook.id == "unknown":
+            return self._escalate(playbook, "не найден подтверждённый сценарий в базе знаний")
         if playbook.escalate_immediately:
             return self._escalate(playbook, "сценарий требует участия специалиста")
         step = self.next_step(playbook, context)

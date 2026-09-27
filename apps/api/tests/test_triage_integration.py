@@ -236,3 +236,18 @@ def test_ai_fallback_reason_is_persisted(client, monkeypatch):
     assert state["rag_source_ids"] == []
     assert state["ai_fallback_reason"] == "low_confidence"
     assert state["ai_latency_ms"] == 87
+
+
+def test_unknown_issue_escalates_to_l1_without_invented_steps(client):
+    original = "У меня странная проблема, ничего не понятно"
+    cid = client.post("/api/conversations").json()["id"]
+
+    state = send(client, cid, original)
+    for answer in ("не знаю", "нет текста ошибки", "сегодня"):
+        assert state["status"] == "CLARIFYING"
+        state = send(client, cid, answer)
+
+    assert state["status"] == "ESCALATED"
+    assert state["escalation_card"]["recommended_team"] == "Service Desk L1"
+    assert state["escalation_card"]["original_request"] == original
+    assert state["completed_steps"] == []

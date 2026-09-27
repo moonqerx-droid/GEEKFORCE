@@ -38,6 +38,7 @@ cases:
       playbook: unknown
       urgency: medium
       questions_before_step: 3
+      action_after_questions: escalate
 
   - name: несколько симптомов — почта
     message: Outlook постоянно просит пароль и письма не отправляются, застряли в исходящих

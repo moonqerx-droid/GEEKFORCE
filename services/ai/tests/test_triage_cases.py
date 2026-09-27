@@ -38,7 +38,7 @@ def test_triage_case(case, engine, simulate):
             asked += 1
             sim.answer("не знаю")
         assert asked == expect["questions_before_step"]
-        assert sim.decision.action.value == "step"
+        assert sim.decision.action.value == expect.get("action_after_questions", "step")
 
 
 def test_analysis_never_repeats_known_facts(engine):

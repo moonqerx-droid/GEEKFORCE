@@ -67,7 +67,19 @@ def test_ambiguous_request_asks_at_most_three_questions(simulate):
         sim.answer("не знаю")
     assert 1 <= len(questions) <= 3
     assert len(questions) == len(set(questions)), "questions must not repeat"
-    assert sim.decision.action == DecisionAction.STEP
+    assert sim.decision.action == DecisionAction.ESCALATE
+
+
+def test_unknown_issue_escalates_after_unique_clarifications(simulate):
+    sim = simulate("У меня странная проблема, ничего не понятно")
+    asked = []
+    while sim.decision.action == DecisionAction.ASK:
+        asked.append(sim.decision.question.fact)
+        sim.answer("не знаю")
+
+    assert asked == ["service_name", "error_text", "since_when"]
+    assert sim.decision.action == DecisionAction.ESCALATE
+    assert sim.decision.escalation_team == "Service Desk L1"
 
 
 def test_answer_changes_next_step(simulate):
