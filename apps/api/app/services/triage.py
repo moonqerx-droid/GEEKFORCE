@@ -184,7 +184,8 @@ class TriageDialogueService(DialogueService):
         playbook = self.engine.kb.get(conversation.playbook_id)
         conversation.missing_facts = [q.fact for q in playbook.questions if q.fact not in conversation.known_facts]
         if decision.action == DecisionAction.ESCALATE:
-            self._escalate(conversation, decision.reason)
+            # The engine explains the hand-off in its own words (what it already noted, who takes it).
+            self._escalate(conversation, decision.reason, message=decision.message)
             return
         if decision.action == DecisionAction.ASK:
             conversation.status = "CLARIFYING"
@@ -197,7 +198,7 @@ class TriageDialogueService(DialogueService):
             conversation.status = "VERIFYING"
         self._message(conversation, "assistant", decision.message)
 
-    def _escalate(self, conversation, reason):
+    def _escalate(self, conversation, reason, message=None):
         card = self.engine.build_escalation_card(self._context(conversation), reason)
         conversation.status = "ESCALATED"
         conversation.escalated_at = conversation.escalated_at or utc_now()
@@ -206,8 +207,8 @@ class TriageDialogueService(DialogueService):
         conversation.escalation_card = card.model_dump(mode="json")
         conversation.escalation_summary = card.ai_summary
         playbook = self.engine.kb.get(conversation.playbook_id)
-        message = f"Обращение передано специалисту ({card.recommended_team}) вместе с собранным контекстом."
-        if playbook.safety_notice:
+        message = message or f"Обращение передано специалисту ({card.recommended_team}) вместе с собранным контекстом."
+        if playbook.safety_notice and playbook.safety_notice not in message:
             message = f"{playbook.safety_notice} {message}"
         self._message(conversation, "assistant", message)
 

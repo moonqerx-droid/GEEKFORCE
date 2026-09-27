@@ -359,6 +359,17 @@ def test_simple_requests_start_solving_quickly(simulate, message, first_step):
     assert sim.decision.step.id == first_step
 
 
+@pytest.mark.parametrize("message", [
+    "Забыл пароль от почты, не могу войти",
+    "не помню пароль от компа",
+])
+def test_forgotten_password_goes_straight_to_reset(simulate, message):
+    sim = simulate(message)
+    assert first_question_facts(sim) == [], "whether the password changed recently does not matter once it is forgotten"
+    assert sim.decision.action == DecisionAction.STEP
+    assert sim.decision.step.id == "self_service_reset"
+
+
 def test_locked_account_waits_instead_of_resetting(simulate):
     sim = simulate("аааа учетку заблокировали, что делать")
     first_question_facts(sim)

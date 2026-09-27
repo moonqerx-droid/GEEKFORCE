@@ -186,3 +186,17 @@ def test_admin_can_work_the_queue(client, people):
 
     assert response.status_code == 200
     assert response.json()["assignee_name"] == "Мария Иванова"
+
+
+def test_handoff_keeps_the_assistants_explanation(client, people):
+    conversation_id = client.post("/api/conversations").json()["id"]
+
+    response = client.post(
+        f"/api/conversations/{conversation_id}/messages",
+        json={"content": "Нужен доступ к папке бухгалтерии на общем диске"},
+    ).json()
+
+    assert response["status"] == "ESCALATED"
+    last = response["messages"][-1]["content"]
+    assert "папке бухгалтерии на общем диске" in last
+    assert "администратор" in last.lower()
