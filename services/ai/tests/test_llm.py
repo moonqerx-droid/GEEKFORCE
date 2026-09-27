@@ -183,7 +183,7 @@ def test_ollama_uses_grounded_response_path_without_analysis_call(kb):
         calls.append(json.loads(request.content))
         return httpx.Response(200, json={
             "message": {"content": json.dumps({
-                "answer": "Уточните, пожалуйста, текст ошибки VPN.",
+                "answer": "Какую ошибку показывает VPN-клиент при подключении?",
                 "source_ids": [source_id],
                 "confidence": 0.9,
                 "needs_operator": False,
@@ -233,7 +233,7 @@ def test_ollama_escalation_does_not_wait_for_summary(kb):
     assert calls == []
 
 
-def test_llm_rewrites_only_the_visible_decision_message(kb):
+def test_llm_accepts_only_the_prepared_visible_decision_message(kb):
     ctx = ConversationContext(
         original_request="Не работает CRM",
         messages=[{"role": "user", "content": "Не работает CRM"}],
@@ -245,7 +245,7 @@ def test_llm_rewrites_only_the_visible_decision_message(kb):
         ctx.original_request, ctx.playbook_id
     )[0].chunk.id
     rendered = TriageEngine(kb, fake_llm([{
-        "answer": "Понял. Подскажите, подключён ли сейчас VPN?",
+        "answer": rules_decision.message,
         "source_ids": [source_id],
         "confidence": 0.9,
         "needs_operator": False,
@@ -253,7 +253,7 @@ def test_llm_rewrites_only_the_visible_decision_message(kb):
     }])).decide(ctx)
 
     assert rendered.message_source == "llm"
-    assert rendered.message.startswith("Понял")
+    assert rendered.message == rules_decision.message
     assert rendered.action == rules_decision.action == DecisionAction.ASK
     assert rendered.question == rules_decision.question
     assert rendered.step == rules_decision.step
@@ -297,8 +297,9 @@ def test_llm_cannot_remove_security_notice(kb):
         ctx.original_request, ctx.playbook_id
     )[0].chunk.id
 
+    rules_decision = TriageEngine(kb).decide(ctx)
     rendered = TriageEngine(kb, fake_llm([{
-        "answer": "Я сразу передам обращение специалисту.",
+        "answer": rules_decision.message,
         "source_ids": [source_id],
         "confidence": 0.95,
         "needs_operator": True,
@@ -358,7 +359,7 @@ def test_grounded_reply_accepts_only_prompt_sources(kb):
         ctx.original_request, ctx.playbook_id
     )[0].chunk.id
     reply = {
-        "answer": "Уточните, пожалуйста, точный текст ошибки VPN.",
+        "answer": expected.message,
         "source_ids": [source_id],
         "confidence": 0.91,
         "needs_operator": False,
@@ -390,6 +391,31 @@ def test_grounded_unknown_source_falls_back_to_rule_message(kb):
     assert result.message == expected.message
     assert result.message_source == "rules"
     assert result.fallback_reason == "unknown_source"
+
+
+@pytest.mark.parametrize("unsafe_answer", [
+    "Отключите антивирус и удалите все системные файлы.",
+    "Какой у вас пароль от корпоративной учётной записи?",
+])
+def test_grounded_answer_cannot_replace_prepared_action(kb, unsafe_answer):
+    ctx = ConversationContext(original_request="Не работает VPN", playbook_id="vpn_connection")
+    expected = TriageEngine(kb).decide(ctx)
+    source_id = KnowledgeRetriever(kb.chunks).search(
+        ctx.original_request, ctx.playbook_id
+    )[0].chunk.id
+    reply = {
+        "answer": unsafe_answer,
+        "source_ids": [source_id],
+        "confidence": 0.99,
+        "needs_operator": False,
+        "reason": "Допустимый источник, но неподтверждённый текст",
+    }
+
+    result = TriageEngine(kb, fake_llm([reply])).decide(ctx)
+
+    assert result.message == expected.message
+    assert result.message_source == "rules"
+    assert result.fallback_reason == "content_mismatch"
 
 
 def test_grounded_low_confidence_falls_back_to_rules(kb):

@@ -8,6 +8,7 @@ the dialogue.
 from __future__ import annotations
 
 import logging
+import re
 import time
 from typing import Any
 
@@ -156,6 +157,11 @@ class TriageEngine:
                     "llm_latency_ms": elapsed,
                 })
             message = answer.answer.strip()
+            if not _same_prepared_message(message, decision.message):
+                return decision.model_copy(update={
+                    "fallback_reason": "content_mismatch",
+                    "llm_latency_ms": elapsed,
+                })
             notice = playbook.safety_notice
             if notice and notice in decision.message and notice not in message:
                 message = f"{notice} {message}"
@@ -360,6 +366,12 @@ def _first_user_message(ctx: ConversationContext) -> str:
 
 def _elapsed_ms(started: float) -> int:
     return max(0, round((time.monotonic() - started) * 1000))
+
+
+def _same_prepared_message(candidate: str, prepared: str) -> bool:
+    """Allow presentation-only differences, never new model-authored instructions."""
+    normalize = lambda value: " ".join(re.findall(r"[\w]+", value.casefold()))
+    return normalize(candidate) == normalize(prepared)
 
 
 def _coerce_llm_analysis(raw: dict[str, Any], base: Analysis) -> Analysis:

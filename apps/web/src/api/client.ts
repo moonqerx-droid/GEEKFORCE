@@ -9,17 +9,23 @@ import type {
 
 const BASE_URL = import.meta.env.VITE_API_BASE_URL ?? "";
 export const REQUEST_TIMEOUT_MS = 12000;
+const configuredMutationTimeout = Number(import.meta.env.VITE_MUTATION_TIMEOUT_MS);
+export const MUTATION_TIMEOUT_MS = Number.isFinite(configuredMutationTimeout)
+  && configuredMutationTimeout >= 100000
+  ? configuredMutationTimeout
+  : 100000;
 
 async function request<T>(
   path: string,
   init: RequestInit = {},
   signal?: AbortSignal,
+  timeoutMs = REQUEST_TIMEOUT_MS,
 ): Promise<T> {
   const controller = new AbortController();
   const cancel = () => controller.abort();
   signal?.addEventListener("abort", cancel, { once: true });
   if (signal?.aborted) cancel();
-  const timer = setTimeout(cancel, REQUEST_TIMEOUT_MS);
+  const timer = setTimeout(cancel, timeoutMs);
   try {
     const response = await fetch(`${BASE_URL}${path}`, {
       ...init,
@@ -48,7 +54,8 @@ async function request<T>(
   } catch (cause) {
     if (signal?.aborted || cause instanceof ApiError) throw cause;
     if (controller.signal.aborted) {
-      throw new Error("Сервер не ответил за 12 секунд. Обновите обращение перед повторной отправкой: сообщение могло сохраниться.");
+      const seconds = Math.round(timeoutMs / 1000);
+      throw new Error(`Сервер не ответил за ${seconds} секунд. Обновите обращение перед повторной отправкой: сообщение могло сохраниться.`);
     }
     throw new NetworkError("network_error", cause);
   } finally {
@@ -87,6 +94,7 @@ export const api = {
       `/api/conversations/${id}/messages`,
       { method: "POST", body: JSON.stringify(payload) },
       signal,
+      MUTATION_TIMEOUT_MS,
     );
   },
 
@@ -99,11 +107,17 @@ export const api = {
       `/api/conversations/${id}/step-result`,
       { method: "POST", body: JSON.stringify(payload) },
       signal,
+      MUTATION_TIMEOUT_MS,
     );
   },
 
   escalate(id: string, signal?: AbortSignal): Promise<Conversation> {
-    return request(`/api/conversations/${id}/escalate`, { method: "POST" }, signal);
+    return request(
+      `/api/conversations/${id}/escalate`,
+      { method: "POST" },
+      signal,
+      MUTATION_TIMEOUT_MS,
+    );
   },
 
   listTickets(signal?: AbortSignal): Promise<OperatorTicket[]> {

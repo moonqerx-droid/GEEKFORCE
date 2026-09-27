@@ -31,5 +31,5 @@ def test_migrated_postgres_serves_and_persists_an_api_conversation():
             {"id": conversation_id},
         ).scalar_one()
 
-    assert revision == "20260926_0003"
+    assert revision == "20260926_0004"
     assert stored_id == conversation_id

@@ -1,6 +1,6 @@
 import { HttpResponse, http } from "msw";
 import { describe, expect, it, vi } from "vitest";
-import { api, REQUEST_TIMEOUT_MS } from "./client";
+import { api, MUTATION_TIMEOUT_MS, REQUEST_TIMEOUT_MS } from "./client";
 import { ConflictError, NotFoundError, ValidationError } from "./errors";
 import { server } from "../test/server";
 import { makeConversation } from "../test/fixtures";
@@ -21,6 +21,11 @@ describe("api client", () => {
       fetchMock.mockRestore();
       vi.useRealTimers();
     }
+  });
+
+  it("waits longer for an AI-backed message mutation than for a health request", async () => {
+    expect(MUTATION_TIMEOUT_MS).toBeGreaterThanOrEqual(100_000);
+    expect(MUTATION_TIMEOUT_MS).toBeGreaterThan(REQUEST_TIMEOUT_MS);
   });
 
   it("rejects HTML returned by an incorrectly configured proxy", async () => {
