@@ -96,6 +96,13 @@ class TokenRequest(BaseModel):
     token: str = Field(min_length=20, max_length=512)
 
 
+class VerifyEmailRequest(BaseModel):
+    email: str
+    code: str = Field(pattern=r"^\d{6}$")
+
+    _email = field_validator("email")(_normalize_email)
+
+
 class ForgotPasswordRequest(BaseModel):
     email: str
 

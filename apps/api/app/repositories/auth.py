@@ -64,15 +64,18 @@ class AuthRepository:
         )
         self.session.commit()
 
-    def consume_email_token(self, token_hash: str, purpose: str) -> EmailToken | None:
-        token = self.session.scalar(
-            select(EmailToken).where(
+    def consume_email_token(
+        self, token_hash: str, purpose: str, *, user_id: str | None = None,
+    ) -> EmailToken | None:
+        conditions = [
                 EmailToken.token_hash == token_hash,
                 EmailToken.purpose == purpose,
                 EmailToken.used_at.is_(None),
                 EmailToken.expires_at > utc_now(),
-            )
-        )
+        ]
+        if user_id is not None:
+            conditions.append(EmailToken.user_id == user_id)
+        token = self.session.scalar(select(EmailToken).where(*conditions))
         if token is None:
             return None
         token.used_at = utc_now()
