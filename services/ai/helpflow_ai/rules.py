@@ -209,8 +209,18 @@ _FACT_PATTERNS: list[tuple[str, str, str]] = [
     ("password_changed_recently", "yes", r"\w*мен\w*л\w* пароль"),
     ("device", "laptop", r"ноут"),
     ("device", "desktop", r"(с|на) (компьютер|пк|компе)"),
+    ("had_access_before", "yes",
+     r"(пропал|исчез|отобрали|слетел)\w* доступ|доступ\w* (пропал|исчез|слетел)|был доступ|больше нет доступа"),
+    ("had_access_before", "no",
+     r"(нуж\w*|дайте|дать|выда\w*|откро\w*|открыть|предостав\w*) доступ|нов\w* сотрудник"),
 ]
 
+# "доступ к папке бухгалтерии на общем диске" -> "папке бухгалтерии на общем диске"
+_RESOURCE_RE = re.compile(
+    r"доступ\w*\s+(?:к|ко|в|во|на)\s+(.+?)"
+    r"(?=\s*[,.!?;:(]|\s+(?:пишет|выдает|выдаёт|горит|срочно|пожалуйста|плиз|пж)\b|$)",
+    re.IGNORECASE,
+)
 _ERROR_CODE_RE = re.compile(r"(?<!\d)([45]\d\d)(?!\d)")
 _QUOTED_RE = re.compile(r"[«\"“]([^»\"”]{3,200})[»\"”]")
 _ERROR_PHRASE_RE = re.compile(
@@ -229,6 +239,9 @@ def extract_facts(text: str) -> dict[str, str]:
     error_text = extract_error_text(text)
     if error_text:
         facts["error_text"] = error_text
+    resource = _RESOURCE_RE.search(text)
+    if resource:
+        facts["resource"] = resource.group(1).strip()[:MAX_FREE_TEXT_FACT]
     return facts
 
 

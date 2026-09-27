@@ -103,6 +103,9 @@ class TriageEngine:
         return self._render_decision(decision, context)
 
     def _decide_rules(self, context: ConversationContext) -> Decision:
+        # Facts stated in the first message count as known even if the caller lost them.
+        stated = rules.extract_facts(context.original_request) if context.original_request else {}
+        context = context.model_copy(update={"known_facts": {**stated, **context.known_facts}})
         playbook = self.kb.get(context.playbook_id)
         last = context.completed_steps[-1] if context.completed_steps else None
         if last and last.outcome == StepOutcome.HELPED and not context.verification_failed:
@@ -119,6 +122,10 @@ class TriageEngine:
             return self._escalate(playbook, "не найден подтверждённый сценарий в базе знаний")
         if playbook.escalate_immediately:
             return self._escalate(playbook, "сценарий требует участия специалиста")
+        described = _described_symptoms(playbook, context)
+        if described & set(playbook.escalate_on_symptoms):
+            return self._escalate(playbook, "решить может только специалист: " + ", ".join(sorted(
+                described & set(playbook.escalate_on_symptoms))), context.known_facts)
         step = self.next_step(playbook, context)
         if step is not None:
             return Decision(action=DecisionAction.STEP, message=f"{step.title}. {step.instruction}",
@@ -193,7 +200,7 @@ class TriageEngine:
         limit = MAX_QUESTIONS_URGENT if context.urgency in URGENT_LEVELS else MAX_QUESTIONS
         if len(context.asked_facts) >= limit:
             return None
-        for question in playbook.questions:
+        for question in _applicable_questions(playbook, context):
             if question.fact not in context.known_facts and question.fact not in context.asked_facts:
                 return question
         return None
@@ -202,8 +209,9 @@ class TriageEngine:
     def next_step(playbook: Playbook, context: ConversationContext) -> Step | None:
         done = {record.step_id for record in context.completed_steps}
         facts = context.known_facts
+        described = _described_symptoms(playbook, context)
         for step in playbook.steps:
-            if step.id in done:
+            if step.id in done or not _symptoms_allow(step, described):
                 continue
             if any(facts.get(key) not in values for key, values in step.when.items()):
                 continue
@@ -290,7 +298,7 @@ class TriageEngine:
     def _finalize(self, analysis: Analysis, ctx: ConversationContext) -> Analysis:
         playbook = self.kb.get(analysis.recommended_playbook)
         flow_ctx = ctx.model_copy(update={"known_facts": analysis.known_facts, "urgency": analysis.urgency})
-        missing = [q.fact for q in playbook.questions if q.fact not in analysis.known_facts]
+        missing = [q.fact for q in _applicable_questions(playbook, flow_ctx) if q.fact not in analysis.known_facts]
         question = self.next_question(playbook, flow_ctx)
         return analysis.model_copy(update={
             "missing_facts": missing,
@@ -307,9 +315,12 @@ class TriageEngine:
         return next((q for q in self.kb.get(ctx.playbook_id).questions if q.fact == fact), None)
 
     @staticmethod
-    def _escalate(playbook: Playbook, reason: str) -> Decision:
+    def _escalate(playbook: Playbook, reason: str, facts: dict[str, str] | None = None) -> Decision:
         text = (f"Передаю обращение специалисту ({playbook.escalation_team}). "
                 "Всё, что мы выяснили, уже в заявке — повторять ничего не придётся.")
+        if playbook.escalation_note:
+            note = playbook.escalation_note.format_map(_FactsOrDash(facts or {}))
+            text = f"{note} {text}"
         if playbook.safety_notice:
             text = f"{playbook.safety_notice} {text}"
         return Decision(action=DecisionAction.ESCALATE, message=text, reason=reason,
@@ -352,6 +363,33 @@ class TriageEngine:
             except LLMError as error:
                 logger.warning("LLM summary failed, using template: %s", error)
         return _template_summary(card), "rules"
+
+
+class _FactsOrDash(dict):
+    def __missing__(self, key: str) -> str:
+        return "—"
+
+
+def _user_text(ctx: ConversationContext) -> str:
+    """Everything the user wrote: symptoms may come from the first message or later answers."""
+    parts = [ctx.original_request] if ctx.original_request else []
+    parts += [str(m.get("content", "")) for m in ctx.messages if m.get("role") == "user"]
+    return " ".join(dict.fromkeys(p.strip() for p in parts if p and p.strip()))
+
+
+def _described_symptoms(playbook: Playbook, ctx: ConversationContext) -> set[str]:
+    return set(rules.detect_symptoms(_user_text(ctx), playbook))
+
+
+def _symptoms_allow(item: Question | Step, described: set[str]) -> bool:
+    if item.when_symptoms and not described & set(item.when_symptoms):
+        return False
+    return not described & set(item.unless_symptoms)
+
+
+def _applicable_questions(playbook: Playbook, ctx: ConversationContext) -> list[Question]:
+    described = _described_symptoms(playbook, ctx)
+    return [q for q in playbook.questions if _symptoms_allow(q, described)]
 
 
 def _summary(playbook: Playbook, service: str, symptoms: list[str]) -> str:

@@ -50,6 +50,10 @@ class Question(BaseModel):
     options: dict[str, list[str]] = Field(default_factory=dict)
     # For YES_NO: store the opposite answer (question is phrased positively).
     invert: bool = False
+    # Asked only when one of these symptoms was described (empty = always).
+    when_symptoms: list[str] = Field(default_factory=list)
+    # Skipped when one of these symptoms was described.
+    unless_symptoms: list[str] = Field(default_factory=list)
 
 
 class Step(BaseModel):
@@ -64,6 +68,9 @@ class Step(BaseModel):
     when: dict[str, list[str]] = Field(default_factory=dict)
     # Step is skipped when any listed fact has one of the given values.
     unless: dict[str, list[str]] = Field(default_factory=dict)
+    # Same as when/unless, but over symptoms described by the user.
+    when_symptoms: list[str] = Field(default_factory=list)
+    unless_symptoms: list[str] = Field(default_factory=list)
     requires_admin: bool = False
 
 
@@ -82,6 +89,10 @@ class Playbook(BaseModel):
     # Shown to the user together with the escalation message.
     safety_notice: str | None = None
     escalate_immediately: bool = False
+    # Hand off once questions are answered, if one of these symptoms was described.
+    escalate_on_symptoms: list[str] = Field(default_factory=list)
+    # Shown to the user before the standard hand-off text; {fact} placeholders allowed.
+    escalation_note: str | None = None
     escalation_team: str = "Service Desk L2"
     default_urgency: Urgency = Urgency.MEDIUM
 
