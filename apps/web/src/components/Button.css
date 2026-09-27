@@ -3,10 +3,10 @@
   align-items: center;
   justify-content: center;
   gap: var(--space-2);
-  border-radius: var(--radius-md);
+  border-radius: 10px;
   border: 1px solid transparent;
   font-weight: 600;
-  transition: background-color 120ms ease, border-color 120ms ease, opacity 120ms ease;
+  transition: background-color 120ms ease, border-color 120ms ease, opacity 120ms ease, transform 120ms ease;
   white-space: nowrap;
 }
 
@@ -32,6 +32,7 @@
 
 .btn-primary:hover:not(:disabled) {
   background: var(--color-accent-hover);
+  transform: translateY(-1px);
 }
 
 .btn-secondary {

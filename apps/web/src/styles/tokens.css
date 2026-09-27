@@ -1,41 +1,45 @@
 :root {
   color-scheme: light;
 
-  --color-bg: #f6f7fb;
+  --color-bg: #f3f6fa;
   --color-surface: #ffffff;
-  --color-surface-muted: #f0f1f7;
-  --color-border: #dfe2ec;
-  --color-text: #1c2030;
-  --color-text-muted: #5b6178;
-  --color-text-faint: #8a90a6;
+  --color-surface-muted: #eaf0f7;
+  --color-surface-raised: #f9fbfd;
+  --color-border: #d7e0eb;
+  --color-border-strong: #bcc9d8;
+  --color-text: #172033;
+  --color-text-muted: #5b687a;
+  --color-text-faint: #667489;
 
-  --color-accent: #4f46e5;
-  --color-accent-hover: #4338ca;
+  --color-accent: #246bfe;
+  --color-accent-hover: #1457dd;
   --color-accent-contrast: #ffffff;
-  --color-accent-soft: #eef0fd;
+  --color-accent-soft: #e8f0ff;
+  --color-accent-ink: #124fc4;
 
-  --color-urgency-low: #1a7f4b;
-  --color-urgency-low-bg: #e6f5ec;
-  --color-urgency-normal: #4f46e5;
-  --color-urgency-normal-bg: #eef0fd;
-  --color-urgency-high: #b5650a;
-  --color-urgency-high-bg: #fbeedd;
-  --color-urgency-critical: #c22a3a;
-  --color-urgency-critical-bg: #fbe6e8;
+  --color-urgency-low: #087968;
+  --color-urgency-low-bg: #dff5ef;
+  --color-urgency-normal: #245cc0;
+  --color-urgency-normal-bg: #e8f0ff;
+  --color-urgency-high: #a85a00;
+  --color-urgency-high-bg: #fff0d7;
+  --color-urgency-critical: #c52d3d;
+  --color-urgency-critical-bg: #fee8eb;
 
-  --color-success: #1a7f4b;
-  --color-success-bg: #e6f5ec;
-  --color-danger: #c22a3a;
-  --color-danger-bg: #fbe6e8;
-  --color-warning: #b5650a;
-  --color-warning-bg: #fbeedd;
+  --color-success: #087968;
+  --color-success-bg: #dff5ef;
+  --color-danger: #c52d3d;
+  --color-danger-bg: #fee8eb;
+  --color-warning: #a85a00;
+  --color-warning-bg: #fff0d7;
 
   --radius-sm: 8px;
-  --radius-md: 12px;
-  --radius-lg: 16px;
+  --radius-md: 10px;
+  --radius-lg: 14px;
+  --radius-xl: 22px;
 
-  --shadow-sm: 0 1px 2px rgba(28, 32, 48, 0.06);
-  --shadow-md: 0 4px 16px rgba(28, 32, 48, 0.08);
+  --shadow-sm: 0 1px 2px rgba(23, 32, 51, 0.06);
+  --shadow-md: 0 12px 32px rgba(38, 58, 83, 0.1);
 
   --space-1: 4px;
   --space-2: 8px;
@@ -45,14 +49,12 @@
   --space-6: 32px;
   --space-7: 48px;
 
-  --font-sans: -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --font-sans: "Manrope Variable", "Segoe UI Variable", "Segoe UI", sans-serif;
   --font-size-sm: 13px;
   --font-size-base: 15px;
   --font-size-md: 17px;
   --font-size-lg: 20px;
   --font-size-xl: 26px;
 
-  --focus-ring: 0 0 0 3px rgba(79, 70, 229, 0.35);
+  --focus-ring: 0 0 0 3px rgba(36, 107, 254, 0.28);
 }
-
-

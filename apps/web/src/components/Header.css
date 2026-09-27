@@ -2,12 +2,14 @@
   display: flex;
   align-items: center;
   gap: var(--space-5);
-  padding: var(--space-3) var(--space-5);
-  background: var(--color-surface);
+  min-height: 64px;
+  padding: 10px clamp(16px, 4vw, 48px);
+  background: rgba(255, 255, 255, 0.94);
   border-bottom: 1px solid var(--color-border);
   position: sticky;
   top: 0;
   z-index: 10;
+  backdrop-filter: blur(14px);
 }
 
 .app-header-brand {
@@ -16,6 +18,22 @@
   color: var(--color-text);
   text-decoration: none;
   letter-spacing: -0.01em;
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+}
+
+.app-header-logo {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 9px 9px 9px 3px;
+  color: #fff;
+  background: var(--color-accent);
+  font-size: 15px;
+  font-weight: 800;
+  box-shadow: 0 7px 18px rgba(36, 107, 254, 0.24);
 }
 
 .app-header-nav {
@@ -25,17 +43,20 @@
 }
 
 .app-header-nav a {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
   color: var(--color-text-muted);
   text-decoration: none;
   font-weight: 600;
   font-size: var(--font-size-sm);
-  padding: 6px 2px;
-  border-bottom: 2px solid transparent;
+  padding: 8px 11px;
+  border-radius: 9px;
 }
 
 .app-header-nav a.active {
-  color: var(--color-accent);
-  border-bottom-color: var(--color-accent);
+  color: var(--color-accent-ink);
+  background: var(--color-accent-soft);
 }
 
 .api-indicator {
@@ -45,6 +66,10 @@
   font-size: var(--font-size-sm);
   color: var(--color-text-muted);
   white-space: nowrap;
+  padding: 6px 10px;
+  border: 1px solid var(--color-border);
+  border-radius: 999px;
+  background: var(--color-surface-raised);
 }
 
 .api-indicator-dot {
@@ -67,7 +92,12 @@
     gap: var(--space-3);
     padding: var(--space-3) var(--space-4);
   }
-  .api-indicator span:last-child {
-    display: none;
+  .app-header-brand > span:last-child,
+  .app-header-nav a {
+    font-size: 0;
+  }
+  .app-header-nav a svg {
+    width: 19px;
+    height: 19px;
   }
 }

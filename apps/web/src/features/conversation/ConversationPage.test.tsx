@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { HttpResponse, http } from "msw";
 import { describe, expect, it } from "vitest";
@@ -12,6 +12,107 @@ function withStoredConversation(conversation: ReturnType<typeof makeConversation
 }
 
 describe("ConversationPage status gating", () => {
+  it("shows the user message immediately while the assistant response is pending", async () => {
+    let releaseResponse: (() => void) | undefined;
+    const responseGate = new Promise<void>((resolve) => {
+      releaseResponse = resolve;
+    });
+    const initial = makeConversation({ id: "optimistic", status: "CLARIFYING" });
+    withStoredConversation(initial);
+    server.use(
+      http.post("*/api/conversations/optimistic/messages", async () => {
+        await responseGate;
+        return HttpResponse.json(makeConversation({
+          id: "optimistic",
+          revision: 2,
+          status: "CLARIFYING",
+          messages: [
+            makeMessage("user", "Не работает VPN"),
+            makeMessage("assistant", "Проверим подключение."),
+          ],
+        }));
+      }),
+    );
+
+    const user = userEvent.setup();
+    render(<ConversationPage />);
+    const textarea = await screen.findByLabelText("Ваше сообщение");
+    await user.type(textarea, "Не работает VPN");
+    await user.click(screen.getByRole("button", { name: "Отправить" }));
+
+    expect(within(screen.getByRole("log", { name: "Ход диалога" })).getByText("Не работает VPN")).toBeInTheDocument();
+    expect(screen.getByRole("status", { name: "HelpFlow готовит ответ" })).toBeInTheDocument();
+    expect(textarea).toBeEnabled();
+    expect(textarea).toHaveValue("");
+
+    releaseResponse?.();
+    expect(await screen.findByText("Проверим подключение.")).toBeInTheDocument();
+  });
+
+  it("keeps both a failed message and the next draft", async () => {
+    let releaseFailure: (() => void) | undefined;
+    const failureGate = new Promise<void>((resolve) => {
+      releaseFailure = resolve;
+    });
+    withStoredConversation(makeConversation({ id: "failed-optimistic", status: "CLARIFYING" }));
+    server.use(
+      http.post("*/api/conversations/failed-optimistic/messages", async () => {
+        await failureGate;
+        return HttpResponse.error();
+      }),
+    );
+
+    const user = userEvent.setup();
+    render(<ConversationPage />);
+    const textarea = await screen.findByLabelText("Ваше сообщение");
+    await user.type(textarea, "Первое сообщение");
+    await user.click(screen.getByRole("button", { name: "Отправить" }));
+    await user.type(textarea, "Следующий черновик");
+    releaseFailure?.();
+
+    expect(await screen.findByRole("button", { name: "Повторить отправку" })).toBeInTheDocument();
+    expect(within(screen.getByRole("log", { name: "Ход диалога" })).getByText("Первое сообщение")).toBeInTheDocument();
+    expect(textarea).toHaveValue("Следующий черновик");
+
+    await user.click(screen.getByRole("button", { name: "Отправить" }));
+    expect(await screen.findAllByRole("button", { name: "Повторить отправку" })).toHaveLength(2);
+    const log = screen.getByRole("log", { name: "Ход диалога" });
+    expect(within(log).getByText("Первое сообщение")).toBeInTheDocument();
+    expect(within(log).getByText("Следующий черновик")).toBeInTheDocument();
+  });
+
+  it("preserves a typed next draft when the response changes the conversation status", async () => {
+    let releaseResponse: (() => void) | undefined;
+    const responseGate = new Promise<void>((resolve) => {
+      releaseResponse = resolve;
+    });
+    withStoredConversation(makeConversation({ id: "status-change", status: "CLARIFYING" }));
+    server.use(
+      http.post("*/api/conversations/status-change/messages", async () => {
+        await responseGate;
+        return HttpResponse.json(makeConversation({
+          id: "status-change",
+          revision: 2,
+          status: "TROUBLESHOOTING",
+          current_step: { code: "restart_vpn", instruction: "Перезапустите VPN-клиент" },
+          messages: [makeMessage("user", "VPN не работает")],
+        }));
+      }),
+    );
+
+    const user = userEvent.setup();
+    render(<ConversationPage />);
+    const textarea = await screen.findByLabelText("Ваше сообщение");
+    await user.type(textarea, "VPN не работает");
+    await user.click(screen.getByRole("button", { name: "Отправить" }));
+    await user.type(textarea, "Ошибка 720");
+    releaseResponse?.();
+
+    expect(await screen.findByText("Перезапустите VPN-клиент")).toBeInTheDocument();
+    expect(screen.getByText("Черновик сохранён")).toBeInTheDocument();
+    expect(screen.getByText("Ошибка 720")).toBeInTheDocument();
+  });
+
   it("sends the welcome draft and preserves it after a failed send", async () => {
     let creates = 0;
     let sends = 0;
@@ -33,10 +134,10 @@ describe("ConversationPage status gating", () => {
     const user = userEvent.setup();
     render(<ConversationPage />);
     await user.type(await screen.findByLabelText("Описание проблемы"), "Не работает VPN");
-    await user.click(screen.getByRole("button", { name: "Отправить обращение" }));
+    await user.click(screen.getByRole("button", { name: "Начать диалог" }));
     expect(await screen.findByRole("alert")).toHaveTextContent("сервер");
     expect(screen.getByLabelText("Описание проблемы")).toHaveValue("Не работает VPN");
-    await user.click(screen.getByRole("button", { name: "Отправить обращение" }));
+    await user.click(screen.getByRole("button", { name: "Начать диалог" }));
     expect(await screen.findByText("Какая ошибка?")).toBeInTheDocument();
     expect(screen.getByText("Не работает VPN")).toBeInTheDocument();
     expect(creates).toBe(1);

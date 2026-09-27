@@ -17,6 +17,8 @@ export function TicketDetail({ ticket }: { ticket: OperatorTicket | null }) {
   return (
     <div className="ticket-detail">
       <header className="ticket-detail-header">
+        <p className="ticket-detail-id">Обращение {ticket.id.slice(0, 8)}</p>
+        <h2>{ticket.summary ?? ticket.original_request}</h2>
         <div className="ticket-detail-head-row">
           <Badge tone={URGENCY_TONE[ticket.urgency]}>Срочность: {URGENCY_LABEL[ticket.urgency]}</Badge>
           {ticket.service ? <Badge tone="neutral">{ticket.service}</Badge> : null}

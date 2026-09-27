@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link, NavLink } from "react-router-dom";
+import { Headphones, MessageCircleMore } from "lucide-react";
 import { api } from "../api/client";
 import "./Header.css";
 
@@ -31,13 +32,16 @@ export function Header() {
   return (
     <header className="app-header">
       <Link to="/" className="app-header-brand">
-        HelpFlow
+        <span className="app-header-logo" aria-hidden="true">H</span>
+        <span>HelpFlow</span>
       </Link>
       <nav className="app-header-nav" aria-label="Разделы">
         <NavLink to="/" end className={({ isActive }) => (isActive ? "active" : undefined)}>
+          <MessageCircleMore size={16} aria-hidden="true" />
           Сотрудник
         </NavLink>
         <NavLink to="/operator" className={({ isActive }) => (isActive ? "active" : undefined)}>
+          <Headphones size={16} aria-hidden="true" />
           Специалист
         </NavLink>
       </nav>

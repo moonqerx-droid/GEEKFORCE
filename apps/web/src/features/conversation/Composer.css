@@ -2,26 +2,32 @@
   display: flex;
   gap: var(--space-3);
   align-items: flex-end;
-  padding: var(--space-3);
+  margin: 0 var(--space-5) var(--space-3);
+  padding: 8px;
   background: var(--color-surface);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-lg);
+  border: 1px solid var(--color-border-strong);
+  border-radius: 16px;
   position: sticky;
-  bottom: 0;
+  bottom: 12px;
+  box-shadow: 0 10px 28px rgba(23, 32, 51, 0.12);
 }
 
 .composer-textarea {
   flex: 1;
   resize: none;
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-md);
-  padding: var(--space-2) var(--space-3);
-  background: var(--color-bg);
+  border: 0;
+  border-radius: 10px;
+  padding: 11px 12px;
+  background: var(--color-surface-raised);
+  outline: none;
+}
+
+.composer-textarea:focus {
+  box-shadow: inset 0 0 0 2px var(--color-accent);
 }
 
 @media (max-width: 480px) {
   .composer {
-    flex-direction: column;
-    align-items: stretch;
+    margin-inline: var(--space-4);
   }
 }

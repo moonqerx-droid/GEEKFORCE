@@ -54,6 +54,16 @@ export function OperatorPage() {
 
   return (
     <div className="operator-page">
+      <header className="operator-heading">
+        <div>
+          <h1>Очередь поддержки</h1>
+          <p>Обращения, которые HelpFlow передал специалистам</p>
+        </div>
+        <div className="operator-heading-count" aria-label={`${filtered.length} обращений в очереди`}>
+          <strong>{filtered.length}</strong>
+          <span>в очереди</span>
+        </div>
+      </header>
       <IncidentsSection incidents={incidents} />
       <div className="operator-layout">
         <div className={`operator-list-pane${selected ? " operator-list-pane-hide-mobile" : ""}`}>

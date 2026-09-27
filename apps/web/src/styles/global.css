@@ -18,6 +18,7 @@ body {
   font-size: var(--font-size-base);
   line-height: 1.5;
   -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
 }
 
 button,
@@ -29,6 +30,11 @@ textarea {
 
 button {
   cursor: pointer;
+}
+
+::selection {
+  color: var(--color-text);
+  background: #cddfff;
 }
 
 button:disabled {

@@ -7,18 +7,26 @@ const STORAGE_KEY = "helpflow.conversationId";
 
 type Phase = "idle" | "loading" | "ready" | "error";
 
+export interface FailedMessage {
+  id: number;
+  content: string;
+}
+
 export interface ConversationState {
   phase: Phase;
   conversation: Conversation | null;
   error: string | null;
   notice: string | null;
   sending: boolean;
+  pendingMessage: string | null;
+  failedMessages: FailedMessage[];
   start: () => Promise<void>;
   startWithMessage: (content: string) => Promise<void>;
   restartFresh: () => Promise<void>;
   sendMessage: (content: string) => Promise<void>;
   sendStepResult: (outcome: StepOutcome) => Promise<void>;
   escalateNow: () => Promise<void>;
+  retryFailedMessage: (id: number) => Promise<void>;
   dismissNotice: () => void;
 }
 
@@ -59,9 +67,17 @@ export function useConversation(): ConversationState {
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [sending, setSending] = useState(false);
+  const [pendingMessage, setPendingMessage] = useState<string | null>(null);
+  const [failedMessages, setFailedMessages] = useState<FailedMessage[]>([]);
   const abortRef = useRef<AbortController | null>(null);
   const mutationRef = useRef(false);
   const createdRef = useRef<Conversation | null>(null);
+  const failedMessageIdRef = useRef(0);
+
+  const enqueueFailedMessage = useCallback((content: string) => {
+    const failed = { id: ++failedMessageIdRef.current, content };
+    setFailedMessages((current) => [...current, failed]);
+  }, []);
 
   const restore = useCallback(async () => {
     const storedId = readStoredId();
@@ -94,6 +110,7 @@ export function useConversation(): ConversationState {
     if (mutationRef.current) return;
     mutationRef.current = true;
     setSending(true);
+    setPendingMessage(content);
     setError(null);
     try {
       const created = createdRef.current ?? await api.createConversation();
@@ -118,6 +135,7 @@ export function useConversation(): ConversationState {
     } finally {
       mutationRef.current = false;
       setSending(false);
+      setPendingMessage(null);
     }
   }, []);
 
@@ -144,6 +162,7 @@ export function useConversation(): ConversationState {
     if (mutationRef.current) return;
     storeId(null);
     createdRef.current = null;
+    setFailedMessages([]);
     setConversation(null);
     await start();
   }, [start]);
@@ -153,8 +172,10 @@ export function useConversation(): ConversationState {
       const fresh = await api.getConversation(id);
       setConversation(fresh);
       setNotice("Обращение изменилось в другой вкладке. Мы загрузили актуальное состояние.");
+      return fresh;
     } catch (err) {
       setError(describeError(err));
+      return null;
     }
   }, []);
 
@@ -163,7 +184,9 @@ export function useConversation(): ConversationState {
       if (!conversation || mutationRef.current) return;
       mutationRef.current = true;
       setSending(true);
+      setPendingMessage(content);
       setError(null);
+      const knownMessageIds = new Set(conversation.messages.map((message) => message.id));
       try {
         const updated = await api.sendMessage(conversation.id, {
           content,
@@ -172,18 +195,36 @@ export function useConversation(): ConversationState {
         setConversation(updated);
       } catch (err) {
         if (err instanceof ConflictError) {
-          await reloadAfterConflict(conversation.id);
+          const fresh = await reloadAfterConflict(conversation.id);
+          const alreadyCommitted = fresh?.messages.some(
+            (message) =>
+              message.role === "user"
+              && message.content === content
+              && !knownMessageIds.has(message.id),
+          );
+          if (!alreadyCommitted) enqueueFailedMessage(content);
         } else {
           setError(describeError(err));
+          enqueueFailedMessage(content);
         }
         throw err;
       } finally {
         mutationRef.current = false;
         setSending(false);
+        setPendingMessage(null);
       }
     },
-    [conversation, reloadAfterConflict],
+    [conversation, enqueueFailedMessage, reloadAfterConflict],
   );
+
+  const retryFailedMessage = useCallback(async (id: number) => {
+    if (!conversation || mutationRef.current) return;
+    const failed = failedMessages.find((message) => message.id === id);
+    if (!failed) return;
+    setFailedMessages((current) => current.filter((message) => message.id !== id));
+    const content = failed.content;
+    await sendMessage(content).catch(() => undefined);
+  }, [conversation, failedMessages, sendMessage]);
 
   const sendStepResult = useCallback(
     async (outcome: StepOutcome) => {
@@ -240,12 +281,15 @@ export function useConversation(): ConversationState {
     error,
     notice,
     sending,
+    pendingMessage,
+    failedMessages,
     start,
     startWithMessage,
     restartFresh,
     sendMessage,
     sendStepResult,
     escalateNow,
+    retryFailedMessage,
     dismissNotice,
   };
 }

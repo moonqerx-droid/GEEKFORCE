@@ -3,7 +3,7 @@ import { StrictMode } from "react";
 import { HttpResponse, http } from "msw";
 import { describe, expect, it } from "vitest";
 import { server } from "../../test/server";
-import { makeConversation } from "../../test/fixtures";
+import { makeConversation, makeMessage } from "../../test/fixtures";
 import { useConversation } from "./useConversation";
 
 describe("useConversation", () => {
@@ -62,6 +62,12 @@ describe("useConversation", () => {
   });
 
   it("on 409 reloads the conversation and shows a notice", async () => {
+    const existingMessage = makeMessage("user", "hello");
+    server.use(
+      http.post("*/api/conversations", () => HttpResponse.json(makeConversation({
+        messages: [existingMessage],
+      }))),
+    );
     const { result } = renderHook(() => useConversation());
     await waitFor(() => expect(result.current.phase).toBe("ready"));
 
@@ -74,7 +80,11 @@ describe("useConversation", () => {
         HttpResponse.json({ detail: "stale" }, { status: 409 }),
       ),
       http.get("*/api/conversations/:id", ({ params }) =>
-        HttpResponse.json(makeConversation({ id: params.id as string, revision: 5 })),
+        HttpResponse.json(makeConversation({
+          id: params.id as string,
+          revision: 5,
+          messages: [existingMessage],
+        })),
       ),
     );
 
@@ -84,5 +94,8 @@ describe("useConversation", () => {
 
     expect(result.current.notice).toMatch(/актуальное состояние/i);
     expect(result.current.conversation?.revision).toBe(5);
+    expect(
+      (result.current as unknown as { failedMessages?: Array<{ content: string }> }).failedMessages,
+    ).toEqual([expect.objectContaining({ content: "hello" })]);
   });
 });

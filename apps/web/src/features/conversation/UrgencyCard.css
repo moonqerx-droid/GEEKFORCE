@@ -1,9 +1,10 @@
 .urgency-card {
-  background: var(--color-surface);
+  background: var(--color-surface-raised);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-lg);
   padding: var(--space-4);
-  margin-bottom: var(--space-4);
+  margin-top: var(--space-4);
+  margin-bottom: 0;
 }
 
 .urgency-card-head {

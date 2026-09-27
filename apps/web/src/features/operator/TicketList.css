@@ -11,10 +11,12 @@
   background: transparent;
   border: none;
   border-bottom: 1px solid var(--color-border);
-  padding: var(--space-3) var(--space-4);
+  position: relative;
+  padding: 16px 18px;
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 8px;
+  transition: background-color 120ms ease;
 }
 
 .ticket-list-item:hover {
@@ -23,7 +25,7 @@
 
 .ticket-list-item.selected {
   background: var(--color-accent-soft);
-  border-left: 3px solid var(--color-accent);
+  box-shadow: inset 3px 0 0 var(--color-accent);
 }
 
 .ticket-list-item-head {
@@ -33,7 +35,9 @@
 }
 
 .ticket-list-service {
-  font-size: var(--font-size-sm);
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.45;
   color: var(--color-text-muted);
   font-weight: 600;
 }

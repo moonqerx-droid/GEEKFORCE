@@ -1,5 +1,5 @@
 .conversation-page {
-  max-width: 720px;
+  max-width: 920px;
   margin: 0 auto;
   padding: var(--space-5) var(--space-4) var(--space-7);
 }
@@ -14,18 +14,39 @@
 .conversation-shell {
   display: flex;
   flex-direction: column;
+  min-height: calc(100vh - 120px);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-xl);
+  overflow: hidden;
+  box-shadow: var(--shadow-md);
 }
 
 .conversation-statusbar {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-bottom: var(--space-3);
+  min-height: 64px;
+  padding: 12px var(--space-5);
+  border-bottom: 1px solid var(--color-border);
+  background: var(--color-surface-raised);
 }
 
 .conversation-status-label {
   font-weight: 700;
   font-size: var(--font-size-md);
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+}
+
+.conversation-status-label::before {
+  content: "";
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: var(--color-success);
+  box-shadow: 0 0 0 4px var(--color-success-bg);
 }
 
 .conversation-notice {
@@ -33,7 +54,7 @@
   color: var(--color-warning);
   border-radius: var(--radius-md);
   padding: var(--space-3) var(--space-4);
-  margin-bottom: var(--space-3);
+  margin: var(--space-4) var(--space-5) 0;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -54,18 +75,70 @@
   color: var(--color-danger);
   border-radius: var(--radius-md);
   padding: var(--space-3) var(--space-4);
-  margin-bottom: var(--space-3);
+  margin: var(--space-4) var(--space-5) 0;
   font-size: var(--font-size-sm);
 }
 
 .conversation-restart-link {
   align-self: center;
-  margin-top: var(--space-4);
+  margin: var(--space-3) 0 var(--space-4);
   background: transparent;
   border: none;
   color: var(--color-text-muted);
   font-size: var(--font-size-sm);
   text-decoration: underline;
+}
+
+.conversation-shell > .urgency-card,
+.conversation-shell > .step-card,
+.conversation-shell > .status-banner,
+.conversation-shell > .status-panel {
+  margin-left: var(--space-5);
+  margin-right: var(--space-5);
+}
+
+.conversation-saved-draft {
+  margin: 0 var(--space-5) var(--space-4);
+  padding: var(--space-3) var(--space-4);
+  border: 1px dashed var(--color-border-strong);
+  border-radius: var(--radius-md);
+  background: var(--color-surface-raised);
+}
+
+.conversation-saved-draft strong {
+  font-size: var(--font-size-sm);
+}
+
+.conversation-saved-draft p {
+  margin: 4px 0 0;
+  color: var(--color-text-muted);
+  white-space: pre-wrap;
+}
+
+@media (max-width: 640px) {
+  .conversation-page {
+    padding: 0;
+  }
+  .conversation-shell {
+    min-height: calc(100vh - 64px);
+    border: 0;
+    border-radius: 0;
+    box-shadow: none;
+  }
+  .conversation-statusbar {
+    padding-inline: var(--space-4);
+  }
+  .conversation-statusbar .btn {
+    padding-inline: 10px;
+    font-size: var(--font-size-sm);
+  }
+  .conversation-shell > .urgency-card,
+  .conversation-shell > .step-card,
+  .conversation-shell > .status-banner,
+  .conversation-shell > .status-panel {
+    margin-left: var(--space-4);
+    margin-right: var(--space-4);
+  }
 }
 
 .conversation-restart-link:hover {

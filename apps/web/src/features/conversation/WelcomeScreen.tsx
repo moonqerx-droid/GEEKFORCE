@@ -25,11 +25,19 @@ export function WelcomeScreen({ busy, onSubmit }: WelcomeScreenProps) {
 
   return (
     <div className="welcome">
-      <h1 className="welcome-title">Опишите проблему своими словами</h1>
-      <p className="welcome-subtitle">
-        HelpFlow разберётся, что случилось, задаст нужные уточнения и поможет решить проблему
-        шаг за шагом — или сразу передаст специалисту.
-      </p>
+      <div className="welcome-intro">
+        <p className="welcome-product-line">IT-помощник вашей команды</p>
+        <h1 className="welcome-title">Расскажите, что сломалось. Дальше разберёмся вместе.</h1>
+        <p className="welcome-subtitle">
+          HelpFlow уточнит детали, предложит безопасные шаги и подключит специалиста,
+          если автоматической помощи окажется недостаточно.
+        </p>
+        <div className="welcome-promises" aria-label="Как работает HelpFlow">
+          <span>Понимает контекст</span>
+          <span>Ведёт по шагам</span>
+          <span>Не теряет историю</span>
+        </div>
+      </div>
 
       <form
         className="welcome-form"
@@ -55,12 +63,12 @@ export function WelcomeScreen({ busy, onSubmit }: WelcomeScreenProps) {
           aria-label="Описание проблемы"
         />
         <Button type="submit" variant="primary" size="lg" busy={busy} disabled={!value.trim()}>
-          Отправить обращение
+          Начать диалог
         </Button>
       </form>
 
       <div className="welcome-examples">
-        <p className="welcome-examples-label">Или выберите пример:</p>
+        <p className="welcome-examples-label">Можно начать с готового примера</p>
         <div className="welcome-examples-list">
           {EXAMPLES.map((example) => (
             <button
