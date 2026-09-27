@@ -41,6 +41,9 @@ class Conversation(Base):
     ai_fallback_reason: Mapped[str | None] = mapped_column(String(80), nullable=True)
     ai_latency_ms: Mapped[int | None] = mapped_column(Integer, nullable=True)
     revision: Mapped[int] = mapped_column(Integer, nullable=False, default=1, server_default="1")
+    owner_id: Mapped[str | None] = mapped_column(
+        ForeignKey("users.id", ondelete="SET NULL"), nullable=True, index=True
+    )
 
     __mapper_args__ = {"version_id_col": revision}
 
@@ -54,6 +57,7 @@ class Conversation(Base):
         cascade="all, delete-orphan",
         order_by="TroubleshootingStep.position",
     )
+    owner: Mapped[User | None] = relationship(back_populates="conversations")
 
 
 class Message(Base):
@@ -80,3 +84,6 @@ class TroubleshootingStep(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
 
     conversation: Mapped[Conversation] = relationship(back_populates="steps")
+
+
+from app.models.auth import User  # noqa: E402
