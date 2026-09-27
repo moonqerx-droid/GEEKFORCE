@@ -89,3 +89,32 @@ export interface Incident {
   created_at: string;
   summary: string | null;
 }
+
+export type UserRole = "employee" | "operator";
+export type Department = "it" | "sales" | "marketing" | "finance" | "hr" | "operations" | "other";
+
+export interface AuthUser {
+  id: string;
+  first_name: string;
+  last_name: string;
+  email: string;
+  department: Department;
+  role: UserRole;
+  email_verified_at: string | null;
+}
+
+export interface LoginPayload {
+  email: string;
+  password: string;
+  remember_me?: boolean;
+}
+
+export interface RegistrationPayload {
+  first_name: string;
+  last_name: string;
+  email: string;
+  department: Department | "";
+  password: string;
+  password_confirmation: string;
+  accepted_terms: boolean;
+}

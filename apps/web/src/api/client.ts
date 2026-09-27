@@ -4,6 +4,9 @@ import type {
   Incident,
   MessageCreatePayload,
   OperatorTicket,
+  AuthUser,
+  LoginPayload,
+  RegistrationPayload,
   StepResultPayload,
 } from "./types";
 
@@ -24,6 +27,7 @@ async function request<T>(
     const response = await fetch(`${BASE_URL}${path}`, {
       ...init,
       signal: controller.signal,
+      credentials: "include",
       headers: {
         "Content-Type": "application/json",
         ...init.headers,
@@ -117,6 +121,40 @@ export const api = {
    */
   listIncidents(signal?: AbortSignal): Promise<Incident[]> {
     return request("/api/operator/incidents", {}, signal);
+  },
+
+  me(signal?: AbortSignal): Promise<AuthUser> {
+    return request("/api/auth/me", {}, signal);
+  },
+
+  login(payload: LoginPayload, signal?: AbortSignal): Promise<AuthUser> {
+    return request("/api/auth/login", { method: "POST", body: JSON.stringify(payload) }, signal);
+  },
+
+  logout(signal?: AbortSignal): Promise<void> {
+    return request("/api/auth/logout", { method: "POST" }, signal);
+  },
+
+  register(payload: RegistrationPayload, signal?: AbortSignal): Promise<AuthUser> {
+    return request("/api/auth/register", { method: "POST", body: JSON.stringify(payload) }, signal);
+  },
+
+  verifyEmail(token: string, signal?: AbortSignal): Promise<void> {
+    return request("/api/auth/verify-email", { method: "POST", body: JSON.stringify({ token }) }, signal);
+  },
+
+  resendVerification(email: string, signal?: AbortSignal): Promise<{ code: string }> {
+    return request("/api/auth/resend-verification", { method: "POST", body: JSON.stringify({ email }) }, signal);
+  },
+
+  forgotPassword(email: string, signal?: AbortSignal): Promise<{ code: string }> {
+    return request("/api/auth/forgot-password", { method: "POST", body: JSON.stringify({ email }) }, signal);
+  },
+
+  resetPassword(token: string, password: string, password_confirmation: string, signal?: AbortSignal): Promise<void> {
+    return request("/api/auth/reset-password", {
+      method: "POST", body: JSON.stringify({ token, password, password_confirmation }),
+    }, signal);
   },
 };
 
