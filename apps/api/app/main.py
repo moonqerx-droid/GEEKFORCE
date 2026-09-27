@@ -11,6 +11,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.api.routes.conversations import router as conversations_router
 from app.api.routes.health import router as health_router
 from app.api.routes.operator import router as operator_router
+from app.api.routes.auth import router as auth_router
 from app.db.base import Base
 from app.db.session import engine
 from app.core.config import get_settings
@@ -38,6 +39,7 @@ app.mount("/static", StaticFiles(directory=base_dir / "static"), name="static")
 app.include_router(health_router)
 app.include_router(conversations_router)
 app.include_router(operator_router)
+app.include_router(auth_router)
 
 
 def asset_versions(*names: str) -> dict[str, str]:
