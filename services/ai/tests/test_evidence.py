@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import pytest
+
 from helpflow_ai.evidence import EvidenceValidator
 from helpflow_ai.schemas import EvidenceAnswer, EvidenceClaim, KnowledgeChunk, KnowledgeMatch
 
@@ -99,3 +101,36 @@ def test_novel_uncited_substantive_sentence_is_rejected() -> None:
     ))
 
     assert EvidenceValidator().validate(answer, [_match()]).reason == "unsupported_claim"
+
+
+def test_model_cannot_request_credentials_even_with_a_real_quote() -> None:
+    source = _match(text="Никогда не сообщайте пароль сотрудникам поддержки.")
+    answer = _answer(
+        answer="Сообщите пароль сотруднику поддержки.",
+        claims=[EvidenceClaim(
+            text="Сообщите пароль сотруднику поддержки.",
+            source_id="document:policy:0",
+            quote="Никогда не сообщайте пароль сотрудникам поддержки.",
+        )],
+    )
+
+    assert EvidenceValidator().validate(answer, [source]).reason == "credential_request"
+
+
+@pytest.mark.parametrize("unsafe_text", [
+    "Отключите антивирус на рабочем компьютере.",
+    "Удалите системные файлы и перезагрузите компьютер.",
+    "Обойдите корпоративную защиту браузера.",
+])
+def test_dangerous_instruction_is_rejected_even_when_source_is_real(unsafe_text: str) -> None:
+    source = _match(text=f"Запрещено выполнять действие: {unsafe_text}")
+    answer = _answer(
+        answer=unsafe_text,
+        claims=[EvidenceClaim(
+            text=unsafe_text,
+            source_id="document:policy:0",
+            quote=f"Запрещено выполнять действие: {unsafe_text}",
+        )],
+    )
+
+    assert EvidenceValidator().validate(answer, [source]).reason == "unsafe_instruction"

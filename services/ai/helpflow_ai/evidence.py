@@ -13,6 +13,18 @@ _SENSITIVE_RE = re.compile(
     r"(?:парол(?:ь|я)|password|api[_ -]?key|токен|token|secret)\s*[:=]\s*\S+",
     re.IGNORECASE,
 )
+_CREDENTIAL_REQUEST_RE = re.compile(
+    r"(?:сообщ\w*|пришл\w*|отправ\w*|назов\w*|введ\w*|покаж\w*|скажи\w*)"
+    r"[^.!?\n]{0,40}(?:парол\w*|токен\w*|секрет\w*|код\w* подтвержден\w*)|"
+    r"(?:какой|укажите)\s+(?:у вас\s+)?(?:парол\w*|токен\w*)",
+    re.IGNORECASE,
+)
+_UNSAFE_INSTRUCTION_RE = re.compile(
+    r"отключ\w*[^.!?\n]{0,30}(?:антивирус\w*|защит\w*|фаервол\w*)|"
+    r"удал\w*[^.!?\n]{0,30}(?:системн\w* файл\w*|все файл\w*|данн\w*)|"
+    r"обойд\w*[^.!?\n]{0,40}(?:защит\w*|ограничен\w*|политик\w*)",
+    re.IGNORECASE,
+)
 
 
 def normalize_evidence_text(value: str) -> str:
@@ -46,6 +58,10 @@ class EvidenceValidator:
             return EvidenceValidation(False, "low_confidence")
         if _SENSITIVE_RE.search(message):
             return EvidenceValidation(False, "sensitive_content")
+        if _CREDENTIAL_REQUEST_RE.search(message):
+            return EvidenceValidation(False, "credential_request")
+        if _UNSAFE_INSTRUCTION_RE.search(message):
+            return EvidenceValidation(False, "unsafe_instruction")
 
         sources = {match.chunk.id: match.chunk.text for match in matches}
         claimed_ids = [claim.source_id for claim in answer.claims]
