@@ -11,9 +11,12 @@ from sqlalchemy import text
 from sqlalchemy.orm import Session
 
 from app.core.security import hash_password, utc_now
-from app.db.session import engine
+from app.db.session import SessionLocal, engine
 from app.main import app
+from app.models import Conversation, Message
 from app.models.auth import User
+from app.repositories.incidents import IncidentRepository
+from app.services.incidents import IncidentService
 
 
 pytestmark = pytest.mark.skipif(
@@ -48,3 +51,41 @@ def test_migrated_postgres_serves_and_persists_an_api_conversation():
 
     assert revision == ScriptDirectory.from_config(Config("alembic.ini")).get_current_head()
     assert stored_id == conversation_id
+
+
+def test_postgres_radar_groups_requests_and_delivers_a_broadcast():
+    marker = uuid4().hex[:8]
+    email = f"smoke-operator-{marker}@example.ru"
+    service_name = f"VPN {marker}"
+    with SessionLocal() as session:
+        session.add(User(
+            first_name="Анна", last_name="Смоук", email=email, department="it",
+            password_hash=hash_password("StrongPass123"), role="operator", email_verified_at=utc_now(),
+        ))
+        radar = IncidentService(IncidentRepository(session), threshold=0.55, min_cluster_size=3)
+        incident = None
+        for _ in range(3):
+            item = Conversation(
+                workflow_version="triage-v1", status="ESCALATED", service=service_name,
+                summary="Не подключается VPN", symptoms=["VPN не подключается"],
+                known_facts={"error_text": "ошибка 809"}, playbook_id="vpn_connection",
+                escalated_at=utc_now(),
+            )
+            item.messages.append(Message(role="user", content="Не подключается VPN, ошибка 809"))
+            session.add(item)
+            session.commit()
+            incident = radar.observe_escalated(item.id) or incident
+            session.commit()
+        assert incident is not None and incident.signature_tokens
+
+    with TestClient(app) as client:
+        assert client.post("/api/auth/login", json={"email": email, "password": "StrongPass123"}).status_code == 200
+        listed = {item["id"]: item for item in client.get("/api/operator/incidents").json()}
+        assert listed[incident.id]["conversation_count"] == 3
+        result = client.post(f"/api/operator/incidents/{incident.id}/broadcast", json={
+            "message": "Чиним VPN.", "request_key": f"smoke-{marker}",
+            "expected_revision": listed[incident.id]["revision"],
+        })
+
+    assert result.status_code == 200, result.text
+    assert len(result.json()["delivered_to"]) == 3
