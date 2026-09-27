@@ -11,6 +11,9 @@ def test_default_configuration_uses_mock_ai_and_sqlite():
 
     assert settings.ai_provider == "mock"
     assert settings.database_url.startswith("sqlite")
+    assert "http://localhost:5174" in settings.cors_origins
+    assert "http://127.0.0.1:5174" in settings.cors_origins
+    assert settings.app_public_url == "http://localhost:5174"
 
 
 def test_configuration_rejects_unknown_ai_provider():

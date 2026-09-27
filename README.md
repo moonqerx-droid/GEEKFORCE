@@ -58,7 +58,7 @@ docker compose down
 3. скопируйте `.env.example` в `.env`;
 4. заполните `SMTP_USERNAME`, `SMTP_PASSWORD` и `SMTP_FROM_EMAIL`;
 5. оставьте `SMTP_HOST=smtp.yandex.ru`, `SMTP_PORT=465`, `SMTP_SECURITY=ssl`;
-6. задайте `APP_PUBLIC_URL` адресом frontend-приложения, например `http://localhost:5173`.
+6. задайте `APP_PUBLIC_URL` адресом frontend-приложения, например `http://localhost:5174`.
 
 Обычный пароль от Яндекс ID использовать нельзя. Файл `.env` исключён из Git; не вставляйте почтовый пароль в исходный код, Dockerfile или команду запуска. Для production укажите HTTPS-адрес приложения и `COOKIE_SECURE=true`.
 
@@ -155,7 +155,7 @@ GET  /api/operator/tickets
 
 Полные схемы запросов и ответов всегда доступны в `/docs` и `/openapi.json`.
 
-React-фронтенд запускается отдельно из корня: `cd apps/web && npm run dev`. Откройте <http://localhost:5173/> для сотрудника и <http://localhost:5173/operator> для оператора. Разрешены origin-порты `3000` и `5173`; список настраивается переменной `CORS_ORIGINS` в JSON-формате.
+React-фронтенд запускается отдельно из корня: `cd apps/web && npm run dev`. Откройте <http://localhost:5173/> для сотрудника и <http://localhost:5173/operator> для оператора. Разрешены origin-порты `3000`, `5173` и `5174`; список настраивается переменной `CORS_ORIGINS` в JSON-формате.
 
 ## AI и совместимость
 
