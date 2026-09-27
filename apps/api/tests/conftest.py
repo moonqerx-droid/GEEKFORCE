@@ -8,7 +8,10 @@ from app.db.base import Base
 from app.db.session import get_db
 from app.main import app
 from app.api.dependencies.auth import require_employee, require_operator
+from app.models import Conversation, Message
 from app.models.auth import User
+from app.repositories.incidents import IncidentRepository
+from app.services.incidents import IncidentService
 
 
 @pytest.fixture
@@ -43,3 +46,66 @@ def client(db_session: Session) -> TestClient:
     with TestClient(app) as test_client:
         yield test_client
     app.dependency_overrides.clear()
+
+
+@pytest.fixture
+def crm_failure_factory(db_session):
+    def create(code="502"):
+        item = Conversation(
+            workflow_version="triage-v1",
+            status="ESCALATED",
+            service="CRM",
+            summary="CRM недоступна",
+            symptoms=["не открывается"],
+            known_facts={"error_text": code},
+            playbook_id="service_unavailable",
+        )
+        item.messages.append(Message(role="user", content=f"CRM не работает, ошибка {code}"))
+        db_session.add(item)
+        db_session.flush()
+        return item
+    return create
+
+
+@pytest.fixture
+def mail_failure_factory(db_session):
+    def create(code="502"):
+        item = Conversation(
+            workflow_version="triage-v1",
+            status="ESCALATED",
+            service="Корпоративная почта",
+            summary="Почта недоступна",
+            symptoms=["не открывается"],
+            known_facts={"error_text": code},
+            playbook_id="email_outlook",
+        )
+        item.messages.append(Message(role="user", content=f"Почта не работает, ошибка {code}"))
+        db_session.add(item)
+        db_session.flush()
+        return item
+    return create
+
+
+@pytest.fixture
+def incident_service(db_session):
+    return IncidentService(
+        IncidentRepository(db_session),
+        threshold=0.55,
+        min_cluster_size=3,
+    )
+
+
+@pytest.fixture
+def candidate(db_session, incident_service, crm_failure_factory):
+    created = None
+    for _ in range(3):
+        item = crm_failure_factory(code="502")
+        created = incident_service.observe_escalated(item.id) or created
+    assert created is not None
+    db_session.flush()
+    return created
+
+
+@pytest.fixture
+def seeded_crm_candidate(candidate):
+    return candidate

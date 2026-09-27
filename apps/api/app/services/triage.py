@@ -1,12 +1,20 @@
 """Transactional adapter between the stable HTTP contract and helpflow_ai."""
 
+import logging
+
 from helpflow_ai import ConversationContext, DecisionAction, StepRecord, TriageEngine
 from sqlalchemy.orm.exc import StaleDataError
 
 from app.models.conversation import Conversation, Message, TroubleshootingStep, utc_now
+from app.core.config import get_settings
 from app.repositories.conversations import ConversationRepository
+from app.repositories.incidents import IncidentRepository
 from app.schemas.conversation import StepOutcome
 from app.services.dialogue import DialogueConflict, DialogueService
+from app.services.incidents import IncidentService
+
+
+logger = logging.getLogger(__name__)
 
 
 class TriageDialogueService(DialogueService):
@@ -22,9 +30,20 @@ class TriageDialogueService(DialogueService):
         "thanks": "Пожалуйста! Если проблема ещё не решена, продолжим с предыдущего вопроса.",
     }
 
-    def __init__(self, repository: ConversationRepository, engine: TriageEngine):
+    def __init__(
+        self,
+        repository: ConversationRepository,
+        engine: TriageEngine,
+        incident_service: IncidentService | None = None,
+    ):
         self.repository = repository
         self.engine = engine
+        settings = get_settings()
+        self.incident_service = incident_service or IncidentService(
+            IncidentRepository(repository.session),
+            threshold=settings.incident_similarity_threshold,
+            min_cluster_size=settings.incident_min_cluster_size,
+        )
 
     def create_conversation(self):
         conversation = Conversation(workflow_version="triage-v1")
@@ -211,6 +230,16 @@ class TriageDialogueService(DialogueService):
         if playbook.safety_notice and playbook.safety_notice not in message:
             message = f"{playbook.safety_notice} {message}"
         self._message(conversation, "assistant", message)
+        try:
+            with self.repository.session.begin_nested():
+                self.incident_service.observe_escalated(conversation.id)
+                self.repository.session.flush()
+        except Exception as error:
+            logger.exception(
+                "incident.detection_failed conversation_id=%s error=%s",
+                conversation.id,
+                type(error).__name__,
+            )
 
     def escalate(self, conversation_id):
         conversation = self.get_conversation(conversation_id)

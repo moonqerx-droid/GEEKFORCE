@@ -1,0 +1,160 @@
+from __future__ import annotations
+
+import logging
+
+from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
+
+from app.models import Incident
+from app.models.conversation import utc_now
+from app.repositories.incidents import IncidentRepository
+from app.schemas.incident import IncidentRead, IncidentUpdateRead
+from app.services.incident_detection import (
+    IncidentFingerprint,
+    build_fingerprint,
+    recompute_signature,
+    similarity,
+)
+
+
+logger = logging.getLogger(__name__)
+
+
+class IncidentService:
+    def __init__(self, repository: IncidentRepository, *, threshold: float, min_cluster_size: int):
+        self.repository = repository
+        self.threshold = threshold
+        self.min_cluster_size = min_cluster_size
+
+    def read(self, incident_id: str) -> IncidentRead:
+        incident = self.repository.get(incident_id)
+        if incident is None:
+            raise LookupError(incident_id)
+        conversation_ids = self.repository.conversation_ids(incident.id)
+        latest = incident.updates[-1] if incident.updates else None
+        return IncidentRead(
+            id=incident.id,
+            status=incident.status,
+            service=incident.service,
+            title=incident.title,
+            signature_tokens=list(incident.signature_tokens),
+            similarity_threshold=incident.similarity_threshold,
+            revision=incident.revision,
+            created_at=incident.created_at,
+            updated_at=incident.updated_at,
+            conversation_count=len(conversation_ids),
+            conversation_ids=conversation_ids,
+            evidence_tokens=list(incident.signature_tokens),
+            latest_update=IncidentUpdateRead.model_validate(latest) if latest else None,
+        )
+
+    def list_open(self) -> list[IncidentRead]:
+        incidents = self.repository.session.scalars(
+            select(Incident).where(
+                Incident.status.in_(("CANDIDATE", "ACTIVE"))
+            )
+        ).all()
+        return [self.read(incident.id) for incident in incidents]
+
+    def observe_escalated(self, conversation_id: str) -> Incident | None:
+        conversation = self.repository.get_conversation(conversation_id)
+        if conversation is None or conversation.status != "ESCALATED":
+            return None
+        if conversation.incident_id:
+            return self.repository.get(conversation.incident_id)
+        fingerprint = build_fingerprint(conversation)
+        if fingerprint is None:
+            return None
+
+        if match := self._best_open(fingerprint):
+            self._link(match, conversation, fingerprint)
+            return match
+
+        candidates = []
+        for item in self.repository.list_unlinked_escalated(fingerprint.service, conversation.id):
+            other = build_fingerprint(item)
+            if other is not None and similarity(fingerprint, other).score >= self.threshold:
+                candidates.append((item, other))
+        if len(candidates) + 1 < self.min_cluster_size:
+            return None
+
+        try:
+            with self.repository.session.begin_nested():
+                all_fingerprints = [fingerprint, *(item[1] for item in candidates)]
+                incident = self.repository.create_candidate(
+                    fingerprint.service,
+                    f"Массовая недоступность {conversation.service or fingerprint.service}",
+                    recompute_signature(all_fingerprints),
+                    self.threshold,
+                )
+                for item, _ in candidates:
+                    self.repository.link(item, incident)
+                self.repository.link(conversation, incident)
+                self._recompute_signature(incident)
+                self.repository.session.flush()
+        except IntegrityError:
+            match = self._best_open(fingerprint)
+            if match is None:
+                logger.exception("incident.detection_failed conversation_id=%s", conversation.id)
+                return None
+            self._link(match, conversation, fingerprint)
+            return match
+
+        logger.info(
+            "incident.cluster_created incident_id=%s member_count=%s",
+            incident.id,
+            len(candidates) + 1,
+        )
+        return incident
+
+    def _best_open(self, fingerprint: IncidentFingerprint) -> Incident | None:
+        scored = []
+        for incident in self.repository.list_open(fingerprint.service):
+            representative = self._incident_fingerprint(incident)
+            result = similarity(fingerprint, representative)
+            if result.score >= incident.similarity_threshold:
+                scored.append((result.score, incident.id, incident))
+        return max(scored, key=lambda item: (item[0], item[1]))[2] if scored else None
+
+    def _incident_fingerprint(self, incident: Incident) -> IncidentFingerprint:
+        fingerprints = [
+            result for item in self.repository.conversations(incident.id)
+            if (result := build_fingerprint(item)) is not None
+        ]
+        if fingerprints:
+            weighted = {
+                token: max(item.weighted_tokens.get(token, 0) for item in fingerprints)
+                for token in set().union(*(item.weighted_tokens for item in fingerprints))
+                if token in incident.signature_tokens
+            }
+        else:
+            weighted = {
+                token: 3 if token in incident.service.split() or any(char.isdigit() for char in token) else 2
+                for token in incident.signature_tokens
+            }
+        return IncidentFingerprint(service=incident.service, weighted_tokens=weighted)
+
+    def _link(
+        self,
+        incident: Incident,
+        conversation,
+        fingerprint: IncidentFingerprint,
+    ) -> None:
+        self.repository.link(conversation, incident)
+        self._recompute_signature(incident)
+        self.repository.session.flush()
+        evidence = similarity(fingerprint, self._incident_fingerprint(incident)).evidence_tokens
+        logger.info(
+            "incident.conversation_linked incident_id=%s conversation_id=%s score_evidence=%s",
+            incident.id,
+            conversation.id,
+            evidence,
+        )
+
+    def _recompute_signature(self, incident: Incident) -> None:
+        fingerprints = [
+            result for item in self.repository.conversations(incident.id)
+            if (result := build_fingerprint(item)) is not None
+        ]
+        incident.signature_tokens = recompute_signature(fingerprints)
+        incident.updated_at = utc_now()
