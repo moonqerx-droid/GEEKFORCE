@@ -4,9 +4,9 @@
 
 ## 0. Проверенный статус P0 — 27 сентября 2026
 
-Интеграционный baseline зафиксирован в ветке `codex/helpflow-integration` на коммите `d431cde` (`test(flow): verify P0 support scenarios`). На этой точке проверено:
+Интеграционный baseline зафиксирован в ветке `codex/helpflow-integration` на коммите `0b5d20c` (`fix(config): allow documented rules fallback`). На этой точке проверено:
 
-- backend: `75 passed`, один PostgreSQL smoke-тест пропущен в локальном pytest без integration-БД;
+- backend: `76 passed`, один PostgreSQL smoke-тест пропущен в локальном pytest без integration-БД;
 - AI: `60 passed`, все тесты выполняются без внешней сети;
 - frontend: `27 passed`, `oxlint` без ошибок (две прежние warnings `react(set-state-in-effect)`), production build успешен;
 - Docker Compose: образ API пересобран, PostgreSQL достиг состояния healthy, API запущен;
