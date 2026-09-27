@@ -66,6 +66,18 @@ describe("auth pages", () => {
     expect(registered?.invite_token).toBe("invite-token-value-12345");
   });
 
+  it("explains a temporary lockout instead of blaming the password", async () => {
+    server.use(http.post("*/api/auth/login", () => HttpResponse.json({
+      detail: { code: "rate_limited", message: "Слишком много неверных попыток. Подождите 10 минут и попробуйте снова" },
+    }, { status: 429 })));
+    renderPage(<LoginPage />);
+    await userEvent.type(screen.getByLabelText("Email"), "a@example.ru");
+    await userEvent.type(screen.getByLabelText("Пароль"), "StrongPass7");
+    await userEvent.click(screen.getByRole("button", { name: "Войти" }));
+    expect(await screen.findByText(/Подождите 10 минут/)).toBeInTheDocument();
+    expect(screen.queryByText("Проверьте email и пароль")).not.toBeInTheDocument();
+  });
+
   it("verifies an email with a six digit code", async () => {
     let body: unknown;
     server.use(http.post("*/api/auth/verify-email", async ({ request }) => {

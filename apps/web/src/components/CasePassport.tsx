@@ -125,7 +125,7 @@ export function CasePassport({ conversation, audience }: {
             {answered.map((item, index) => (
               <div key={index}>
                 <dt>{item.question}</dt>
-                <dd>{item.answer}</dd>
+                <dd>{item.answer ? factValue(item.answer) : null}</dd>
               </div>
             ))}
           </dl>

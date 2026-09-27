@@ -11,6 +11,11 @@ const DEMO_ACCOUNTS = [
   { label: "Руководитель", email: "admin@helpflow.demo" },
 ];
 const DEMO_PASSWORD = "DemoPass123";
+function serverMessage(error: ApiError): string | null {
+  const detail = error.detail as { message?: unknown } | null | undefined;
+  return detail && typeof detail.message === "string" ? detail.message : null;
+}
+
 const SHOW_DEMO = import.meta.env.DEV || import.meta.env.VITE_SHOW_DEMO_LOGINS === "true";
 
 export function LoginPage() {
@@ -24,7 +29,14 @@ export function LoginPage() {
     <form className="auth-form" onSubmit={async (event) => {
       event.preventDefault(); setBusy(true); setMessage("");
       try { await login({ email, password, remember_me: remember }); setMessage("Вход выполнен"); }
-      catch (error) { setPassword(""); setMessage(error instanceof ApiError ? "Проверьте email и пароль" : "Не удалось связаться с сервером"); }
+      catch (error) {
+        const locked = error instanceof ApiError && error.status === 429;
+        // A lockout is not a typo: keep the password and say how long to wait.
+        if (!locked) setPassword("");
+        setMessage(!(error instanceof ApiError) ? "Не удалось связаться с сервером"
+          : locked || error.status === 403 ? serverMessage(error) ?? "Сейчас войти нельзя, попробуйте позже"
+          : "Неверная почта или пароль");
+      }
       finally { setBusy(false); }
     }}>
       {message ? <div className="auth-message" role="status">{message}</div> : null}

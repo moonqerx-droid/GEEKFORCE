@@ -16,7 +16,9 @@ export function TicketWorkspace({
   onAssign,
   onReply,
   onResolve,
+  onShowCard,
 }: {
+  onShowCard: () => void;
   ticket: OperatorTicket | null;
   loading: boolean;
   busy: boolean;
@@ -56,12 +58,15 @@ export function TicketWorkspace({
             {ticket.owner_name ?? "Сотрудник"}, обращение от {formatDateTime(ticket.created_at)}
           </p>
         </div>
+        <div className="workspace-actions">
+        <Button variant="ghost" className="workspace-card-toggle" onClick={onShowCard}>Карточка</Button>
         {ticket.status === "ESCALATED" && !ticket.assignee_id ? (
-          <Button variant="human" busy={busy} onClick={() => void onAssign().catch(() => undefined)}>Взять в работу</Button>
+          <Button variant="human" busy={busy} title="Первый ответ тоже закрепит обращение за вами" onClick={() => void onAssign().catch(() => undefined)}>Взять в работу</Button>
         ) : null}
         {ticket.status === "IN_PROGRESS" && !takenByOther && !resolving ? (
           <Button variant="secondary" disabled={busy} onClick={() => setResolving(true)}>Закрыть обращение</Button>
         ) : null}
+        </div>
       </header>
 
       {error ? <div className="workspace-alert" role="alert">{error}</div> : null}
@@ -115,7 +120,7 @@ export function TicketWorkspace({
           onValueChange={setDraft}
           tone="human"
           label="Ответ сотруднику"
-          placeholder={ticket.status === "ESCALATED" ? "Ответить — обращение перейдёт к вам…" : "Ответить сотруднику…"}
+          placeholder="Ответить сотруднику…"
           onSend={async (content) => { await onReply(content); }}
         />
       ) : null}

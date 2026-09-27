@@ -1,6 +1,7 @@
 .composer {
   position: sticky;
-  bottom: var(--space-4);
+  /* Clear of the window edge and an auto-hidden Dock. */
+  bottom: var(--space-5);
   display: flex;
   align-items: flex-end;
   gap: var(--space-2);

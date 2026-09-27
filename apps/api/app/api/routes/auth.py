@@ -84,18 +84,16 @@ def register_operator(payload: OperatorRegister, service: AuthServiceDependency)
 @router.post("/login", response_model=CurrentUser)
 def login(payload: LoginRequest, request: Request, response: Response, service: AuthServiceDependency):
     client_host = request.client.host if request.client else "unknown"
+    limiter_key = f"{client_host}:{payload.email}"
+    # Only wrong passwords count: switching roles during a demo must never lock anyone out.
     try:
-        _rate_limiter.check(
-            "login",
-            f"{client_host}:{payload.email}",
-            limit=5,
-            window=timedelta(minutes=10),
-        )
+        _rate_limiter.ensure_allowed("login", limiter_key, limit=5, window=timedelta(minutes=10))
     except RateLimitExceeded as exc:
-        raise error(429, "rate_limited", "Слишком много попыток. Повторите позже") from exc
+        raise error(429, "rate_limited", "Слишком много неверных попыток. Подождите 10 минут и попробуйте снова") from exc
     try:
         user, raw_token, expires_at = service.login(payload, user_agent=request.headers.get("user-agent"))
     except InvalidCredentials as exc:
+        _rate_limiter.record("login", limiter_key)
         raise error(401, "invalid_credentials", "Неверный email или пароль") from exc
     except EmailNotVerified as exc:
         raise error(403, "email_not_verified", "Подтвердите email перед входом") from exc

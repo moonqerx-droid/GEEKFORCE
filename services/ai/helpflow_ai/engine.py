@@ -589,8 +589,14 @@ def _summary(playbook: Playbook, service: str, symptoms: list[str]) -> str:
         title = f"Проблема: {service} (готового сценария нет)"
     else:
         title = playbook.title
-    extra = [s for s in symptoms if s.lower() not in title.lower()]
+    title_words = _words(title)
+    # "VPN не подключается" adds nothing to "Не подключается VPN": same words, other order.
+    extra = [s for s in symptoms if not _words(s) <= title_words]
     return f"{title}: {', '.join(extra)}" if extra else title
+
+
+def _words(text: str) -> set[str]:
+    return set(re.findall(r"\w+", text.lower()))
 
 
 def _first_user_message(ctx: ConversationContext) -> str:

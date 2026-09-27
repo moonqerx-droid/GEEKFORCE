@@ -404,3 +404,8 @@ def test_no_question_about_a_known_fact(simulate, message):
         else:
             break
     assert sim.decision.action in (DecisionAction.ESCALATE, DecisionAction.STEP)
+
+
+def test_summary_does_not_repeat_the_title_in_other_words(engine):
+    analysis = engine.analyze("Не подключается VPN из дома, пишет ошибку подключения")
+    assert analysis.summary.count("VPN") == 1, analysis.summary

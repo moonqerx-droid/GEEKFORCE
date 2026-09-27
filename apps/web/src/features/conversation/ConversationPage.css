@@ -4,7 +4,7 @@
   align-items: start;
   gap: var(--space-6);
   max-width: 1180px;
-  min-height: calc(100vh - 64px);
+  min-height: calc(100vh - var(--header-h));
   margin: 0 auto;
   padding: var(--space-6) var(--space-6) var(--space-5);
 }
@@ -43,14 +43,14 @@
 
 .conv-side {
   position: sticky;
-  top: calc(64px + var(--space-5));
+  top: calc(var(--header-h) + var(--space-5));
   display: grid;
   gap: var(--space-4);
 }
 
 .conv-page > .passport {
   position: sticky;
-  top: calc(64px + var(--space-5));
+  top: calc(var(--header-h) + var(--space-5));
   margin-top: var(--space-8);
 }
 

@@ -58,3 +58,17 @@ def test_login_is_rate_limited(client):
     for _ in range(5):
         assert client.post("/api/auth/login", json=payload).status_code == 401
     assert client.post("/api/auth/login", json=payload).status_code == 429
+
+
+def test_successful_logins_do_not_lock_the_account(client, db_session):
+    user = verified_user(db_session, role="operator")
+    payload = {"email": user.email, "password": "StrongPass7"}
+    for _ in range(8):
+        assert client.post("/api/auth/login", json=payload).status_code == 200
+
+
+def test_correct_password_is_still_refused_while_locked_out(client, db_session):
+    user = verified_user(db_session, role="admin")
+    for _ in range(5):
+        client.post("/api/auth/login", json={"email": user.email, "password": "WrongPassword7"})
+    assert client.post("/api/auth/login", json={"email": user.email, "password": "StrongPass7"}).status_code == 429

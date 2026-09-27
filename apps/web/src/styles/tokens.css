@@ -81,6 +81,15 @@
   --font-size-xl: 28px;
   --font-size-display: clamp(34px, 5vw, 52px);
 
+  /* Sticky header height; layouts below it are sized from this. */
+  --header-h: 64px;
+
   --focus-ring: 0 0 0 3px rgba(232, 87, 42, 0.32);
   --ease: cubic-bezier(0.2, 0.7, 0.2, 1);
+}
+
+@media (max-width: 760px) {
+  :root {
+    --header-h: 100px;
+  }
 }

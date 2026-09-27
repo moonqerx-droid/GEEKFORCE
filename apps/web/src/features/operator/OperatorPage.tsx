@@ -18,6 +18,8 @@ export function OperatorPage() {
   const { user } = useAuth();
   const [params, setParams] = useSearchParams();
   const [scope, setScope] = useState<TicketScope>("queue");
+  // On narrow screens the case card slides in over the chat instead of taking a column.
+  const [cardOpen, setCardOpen] = useState(false);
   const selectedId = params.get("ticket");
   const queue = useTicketQueue(scope);
   const reloadQueue = queue.reload;
@@ -55,8 +57,18 @@ export function OperatorPage() {
         onAssign={current.assign}
         onReply={current.reply}
         onResolve={current.resolve}
+        onShowCard={() => setCardOpen(true)}
       />
-      <div className="operator-side">
+      {cardOpen ? <button type="button" className="operator-scrim" aria-label="Скрыть карточку" onClick={() => setCardOpen(false)} /> : null}
+      <div className={`operator-side ${cardOpen ? "operator-side-open" : ""}`}>
+        {ticket ? (
+          <button type="button" className="operator-side-close" onClick={() => setCardOpen(false)}>Скрыть карточку</button>
+        ) : null}
+        {!ticket ? (
+          <p className="operator-side-hint">
+            Здесь появится карточка от помощника: что случилось, как сотрудник описал это своими словами, какие вопросы уже задали и что пробовали.
+          </p>
+        ) : null}
         {ticket ? (
           <>
             <CasePassport conversation={ticket} audience="operator" />
