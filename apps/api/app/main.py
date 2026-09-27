@@ -12,15 +12,20 @@ from app.api.routes.conversations import router as conversations_router
 from app.api.routes.health import router as health_router
 from app.api.routes.operator import router as operator_router
 from app.api.routes.auth import router as auth_router
+from app.api.routes.admin import router as admin_router
 from app.db.base import Base
-from app.db.session import engine
+from app.db.session import SessionLocal, engine
 from app.core.config import get_settings
 from app import models  # noqa: F401 -- registers SQLAlchemy tables
+from app.services.admin import bootstrap_admin
 
 
 @asynccontextmanager
 async def lifespan(_: FastAPI):
     Base.metadata.create_all(engine)
+    settings = get_settings()
+    with SessionLocal() as session:
+        bootstrap_admin(session, email=settings.admin_email, password=settings.admin_password)
     yield
 
 
@@ -40,6 +45,7 @@ app.include_router(health_router)
 app.include_router(conversations_router)
 app.include_router(operator_router)
 app.include_router(auth_router)
+app.include_router(admin_router)
 
 
 def asset_versions(*names: str) -> dict[str, str]:

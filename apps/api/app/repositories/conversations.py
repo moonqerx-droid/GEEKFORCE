@@ -20,8 +20,9 @@ class ConversationRepository:
             .where(Conversation.id == conversation_id)
             .execution_options(populate_existing=True)
             .options(
-                selectinload(Conversation.messages),
+                selectinload(Conversation.messages).selectinload(Message.author),
                 selectinload(Conversation.steps),
+                selectinload(Conversation.assignee),
             )
         )
         if owner_id is not None:

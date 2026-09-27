@@ -44,6 +44,16 @@ class Conversation(Base):
     owner_id: Mapped[str | None] = mapped_column(
         ForeignKey("users.id", ondelete="SET NULL"), nullable=True, index=True
     )
+    assignee_id: Mapped[str | None] = mapped_column(
+        ForeignKey("users.id", ondelete="SET NULL"), nullable=True, index=True
+    )
+    escalated_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    assigned_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    first_operator_reply_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    resolved_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True, index=True)
+    resolved_by: Mapped[str | None] = mapped_column(String(16), nullable=True)
+    rating: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    rating_comment: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     __mapper_args__ = {"version_id_col": revision}
 
@@ -57,7 +67,20 @@ class Conversation(Base):
         cascade="all, delete-orphan",
         order_by="TroubleshootingStep.position",
     )
-    owner: Mapped[User | None] = relationship(back_populates="conversations")
+    owner: Mapped[User | None] = relationship(back_populates="conversations", foreign_keys=[owner_id])
+    assignee: Mapped[User | None] = relationship(foreign_keys=[assignee_id])
+
+    @property
+    def owner_name(self) -> str | None:
+        return self.owner.full_name if self.owner else None
+
+    @property
+    def owner_department(self) -> str | None:
+        return self.owner.department if self.owner else None
+
+    @property
+    def assignee_name(self) -> str | None:
+        return self.assignee.full_name if self.assignee else None
 
 
 class Message(Base):
@@ -68,8 +91,14 @@ class Message(Base):
     role: Mapped[str] = mapped_column(String(16))
     content: Mapped[str] = mapped_column(Text)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
+    author_id: Mapped[str | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
 
     conversation: Mapped[Conversation] = relationship(back_populates="messages")
+    author: Mapped[User | None] = relationship()
+
+    @property
+    def author_name(self) -> str | None:
+        return self.author.full_name if self.author else None
 
 
 class TroubleshootingStep(Base):

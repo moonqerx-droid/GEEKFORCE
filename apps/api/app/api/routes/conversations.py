@@ -8,7 +8,7 @@ from sqlalchemy.orm import Session
 
 from app.db.session import get_db
 from app.repositories.conversations import ConversationRepository
-from app.schemas.conversation import ConversationRead, MessageCreate, StepResultCreate
+from app.schemas.conversation import ConversationRead, MessageCreate, RatingCreate, StepResultCreate
 from app.services.ai import MockAIService
 from app.services.dialogue import ConversationNotFound, DialogueConflict, DialogueService
 from app.services.triage import TriageDialogueService
@@ -132,3 +132,21 @@ def escalate(
         raise not_found() from exc
     except DialogueConflict as exc:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
+
+
+@router.post("/{conversation_id}/rating", response_model=ConversationRead)
+def rate_conversation(
+    conversation_id: str,
+    payload: RatingCreate,
+    db: Annotated[Session, Depends(get_db)],
+    user: Annotated[User, Depends(require_employee)],
+) -> ConversationRead:
+    conversation = ConversationRepository(db).get(conversation_id, owner_id=user.id)
+    if conversation is None:
+        raise not_found()
+    if conversation.status != "RESOLVED":
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="only resolved conversations can be rated")
+    conversation.rating = payload.rating
+    conversation.rating_comment = (payload.comment or "").strip() or None
+    db.commit()
+    return serialize(ConversationRepository(db).get(conversation_id))

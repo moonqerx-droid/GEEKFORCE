@@ -67,12 +67,18 @@ class TriageDialogueService(DialogueService):
     def handle_message(self, conversation_id, content, *, expected_revision=None):
         conversation = self.get_conversation(conversation_id)
         self._check_revision(conversation, expected_revision)
+        if conversation.status in {"ESCALATED", "IN_PROGRESS"}:
+            # A specialist owns the conversation now: keep the employee's words for them.
+            try:
+                self._message(conversation, "user", content.strip())
+                return self._commit(conversation)
+            except Exception:
+                self.repository.session.rollback()
+                raise
         intent = self.engine.conversation_intent(content)
         if intent == "operator":
             if conversation.status == "RESOLVED":
                 raise DialogueConflict("resolved conversation cannot be escalated")
-            if conversation.status == "ESCALATED":
-                return conversation
             try:
                 self._message(conversation, "user", content.strip())
                 self._escalate(conversation, "пользователь запросил специалиста")
@@ -133,6 +139,8 @@ class TriageDialogueService(DialogueService):
                 solved = self.engine.interpret_confirmation(content)
                 if solved is True:
                     conversation.status = "RESOLVED"
+                    conversation.resolved_at = utc_now()
+                    conversation.resolved_by = "assistant"
                     self._message(conversation, "assistant", "Отлично, проблема решена. Обращение закрыто.")
                 elif solved is False:
                     conversation.verification_failed = True
@@ -192,6 +200,7 @@ class TriageDialogueService(DialogueService):
     def _escalate(self, conversation, reason):
         card = self.engine.build_escalation_card(self._context(conversation), reason)
         conversation.status = "ESCALATED"
+        conversation.escalated_at = conversation.escalated_at or utc_now()
         conversation.current_step_code = None
         conversation.current_step_instruction = None
         conversation.escalation_card = card.model_dump(mode="json")
@@ -206,7 +215,7 @@ class TriageDialogueService(DialogueService):
         conversation = self.get_conversation(conversation_id)
         if conversation.status == "RESOLVED":
             raise DialogueConflict("resolved conversation cannot be escalated")
-        if conversation.status == "ESCALATED":
+        if conversation.status in {"ESCALATED", "IN_PROGRESS"}:
             return conversation
         try:
             self._escalate(conversation, "пользователь запросил специалиста")

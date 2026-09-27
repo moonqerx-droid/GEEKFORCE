@@ -55,9 +55,10 @@ class AuthService:
     def register_operator(self, payload: OperatorRegister) -> User:
         if self.repository.consume_invite(hash_token(payload.invite_token), payload.email) is None:
             raise InvalidInvite()
-        return self._register(payload, "operator")
+        # The invite link itself proves the operator controls this mailbox.
+        return self._register(payload, "operator", verified=True)
 
-    def _register(self, payload, role: str) -> User:
+    def _register(self, payload, role: str, *, verified: bool = False) -> User:
         if self.repository.get_user_by_email(payload.email):
             raise DuplicateEmail()
         user = User(
@@ -67,12 +68,15 @@ class AuthService:
             department=payload.department,
             password_hash=hash_password(payload.password),
             role=role,
+            email_verified_at=utc_now() if verified else None,
         )
         try:
             self.repository.add_user(user)
         except IntegrityError as exc:
             self.repository.session.rollback()
             raise DuplicateEmail() from exc
+        if verified:
+            return user
         try:
             self._send_action(user, "verify_email")
         except Exception as exc:

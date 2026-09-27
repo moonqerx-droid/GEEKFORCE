@@ -27,6 +27,8 @@ class Settings(BaseSettings):
     smtp_password: str = ""
     smtp_from_email: str = ""
     smtp_from_name: str = "HelpFlow"
+    admin_email: str = ""
+    admin_password: str = ""
 
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 

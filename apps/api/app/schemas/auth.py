@@ -7,7 +7,7 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator, model_valida
 
 
 Department = Literal["it", "sales", "marketing", "finance", "hr", "operations", "other"]
-UserRole = Literal["employee", "operator"]
+UserRole = Literal["employee", "operator", "admin"]
 _EMAIL_RE = re.compile(r"^[^\s@]+@[^\s@]+\.[^\s@]{2,}$")
 
 

@@ -44,6 +44,12 @@ def require_employee(user: Annotated[User, Depends(require_verified_user)]) -> U
 
 
 def require_operator(user: Annotated[User, Depends(require_verified_user)]) -> User:
-    if user.role != "operator":
+    if user.role not in {"operator", "admin"}:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Operator role required")
+    return user
+
+
+def require_admin(user: Annotated[User, Depends(require_verified_user)]) -> User:
+    if user.role != "admin":
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Admin role required")
     return user

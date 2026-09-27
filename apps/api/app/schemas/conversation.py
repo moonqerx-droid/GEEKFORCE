@@ -12,6 +12,7 @@ class ConversationStatus(StrEnum):
     VERIFYING = "VERIFYING"
     RESOLVED = "RESOLVED"
     ESCALATED = "ESCALATED"
+    IN_PROGRESS = "IN_PROGRESS"
 
 
 class Urgency(StrEnum):
@@ -25,6 +26,7 @@ class MessageRole(StrEnum):
     USER = "user"
     ASSISTANT = "assistant"
     SYSTEM = "system"
+    OPERATOR = "operator"
 
 
 class StepOutcome(StrEnum):
@@ -59,6 +61,7 @@ class MessageRead(BaseModel):
     role: MessageRole
     content: str
     created_at: datetime
+    author_name: str | None = None
 
 
 class StepRead(BaseModel):
@@ -103,6 +106,15 @@ class ConversationRead(BaseModel):
     rag_source_ids: list[str] = Field(default_factory=list)
     ai_fallback_reason: str | None = None
     ai_latency_ms: int | None = None
+    assignee_id: str | None = None
+    assignee_name: str | None = None
+    escalated_at: datetime | None = None
+    assigned_at: datetime | None = None
+    first_operator_reply_at: datetime | None = None
+    resolved_at: datetime | None = None
+    resolved_by: str | None = None
+    rating: int | None = None
+    rating_comment: str | None = None
 
     @classmethod
     def from_model(cls, model) -> "ConversationRead":
@@ -117,3 +129,29 @@ class ConversationRead(BaseModel):
 
 class OperatorTicket(ConversationRead):
     original_request: str
+    owner_name: str | None = None
+    owner_department: str | None = None
+
+
+def _strip_required(value: str) -> str:
+    normalized = value.strip()
+    if not normalized:
+        raise ValueError("must not be blank")
+    return normalized
+
+
+class RatingCreate(BaseModel):
+    rating: int = Field(ge=1, le=5)
+    comment: str | None = Field(default=None, max_length=1000)
+
+
+class OperatorMessageCreate(BaseModel):
+    content: str = Field(min_length=1, max_length=4000)
+
+    _content = field_validator("content")(_strip_required)
+
+
+class ResolveCreate(BaseModel):
+    summary: str = Field(min_length=1, max_length=2000)
+
+    _summary = field_validator("summary")(_strip_required)
