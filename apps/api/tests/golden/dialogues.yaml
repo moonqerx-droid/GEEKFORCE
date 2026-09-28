@@ -2535,3 +2535,320 @@
   say: ["помогите пожалуйста"]
   playbook: unknown
   tags: [контроль-6]
+
+# --- контроль-7: слепая группа, написана до изменений understanding-v4 ---
+
+- id: h7-01
+  say: ["Здравствуйте, я юрист, не могу зайти в свою учётку на компьютере, пишет что пароль истёк"]
+  playbook: password_login
+  tags: [контроль-7]
+
+- id: h7-02
+  say: ["учетка заблокирована после трех попыток, что делать"]
+  playbook: password_login
+  tags: [контроль-7]
+
+- id: h7-03
+  say: ["забыла пароль после отпуска, комп не пускает"]
+  playbook: password_login
+  tags: [контроль-7]
+
+- id: h7-04
+  say: ["выкинуло из винды и теперь не принимает мой пароль"]
+  playbook: password_login
+  tags: [контроль-7]
+
+- id: h7-05
+  say: ["сбросьте пароль пожалуйста, не помню его"]
+  playbook: password_login
+  tags: [контроль-7]
+
+- id: h7-06
+  say: ["не приходят письма от клиентов со вчерашнего дня"]
+  playbook: email_outlook
+  tags: [контроль-7]
+
+- id: h7-07
+  say: ["аутлук не открывается, крутится загрузка профиля"]
+  playbook: email_outlook
+  tags: [контроль-7]
+
+- id: h7-08
+  say: ["почтовый ящик переполнен, не могу ничего отправить"]
+  playbook: email_outlook
+  tags: [контроль-7]
+
+- id: h7-09
+  say: ["письма уходят, но возвращаются с ошибкой доставки"]
+  playbook: email_outlook
+  tags: [контроль-7]
+
+- id: h7-10
+  say: ["в outlook пропала папка входящие"]
+  playbook: email_outlook
+  tags: [контроль-7]
+
+- id: h7-11
+  say: ["из дома не подключается впн, пишет ошибка 809"]
+  playbook: vpn_connection
+  tags: [контроль-7]
+
+- id: h7-12
+  say: ["ВПН постоянно отваливается каждые 5 минут"]
+  playbook: vpn_connection
+  tags: [контроль-7]
+
+- id: h7-13
+  say: ["я в командировке и не могу попасть во внутреннюю сеть"]
+  playbook: vpn_connection
+  tags: [контроль-7]
+
+- id: h7-14
+  say: ["форти клиент висит на 98 процентах"]
+  playbook: vpn_connection
+  tags: [контроль-7]
+
+- id: h7-15
+  say: ["интернет в переговорке пропал"]
+  playbook: network_wifi
+  tags: [контроль-7]
+
+- id: h7-16
+  say: ["вай фай в офисе есть, но страницы не грузятся"]
+  playbook: network_wifi
+  tags: [контроль-7]
+
+- id: h7-17
+  say: ["ноут не подключается к корпоративной сети wifi, пишет неверный ключ"]
+  playbook: network_wifi
+  tags: [контроль-7]
+
+- id: h7-18
+  say: ["сетевой кабель воткнут, а интернета нет"]
+  playbook: network_wifi
+  tags: [контроль-7]
+
+- id: h7-19
+  say: ["принтер на втором этаже жуёт бумагу"]
+  playbook: printer
+  tags: [контроль-7]
+
+- id: h7-20
+  say: ["печатает пустые листы"]
+  playbook: printer
+  tags: [контроль-7]
+
+- id: h7-21
+  say: ["документ ушёл на печать и застрял в очереди"]
+  playbook: printer
+  tags: [контроль-7]
+
+- id: h7-22
+  say: ["МФУ не сканирует в папку"]
+  playbook: printer
+  tags: [контроль-7]
+
+- id: h7-23
+  say: ["не могу открыть папку отдела, пишет нет доступа"]
+  playbook: access_rights
+  tags: [контроль-7]
+
+- id: h7-24
+  say: ["нужен доступ к папке проекта альфа, руководитель согласовал"]
+  playbook: access_rights
+  tags: [контроль-7]
+
+- id: h7-25
+  say: ["в шарепоинте нет прав на редактирование файла"]
+  playbook: access_rights
+  tags: [контроль-7]
+
+- id: h7-26
+  say: ["мне закрыли доступ к отчетам после перевода в другой отдел"]
+  playbook: access_rights
+  tags: [контроль-7]
+
+- id: h7-27
+  say: ["эксель вылетает при открытии большого файла"]
+  playbook: app_not_starting
+  tags: [контроль-7]
+
+- id: h7-28
+  say: ["ворд пишет что не удалось запустить приложение"]
+  playbook: app_not_starting
+  tags: [контроль-7]
+
+- id: h7-29
+  say: ["после обновления не открывается программа для сдачи отчётности"]
+  playbook: app_not_starting
+  tags: [контроль-7]
+
+- id: h7-30
+  say: ["акробат закрывается сразу после запуска"]
+  playbook: app_not_starting
+  tags: [контроль-7]
+
+- id: h7-31
+  say: ["поставьте пожалуйста фотошоп, нужен для работы"]
+  playbook: software_install
+  tags: [контроль-7]
+
+- id: h7-32
+  say: ["можно мне установить телеграм на рабочий комп?"]
+  playbook: ["software_install", "unknown"]
+  tags: [контроль-7]
+
+- id: h7-33
+  say: ["для обучения нужен python и vs code"]
+  playbook: software_install
+  tags: [контроль-7]
+
+- id: h7-34
+  say: ["попросили скачать программу для видеомонтажа, а у меня нет прав"]
+  playbook: software_install
+  tags: [контроль-7]
+
+- id: h7-35
+  say: ["мышка перестала работать, светится но курсор не двигается"]
+  playbook: peripherals
+  tags: [контроль-7]
+
+- id: h7-36
+  say: ["второй монитор не определяется"]
+  playbook: peripherals
+  tags: [контроль-7]
+
+- id: h7-37
+  say: ["клавиатура печатает не те буквы"]
+  playbook: peripherals
+  tags: [контроль-7]
+
+- id: h7-38
+  say: ["гарнитура не подключается по блютус"]
+  playbook: peripherals
+  tags: [контроль-7]
+
+- id: h7-39
+  say: ["в зуме собеседники меня не слышат"]
+  playbook: video_calls
+  tags: [контроль-7]
+
+- id: h7-40
+  say: ["камера в тимс показывает чёрный экран"]
+  playbook: video_calls
+  tags: [контроль-7]
+
+- id: h7-41
+  say: ["созвон постоянно прерывается и картинка замирает"]
+  playbook: video_calls
+  tags: [контроль-7]
+
+- id: h7-42
+  say: ["не могу запустить демонстрацию экрана в телемосте"]
+  playbook: video_calls
+  tags: [контроль-7]
+
+- id: h7-43
+  say: ["компьютер включается минут десять"]
+  playbook: slow_performance
+  tags: [контроль-7]
+
+- id: h7-44
+  say: ["всё виснет, вентилятор шумит как самолёт"]
+  playbook: slow_performance
+  tags: [контроль-7]
+
+- id: h7-45
+  say: ["браузер жутко тормозит, вкладки открываются по минуте"]
+  playbook: slow_performance
+  tags: [контроль-7]
+
+- id: h7-46
+  say: ["у всех в офисе пропал интернет"]
+  playbook: mass_incident
+  tags: [контроль-7]
+
+- id: h7-47
+  say: ["никто на этаже не может печатать"]
+  playbook: mass_incident
+  tags: [контроль-7]
+
+- id: h7-48
+  say: ["у половины отдела не работает црм с утра"]
+  playbook: mass_incident
+  tags: [контроль-7]
+
+- id: h7-49
+  say: ["портал выдаёт ошибку 503 у меня и у коллег"]
+  playbook: ["service_unavailable", "mass_incident"]
+  tags: [контроль-7]
+
+- id: h7-50
+  say: ["джира не открывается, пишет сервер недоступен"]
+  playbook: service_unavailable
+  tags: [контроль-7]
+
+- id: h7-51
+  say: ["корпоративный портал лежит"]
+  playbook: service_unavailable
+  tags: [контроль-7]
+
+- id: h7-52
+  say: ["1с пишет превышено количество лицензий"]
+  playbook: onec_login
+  tags: [контроль-7]
+
+- id: h7-53
+  say: ["в списке баз 1с пусто"]
+  playbook: onec_login
+  tags: [контроль-7]
+
+- id: h7-54
+  say: ["не могу войти в 1с, неправильный пароль, хотя вводила правильный"]
+  playbook: onec_login
+  tags: [контроль-7]
+
+- id: h7-55
+  say: ["в црм не пускает с нового ноутбука, со старого всё нормально"]
+  playbook: crm_login_device_specific
+  tags: [контроль-7]
+
+- id: h7-56
+  say: ["битрикс на телефоне открывается, а на ноуте нет"]
+  playbook: crm_login_device_specific
+  tags: [контроль-7]
+
+- id: h7-57
+  say: ["пришло письмо что мой ящик будет удален, надо перейти по ссылке"]
+  playbook: security_incident
+  tags: [контроль-7]
+
+- id: h7-58
+  say: ["звонил кто-то из «IT-отдела» и просил продиктовать код из смс"]
+  playbook: security_incident
+  tags: [контроль-7]
+
+- id: h7-59
+  say: ["на компе появились файлы с расширением .locked и записка"]
+  playbook: security_incident
+  tags: [контроль-7]
+
+- id: h7-60
+  say: ["сисадмин скиньте пароль от роутера в переговорке"]
+  playbook: credentials_request
+  tags: [контроль-7]
+
+- id: h7-61
+  say: ["дайте логин и пароль от тестового стенда"]
+  playbook: credentials_request
+  tags: [контроль-7]
+
+- id: h7-62
+  say: ["у меня всё плохо, ничего не работает"]
+  playbook: unknown
+  tags: [контроль-7]
+
+- id: h7-63
+  say: ["кофемашина на кухне сломалась"]
+  playbook: unknown
+  tags: [контроль-7]
