@@ -36,8 +36,9 @@ def get_dialogue_service(request: Request, db: Annotated[Session, Depends(get_db
 DialogueDependency = Annotated[DialogueService, Depends(get_dialogue_service)]
 
 
-def serialize(conversation) -> ConversationRead:
-    return ConversationRead.from_model(conversation)
+def serialize(conversation, service: DialogueService | None = None) -> ConversationRead:
+    replies = service.quick_replies(conversation) if service is not None else None
+    return ConversationRead.from_model(conversation, quick_replies=replies)
 
 
 def not_found() -> HTTPException:
@@ -77,7 +78,7 @@ def get_conversation(
 ) -> ConversationRead:
     ensure_owned(db, conversation_id, user)
     try:
-        return serialize(service.get_conversation(conversation_id))
+        return serialize(service.get_conversation(conversation_id), service)
     except ConversationNotFound as exc:
         raise not_found() from exc
 
@@ -98,7 +99,7 @@ def send_message(
     try:
         return serialize(service.handle_message(conversation_id, payload.content,
                                                expected_revision=payload.expected_revision,
-                                               attachments=attachments))
+                                               attachments=attachments), service)
     except ConversationNotFound as exc:
         raise not_found() from exc
     except DialogueConflict as exc:
@@ -117,7 +118,7 @@ def record_step_result(
     try:
         return serialize(service.record_step_result(conversation_id, payload.outcome.value,
                                                     expected_revision=payload.expected_revision,
-                                                    step_code=payload.step_code))
+                                                    step_code=payload.step_code), service)
     except ConversationNotFound as exc:
         raise not_found() from exc
     except DialogueConflict as exc:
@@ -133,7 +134,7 @@ def escalate(
 ) -> ConversationRead:
     ensure_owned(db, conversation_id, user)
     try:
-        return serialize(service.escalate(conversation_id))
+        return serialize(service.escalate(conversation_id), service)
     except ConversationNotFound as exc:
         raise not_found() from exc
     except DialogueConflict as exc:

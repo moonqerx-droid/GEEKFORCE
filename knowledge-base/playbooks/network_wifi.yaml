@@ -17,6 +17,9 @@ questions:
     options:
       office: [офис, на работе]
       remote: [дом, дома, удалён, удален, кафе, коворкинг]
+    option_labels:
+      office: В офисе
+      remote: Дома или в другом месте
   - fact: colleagues_affected
     text: У коллег рядом интернет работает нормально?
     kind: yes_no

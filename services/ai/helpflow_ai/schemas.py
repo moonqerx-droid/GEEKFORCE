@@ -55,6 +55,8 @@ class Question(BaseModel):
     kind: QuestionKind = QuestionKind.TEXT
     # For CHOICE: normalized value -> keywords that select it.
     options: dict[str, list[str]] = Field(default_factory=dict)
+    # For CHOICE: how each option reads as a one-tap answer ("В браузере").
+    option_labels: dict[str, str] = Field(default_factory=dict)
     # For YES_NO: store the opposite answer (question is phrased positively).
     invert: bool = False
     # Asked only when one of these symptoms was described (empty = always).

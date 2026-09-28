@@ -20,6 +20,9 @@ class DialogueService:
     def create_conversation(self) -> Conversation:
         return self.repository.create()
 
+    def quick_replies(self, conversation: Conversation) -> list[str]:
+        return []
+
     def get_conversation(self, conversation_id: str) -> Conversation:
         conversation = self.repository.get(conversation_id)
         if conversation is None:

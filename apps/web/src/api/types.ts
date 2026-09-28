@@ -75,6 +75,8 @@ export interface Conversation {
   answer_kind?: "playbook" | "document" | "general" | "handoff" | null;
   /** Company document fragments the current answer is quoted from. */
   citations?: Citation[];
+  /** One-tap answers to the question the assistant just asked; empty when it needs free text. */
+  quick_replies?: string[];
   rag_source_ids: string[];
   ai_fallback_reason: string | null;
   ai_latency_ms: number | null;

@@ -260,6 +260,15 @@ class TriageDialogueService(DialogueService):
             self.repository.session.rollback()
             raise
 
+    def quick_replies(self, conversation) -> list[str]:
+        """One-tap answers while the assistant waits for a reply to a closed question."""
+        if conversation.status != "CLARIFYING" or not conversation.asked_facts:
+            return []
+        fact = conversation.asked_facts[-1]
+        if fact in conversation.known_facts:
+            return []
+        return self.engine.quick_replies(conversation.playbook_id, fact)
+
     def record_step_result(self, conversation_id, outcome, *, expected_revision=None, step_code=None):
         conversation = self.get_conversation(conversation_id)
         self._check_revision(conversation, expected_revision)

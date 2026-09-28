@@ -382,6 +382,19 @@ def parse_answer(question: Question, text: str) -> str:
     return text.strip()[:MAX_FREE_TEXT_FACT]
 
 
+def quick_replies(question: Question) -> list[str]:
+    """One-tap answers for a closed question; each one parses back to its own option."""
+    if question.kind == QuestionKind.YES_NO:
+        return ["Да", "Нет", "Не знаю"]
+    if question.kind == QuestionKind.CHOICE:
+        labels = [
+            question.option_labels.get(value) or keywords[0].capitalize()
+            for value, keywords in question.options.items()
+        ]
+        return [*labels, "Не знаю"]
+    return []
+
+
 def _parse_yes_no(norm: str, invert: bool) -> str:
     if _UNKNOWN_RE.search(norm):
         return "unknown"

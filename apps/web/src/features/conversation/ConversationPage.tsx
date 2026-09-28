@@ -11,6 +11,7 @@ import { WelcomeScreen } from "./WelcomeScreen";
 import { MessageThread } from "./MessageThread";
 import { stepMarkers } from "./steps";
 import { StepCard } from "./StepCard";
+import { QuickReplies } from "./QuickReplies";
 import { Composer } from "./Composer";
 import { OutagePanel, VerifyingPanel, ResolvedPanel, WaitingPanel } from "./StatusPanels";
 import "./ConversationPage.css";
@@ -123,6 +124,10 @@ export function ConversationPage({ onActivity }: { onActivity?: (conversation: C
                 thinkingLabel={live ? "Отправляем специалисту" : c ? "Помощник думает" : "Помощник разбирается в ситуации"}
                 steps={steps}
               />
+            ) : null}
+
+            {c?.status === "CLARIFYING" && c.quick_replies?.length && !conv.sending && conv.pendingMessage == null ? (
+              <QuickReplies replies={c.quick_replies} onPick={(reply) => void conv.sendMessage(reply, []).catch(() => undefined)} />
             ) : null}
 
             {c?.status === "TROUBLESHOOTING" && c.current_step ? (

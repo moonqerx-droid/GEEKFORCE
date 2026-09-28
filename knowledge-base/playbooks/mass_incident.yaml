@@ -15,5 +15,9 @@ questions:
       few: [несколько, пару, двое, трое, коллег рядом]
       department: [отдел, команд]
       office: [офис, все, всех, компани]
+    option_labels:
+      few: Несколько коллег
+      department: Весь отдел
+      office: Весь офис
 steps: []
 verify_question: Сервис снова работает у вас и у коллег?

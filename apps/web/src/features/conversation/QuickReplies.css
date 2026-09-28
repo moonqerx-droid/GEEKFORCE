@@ -1,0 +1,39 @@
+/* Sits where the employee's reply will appear: right-aligned, in the voice of their bubbles. */
+.quick-replies {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: var(--space-2);
+  animation: bubble-in 300ms var(--ease) both;
+}
+
+.quick-reply {
+  min-height: 40px;
+  padding: 8px 16px;
+  border: 1.5px solid var(--coral);
+  border-radius: var(--radius-pill);
+  background: var(--color-surface);
+  color: var(--coral-deep);
+  font: inherit;
+  font-size: var(--font-size-sm);
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 150ms var(--ease), color 150ms var(--ease);
+}
+
+.quick-reply:hover {
+  background: var(--coral-deep);
+  border-color: var(--coral-deep);
+  color: #fff;
+}
+
+.quick-reply:focus-visible {
+  outline: 3px solid var(--coral-deep);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .quick-replies {
+    animation: none;
+  }
+}

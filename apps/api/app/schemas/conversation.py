@@ -140,6 +140,8 @@ class ConversationRead(BaseModel):
     ai_latency_ms: int | None = None
     answer_kind: Literal["playbook", "document", "general", "handoff"] | None = None
     citations: list[CitationRead] = Field(default_factory=list)
+    # One-tap answers to the question the assistant just asked (empty for free text).
+    quick_replies: list[str] = Field(default_factory=list)
     assignee_id: str | None = None
     assignee_name: str | None = None
     escalated_at: datetime | None = None
@@ -151,8 +153,9 @@ class ConversationRead(BaseModel):
     rating_comment: str | None = None
 
     @classmethod
-    def from_model(cls, model) -> "ConversationRead":
+    def from_model(cls, model, quick_replies: list[str] | None = None) -> "ConversationRead":
         data = cls.model_validate(model, from_attributes=True)
+        data.quick_replies = list(quick_replies or [])
         if model.current_step_code and model.current_step_instruction:
             data.current_step = CurrentStep(
                 code=model.current_step_code,

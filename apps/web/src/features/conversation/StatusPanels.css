@@ -180,3 +180,10 @@
   background: inherit;
   animation: pulse 1.8s ease-out infinite;
 }
+
+.ribbon-eta {
+  display: block;
+  margin-top: 2px;
+  color: var(--sea);
+  font-weight: 600;
+}

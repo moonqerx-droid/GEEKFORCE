@@ -150,6 +150,13 @@ class TriageEngine:
     def conversation_intent(message: str) -> str | None:
         return rules.conversation_intent(message)
 
+    def quick_replies(self, playbook_id: str | None, fact: str) -> list[str]:
+        """Buttons for the question that fills `fact`; empty for free-text or unknown ones."""
+        if not playbook_id or not self.kb.has(playbook_id):
+            return []
+        question = next((q for q in self.kb.get(playbook_id).questions if q.fact == fact), None)
+        return rules.quick_replies(question) if question else []
+
     # --- flow ---------------------------------------------------------------
 
     def decide(self, context: ConversationContext) -> Decision:

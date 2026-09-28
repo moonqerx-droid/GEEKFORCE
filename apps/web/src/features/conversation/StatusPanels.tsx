@@ -17,6 +17,14 @@ export function VerifyingPanel({ busy, onAnswer }: { busy: boolean; onAnswer: (t
   );
 }
 
+/** When to expect the first human reply, stated with the reason so it reads as a promise, not a guess. */
+const RESPONSE_TARGET: Record<Conversation["urgency"], string> = {
+  critical: "Критичные обращения берут в работу в течение 15 минут.",
+  high: "Срочные обращения берут в работу в течение часа.",
+  normal: "Обычно отвечают в течение 4 часов в рабочее время.",
+  low: "Ответят в течение рабочего дня.",
+};
+
 /** Pinned above the composer while people own the request: one line, not a second copy of the chat. */
 export function WaitingPanel({ conversation }: { conversation: Conversation }) {
   const card = conversation.escalation_card as { recommended_team?: string } | null;
@@ -27,6 +35,7 @@ export function WaitingPanel({ conversation }: { conversation: Conversation }) {
         <strong id="waiting-title">Передали специалисту</strong>
         {" "}{card?.recommended_team ? `Команда «${card.recommended_team}» уже видит карточку` : "Специалист уже видит карточку"}:
         пересказывать ничего не нужно, ответ придёт сюда. Можно дописать детали или приложить скриншот.
+        <span className="ribbon-eta">{RESPONSE_TARGET[conversation.urgency]}</span>
       </p>
     </section>
   );

@@ -18,6 +18,9 @@ questions:
     options:
       outlook: [outlook, аутлук, программ, приложени]
       web: [браузер, веб, owa, сайт]
+    option_labels:
+      outlook: В программе Outlook
+      web: В браузере
   - fact: error_text
     text: Есть ли сообщение об ошибке? Если да — что в нём написано?
     kind: text
