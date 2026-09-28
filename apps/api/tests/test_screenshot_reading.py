@@ -61,3 +61,8 @@ def test_unreadable_screenshot_keeps_the_old_behaviour(client, people, screen):
 def test_best_error_line_is_picked_from_noisy_text():
     text = "Файл Правка Вид\nОшибка входа: неверное имя пользователя или пароль\nОтмена ОК"
     assert ocr.error_line(text) == "Ошибка входа: неверное имя пользователя или пароль"
+
+
+def test_a_line_with_an_error_code_is_preferred():
+    text = "Подключение VPN\nНе удалось подключиться к удалённому серверу.\nОшибка 809: сетевое подключение прервано."
+    assert ocr.error_line(text) == "Ошибка 809: сетевое подключение прервано."

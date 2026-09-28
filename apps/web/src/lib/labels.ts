@@ -228,3 +228,23 @@ export function plural(count: number, one: string, few: string, many: string): s
   if (mod10 >= 2 && mod10 <= 4 && (mod100 < 12 || mod100 > 14)) return few;
   return many;
 }
+
+/** Internal team codes («Service Desk L1 (оргтехника)») are for specialists; employees read people. */
+const TEAM_FOR_EMPLOYEE: Record<string, string> = {
+  "service desk l1": "Специалисты поддержки",
+  "service desk l1 (оргтехника)": "Специалисты по оргтехнике",
+  "service desk l2": "Инженеры поддержки",
+  "service desk l2 (рабочие места)": "Инженеры по рабочим местам",
+  "service desk l2 (учётные записи)": "Специалисты по учётным записям",
+  "администраторы доступа": "Администраторы доступа",
+  "администраторы почты": "Администраторы почты",
+  "администраторы прикладных систем": "Администраторы рабочих систем",
+  "дежурный инженер": "Дежурные инженеры",
+  "дежурный инженер (инциденты)": "Дежурные инженеры",
+  "отдел информационной безопасности": "Специалисты по информационной безопасности",
+  "сетевые администраторы": "Сетевые администраторы",
+};
+
+export function teamForEmployee(team: string | null | undefined): string {
+  return (team && TEAM_FOR_EMPLOYEE[team.trim().toLowerCase()]) || "Специалисты поддержки";
+}

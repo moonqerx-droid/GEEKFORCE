@@ -3,6 +3,7 @@
 import logging
 
 from app.services import ocr
+from helpflow_ai import voice
 from helpflow_ai.engine import ALSO_REPORTED
 from helpflow_ai import AnswerKind, ConversationContext, DecisionAction, StepRecord, TriageEngine
 from sqlalchemy.orm.exc import StaleDataError
@@ -223,7 +224,8 @@ class TriageDialogueService(DialogueService):
                 if analysis.should_escalate:
                     self._escalate(conversation, "сценарий требует немедленного участия специалиста")
                 else:
-                    self._advance(conversation)
+                    # One human sentence for «задолбали!!!» or «опять», then straight to business.
+                    self._advance(conversation, intro=voice.acknowledgement(typed))
             elif previous_status == "CLARIFYING":
                 context = self._context(conversation)
                 added = self.engine.reports_new_problem(content, context)
@@ -453,7 +455,7 @@ class TriageDialogueService(DialogueService):
         conversation.escalation_card = card.model_dump(mode="json")
         conversation.escalation_summary = card.ai_summary
         playbook = self.engine.kb.get(conversation.playbook_id)
-        message = message or f"Обращение передано специалисту ({card.recommended_team}) вместе с собранным контекстом."
+        message = message or f"Обращение передано {voice.to_whom(card.recommended_team)} вместе с собранным контекстом."
         if playbook.safety_notice and playbook.safety_notice not in message:
             message = f"{playbook.safety_notice} {message}"
         conversation.answer_kind = "handoff"

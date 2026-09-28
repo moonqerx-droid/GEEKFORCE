@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Button } from "../../components/Button";
 import type { Conversation } from "../../api/types";
-import { formatMinutes } from "../../lib/labels";
+import { formatMinutes, teamForEmployee } from "../../lib/labels";
 import "./StatusPanels.css";
 
 export function VerifyingPanel({ busy, onAnswer }: { busy: boolean; onAnswer: (text: string) => void }) {
@@ -33,7 +33,7 @@ export function WaitingPanel({ conversation }: { conversation: Conversation }) {
       <span className="ribbon-pulse" aria-hidden="true" />
       <p>
         <strong id="waiting-title">Передали специалисту</strong>
-        {" "}{card?.recommended_team ? `Команда «${card.recommended_team}» уже видит карточку` : "Специалист уже видит карточку"}:
+        {" "}{teamForEmployee(card?.recommended_team)} уже видят карточку:
         пересказывать ничего не нужно, ответ придёт сюда. Можно дописать детали или приложить скриншот.
         <span className="ribbon-eta">{RESPONSE_TARGET[conversation.urgency]}</span>
       </p>

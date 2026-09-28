@@ -72,8 +72,12 @@ def clean(raw: str) -> str | None:
 
 
 def error_line(text: str) -> str | None:
-    """The line that names the failure, if the screenshot has one."""
-    for line in text.splitlines():
-        if _ERROR_HINT.search(line):
-            return line[:160]
-    return None
+    """The line that names the failure, if the screenshot has one; a line with an error
+    code («Ошибка 809: …») beats a general one («Не удалось подключиться…»)."""
+    failing = [line for line in text.splitlines() if _ERROR_HINT.search(line)]
+    coded = [line for line in failing if _ERROR_CODE.search(line)]
+    best = (coded or failing or [None])[0]
+    return best[:160] if best else None
+
+
+_ERROR_CODE = re.compile(r"\b(?:ошибк\w*|error|код|code)\W*(?:0x[0-9a-f]+|\d{2,5})\b|0x[0-9a-f]{4,}", re.IGNORECASE)

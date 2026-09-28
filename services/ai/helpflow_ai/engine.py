@@ -20,6 +20,7 @@ from .answer_policy import AnswerPolicy, AnswerRoute
 from .evidence import EvidenceValidator
 from .knowledge import KnowledgeBase
 from .llm import LLMClient, LLMError, LLMSettings
+from . import voice
 from .understanding import morph
 from .understanding.semantic import SemanticIndex, from_env as semantic_from_env
 from .retrieval import KnowledgeRetriever
@@ -697,7 +698,7 @@ class TriageEngine:
 
     @staticmethod
     def _escalate(playbook: Playbook, reason: str, facts: dict[str, str] | None = None) -> Decision:
-        text = (f"Передаю обращение специалисту ({playbook.escalation_team}). "
+        text = (f"Передаю обращение {voice.to_whom(playbook.escalation_team)}. "
                 "Всё, что мы выяснили, уже в заявке — повторять ничего не придётся.")
         if playbook.escalation_note:
             note = playbook.escalation_note.format_map(_FactsOrDash(facts or {}))

@@ -188,7 +188,7 @@ def test_natural_operator_request_escalates_from_active_dialogue(client):
 
     assert result["status"] == "ESCALATED"
     assert result["escalation_card"]["escalation_reason"] == "пользователь запросил специалиста"
-    assert "передано специалисту" in result["messages"][-1]["content"].lower()
+    assert "обращение передано" in result["messages"][-1]["content"].lower()
 
 
 def test_ai_provenance_survives_database_reload(client, db_session, monkeypatch):
