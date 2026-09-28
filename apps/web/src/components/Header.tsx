@@ -51,7 +51,7 @@ export function Header({ role, name, onLogout }: HeaderProps) {
         <img className="app-header-logo" src="/brand/helpflow-mark.svg" alt="" aria-hidden="true" />
         <span>HelpFlow</span>
       </Link>
-      <nav className="app-header-nav" aria-label="Разделы">
+      <nav className={`app-header-nav app-header-nav-${role}`} aria-label="Разделы">
         {NAV[role].map((item) => (
           <NavLink key={item.to} to={item.to} end={item.end}
             className={({ isActive }) => (isActive ? "active" : undefined)}>

@@ -70,3 +70,20 @@
   white-space: pre-wrap;
   overflow-wrap: anywhere;
 }
+
+/* A document answer is information, not a task: calmer frame, section mark instead of a number. */
+.step-card-document {
+  border-color: var(--sea);
+}
+
+.step-card-document .step-card-number {
+  background: var(--sea);
+}
+
+.step-card-note {
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-md);
+  background: var(--sand);
+  color: var(--ink-soft);
+  font-size: var(--font-size-sm);
+}

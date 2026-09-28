@@ -145,3 +145,11 @@
     white-space: nowrap;
   }
 }
+
+/* Wide screens show the employee's requests in the side rail, which already offers
+   both links; repeating them in the header only added noise. */
+@media (min-width: 901px) {
+  .app-header-nav-employee {
+    visibility: hidden;
+  }
+}

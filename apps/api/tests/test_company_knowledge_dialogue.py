@@ -148,3 +148,33 @@ def test_general_metadata_is_stored_on_the_assistant_message(client):
     assert assistant["citations"] == []
     reloaded = client.get(f"/api/conversations/{conversation_id}").json()
     assert reloaded["messages"][-1]["answer_kind"] == "general"
+
+
+def test_confirming_a_document_answer_closes_the_request_without_asking_again(client, admin):
+    upload_markdown(client)
+    conversation_id, result = ask(client, "Как подключиться к VPN? Клиент пишет ошибку 809.")
+    assert result["status"] == "TROUBLESHOOTING"
+
+    response = client.post(
+        f"/api/conversations/{conversation_id}/step-result",
+        json={"outcome": "helped", "step_code": result["current_step"]["code"]},
+    )
+
+    assert response.status_code == 200, response.text
+    closed = response.json()
+    assert closed["status"] == "RESOLVED"
+    assert closed["resolved_by"] == "assistant"
+    assert "решил ваш вопрос" not in closed["messages"][-1]["content"]
+
+
+def test_rejecting_a_document_answer_still_reaches_a_specialist(client, admin):
+    upload_markdown(client)
+    conversation_id, result = ask(client, "Как подключиться к VPN? Клиент пишет ошибку 809.")
+
+    response = client.post(
+        f"/api/conversations/{conversation_id}/step-result",
+        json={"outcome": "not_helped", "step_code": result["current_step"]["code"]},
+    )
+
+    assert response.status_code == 200, response.text
+    assert response.json()["status"] == "ESCALATED"

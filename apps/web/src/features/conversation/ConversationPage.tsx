@@ -127,7 +127,8 @@ export function ConversationPage({ onActivity }: { onActivity?: (conversation: C
 
             {c?.status === "TROUBLESHOOTING" && c.current_step ? (
               <StepCard step={c.current_step} number={c.completed_steps.length + 1} busy={conv.sending} onResult={conv.sendStepResult}
-                sources={c.answer_kind === "document" ? c.citations ?? [] : []} />
+                sources={c.answer_kind === "document" ? c.citations ?? [] : []}
+                kind={c.answer_kind === "document" || c.answer_kind === "general" ? c.answer_kind : "playbook"} />
             ) : null}
 
             {c?.status === "VERIFYING" ? (

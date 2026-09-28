@@ -276,6 +276,16 @@ class TriageDialogueService(DialogueService):
                 position=len(conversation.steps),
             ))
             conversation.verification_failed = False
+            if conversation.answer_kind == "document" and parsed == StepOutcome.HELPED:
+                # «Да, это ответ» on a company-document answer already is the confirmation;
+                # asking «решило ли это вопрос?» again would only make the employee click twice.
+                conversation.current_step_code = None
+                conversation.current_step_instruction = None
+                conversation.status = "RESOLVED"
+                conversation.resolved_at = utc_now()
+                conversation.resolved_by = "assistant"
+                self._message(conversation, "assistant", "Отлично, ответ нашёлся. Обращение закрыто — если появится новый вопрос, просто напишите.")
+                return self._commit(conversation)
             self._advance(conversation)
             return self._commit(conversation)
         except Exception:
