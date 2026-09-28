@@ -184,7 +184,6 @@ export function KnowledgePage() {
                 <th scope="col">Формат</th>
                 <th scope="col">Размер</th>
                 <th scope="col">Статус</th>
-                <th scope="col">Версия</th>
                 <th scope="col">Загружен</th>
               </tr>
             </thead>
@@ -203,7 +202,6 @@ export function KnowledgePage() {
                     <span className={`kb-status kb-status-${item.status}`}>{STATUS_LABEL[item.status]}</span>
                     {item.status === "failed" && item.error_message ? <span className="kb-reason">{item.error_message}</span> : null}
                   </td>
-                  <td data-label="Версия" className="num">{item.revision}</td>
                   <td data-label="Загружен" className="kb-when">
                     {formatDateTime(item.created_at)}
                     {item.uploaded_by_name ? <span className="kb-author">{item.uploaded_by_name}</span> : null}

@@ -50,7 +50,7 @@ function pickFile(name: string, content = "Правила", type = "text/plain")
 afterEach(() => vi.restoreAllMocks());
 
 describe("KnowledgePage", () => {
-  it("lists documents with format, size, status, version and author", async () => {
+  it("lists documents with format, size, status and author", async () => {
     serveDocuments([
       makeDocument(),
       makeDocument({
@@ -67,7 +67,8 @@ describe("KnowledgePage", () => {
     expect(within(travel).getByText("DOCX")).toBeInTheDocument();
     expect(within(travel).getByText("47 КБ")).toBeInTheDocument();
     expect(within(travel).getByText("Готов")).toBeInTheDocument();
-    expect(within(travel).getByText("2")).toBeInTheDocument();
+    // revision is a lock counter, not a document version: it is not shown as "версия".
+    expect(within(table).queryByRole("columnheader", { name: "Версия" })).not.toBeInTheDocument();
     expect(within(travel).getByText(/Мария Иванова/)).toBeInTheDocument();
     expect(within(scan).getByText("Ошибка")).toBeInTheDocument();
     expect(within(scan).getByText("В документе нет текста, который можно прочитать.")).toBeInTheDocument();
