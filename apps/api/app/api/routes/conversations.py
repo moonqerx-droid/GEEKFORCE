@@ -12,6 +12,7 @@ from app.schemas.conversation import AttachmentRead, ConversationRead, MessageCr
 from app.services.attachments import MAX_BYTES, AttachmentRejected, AttachmentService
 from app.services.ai import MockAIService
 from app.services.dialogue import ConversationNotFound, DialogueConflict, DialogueService
+from app.services.company_knowledge import sync_engine_knowledge
 from app.services.triage import TriageDialogueService
 from app.api.dependencies.auth import require_employee
 from app.models.auth import User
@@ -30,7 +31,10 @@ def get_dialogue_service(request: Request, db: Annotated[Session, Depends(get_db
     conversation = repository.get(conversation_id) if conversation_id else None
     if conversation is not None and conversation.workflow_version == "legacy":
         return DialogueService(repository, MockAIService())
-    return TriageDialogueService(repository, get_triage_engine())
+    engine = get_triage_engine()
+    # Answers use the documents that are ready right now, uploaded by the support lead.
+    sync_engine_knowledge(engine, db)
+    return TriageDialogueService(repository, engine)
 
 
 DialogueDependency = Annotated[DialogueService, Depends(get_dialogue_service)]
