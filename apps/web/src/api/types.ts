@@ -17,12 +17,23 @@ export type MessageRole = "user" | "assistant" | "system" | "operator";
 
 export type StepOutcome = "helped" | "not_helped" | "cannot_perform";
 
+export interface Attachment {
+  id: string;
+  filename: string;
+  content_type: string;
+  size: number;
+  kind: "image" | "file";
+  url: string;
+  created_at: string;
+}
+
 export interface Message {
   id: number;
   role: MessageRole;
   content: string;
   created_at: string;
   author_name?: string | null;
+  attachments?: Attachment[];
 }
 
 export interface CompletedStep {
@@ -146,6 +157,7 @@ export interface Metrics {
 export interface MessageCreatePayload {
   content: string;
   expected_revision?: number;
+  attachment_ids?: string[];
 }
 
 export interface StepResultPayload {

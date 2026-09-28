@@ -3,6 +3,7 @@ import type { Message, StepOutcome } from "../../api/types";
 import { Avatar, Badge } from "../../components/primitives";
 import type { FailedMessage } from "./useConversation";
 import { OUTCOME_LABEL, OUTCOME_TONE, formatTime } from "../../lib/labels";
+import { AttachmentList } from "./AttachmentList";
 import "./MessageThread.css";
 
 /** Assistant messages that are really steps render as compact step bubbles (or not at all while the step card is open). */
@@ -24,7 +25,9 @@ export function MessageThread({
   thinkingLabel = "Помощник думает",
   steps,
   employeeName,
+  pendingFiles = [],
 }: {
+  pendingFiles?: string[];
   employeeName?: string | null;
   steps?: Map<string, StepMarker>;
   messages: Message[];
@@ -85,18 +88,22 @@ export function MessageThread({
               <div className={`bubble bubble-${message.role} ${mine ? "bubble-mine" : ""}`}>
                 {!mine && message.role === "operator" ? <span className="bubble-author">{author}</span> : null}
                 {!mine && message.role === "assistant" && viewer === "operator" ? <span className="bubble-author">Помощник</span> : null}
-                <p className="bubble-text">{message.content}</p>
+                {message.attachments?.length ? (
+                  <AttachmentList items={message.attachments} tone={mine && message.role === "operator" ? "dark" : "light"} />
+                ) : null}
+                {message.content ? <p className="bubble-text">{message.content}</p> : null}
                 <time className="bubble-time" dateTime={message.created_at}>{formatTime(message.created_at)}</time>
               </div>
             </div>
           </Fragment>
         );
       })}
-      {pendingMessage ? (
+      {pendingMessage != null && (pendingMessage || pendingFiles.length) ? (
         <>
           <div className="thread-row thread-row-mine">
             <div className={`bubble bubble-mine bubble-${viewer === "employee" ? "user" : "operator"} bubble-pending`}>
-              <p className="bubble-text">{pendingMessage}</p>
+              {pendingFiles.length ? <p className="bubble-files-pending">Загружаем: {pendingFiles.join(", ")}</p> : null}
+              {pendingMessage.trim() ? <p className="bubble-text">{pendingMessage}</p> : null}
               <span className="bubble-time">Отправляется</span>
             </div>
           </div>

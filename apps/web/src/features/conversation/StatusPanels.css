@@ -132,3 +132,51 @@
 .panel-outage .panel-title {
   color: var(--sea);
 }
+
+/* Status ribbon above the composer */
+.ribbon {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3);
+  padding: var(--space-2) var(--space-4);
+  border-radius: var(--radius-md);
+  background: var(--sea-wash);
+  color: var(--ink);
+  font-size: var(--font-size-sm);
+  line-height: 1.45;
+}
+
+.ribbon strong {
+  color: var(--sea);
+}
+
+.ribbon-outage {
+  background: var(--color-warning-bg);
+}
+
+.ribbon-outage strong {
+  color: var(--color-warning);
+}
+
+.ribbon-pulse {
+  position: relative;
+  flex: none;
+  width: 10px;
+  height: 10px;
+  margin-top: 6px;
+  border-radius: 50%;
+  background: var(--sea);
+}
+
+.ribbon-outage .ribbon-pulse {
+  background: var(--color-warning);
+}
+
+.ribbon-pulse::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background: inherit;
+  animation: pulse 1.8s ease-out infinite;
+}

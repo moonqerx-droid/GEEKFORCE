@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import type { OperatorTicket } from "../../api/types";
 import { Button } from "../../components/Button";
 import { EmptyState, Spinner } from "../../components/primitives";
@@ -25,10 +25,11 @@ export function TicketWorkspace({
   error: string | null;
   currentUserId: string;
   onAssign: () => Promise<unknown>;
-  onReply: (content: string) => Promise<unknown>;
+  onReply: (content: string, files: File[]) => Promise<unknown>;
   onResolve: (summary: string) => Promise<unknown>;
 }) {
   const [draft, setDraft] = useState("");
+  const threadRef = useRef<HTMLElement>(null);
   const [resolving, setResolving] = useState(false);
   const [summary, setSummary] = useState("");
 
@@ -50,7 +51,7 @@ export function TicketWorkspace({
   const canWrite = open && !takenByOther;
 
   return (
-    <section className="workspace" aria-label="Переписка по обращению">
+    <section className="workspace" aria-label="Переписка по обращению" ref={threadRef}>
       <header className="workspace-head">
         <div>
           <h1 className="workspace-title">{ticket.summary || ticket.original_request}</h1>
@@ -121,7 +122,9 @@ export function TicketWorkspace({
           tone="human"
           label="Ответ сотруднику"
           placeholder="Ответить сотруднику…"
-          onSend={async (content) => { await onReply(content); }}
+          allowFiles
+          dropTarget={threadRef}
+          onSend={async (content, files) => { await onReply(content, files); }}
         />
       ) : null}
     </section>

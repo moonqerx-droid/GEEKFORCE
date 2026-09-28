@@ -53,6 +53,7 @@ export function CasePassport({ conversation, audience }: {
   const facts = Object.entries(conversation.known_facts ?? {}).filter(([, value]) => value);
   const steps = [...conversation.completed_steps].sort((a, b) => a.position - b.position);
   const ticket = "original_request" in conversation ? conversation : null;
+  const files = conversation.messages.flatMap((message) => message.attachments ?? []);
   const answered = card?.questions_and_answers.filter((item) => item.answer && item.answer !== "нет ответа") ?? [];
 
   return (
@@ -143,6 +144,22 @@ export function CasePassport({ conversation, audience }: {
               </li>
             ))}
           </ol>
+        </section>
+      ) : null}
+
+      {files.length ? (
+        <section className="passport-row">
+          <h3>Файлы</h3>
+          <ul className="passport-files">
+            {files.map((file) => (
+              <li key={file.id}>
+                <a href={file.url} target="_blank" rel="noreferrer" className="passport-file">
+                  {file.kind === "image" ? <img src={file.url} alt="" loading="lazy" /> : <span className="passport-file-icon" aria-hidden="true">{file.filename.split(".").pop()?.toUpperCase()}</span>}
+                  <span>{file.filename}</span>
+                </a>
+              </li>
+            ))}
+          </ul>
         </section>
       ) : null}
 

@@ -10,6 +10,8 @@ type Phase = "idle" | "loading" | "ready" | "error";
 export interface FailedMessage {
   id: number;
   content: string;
+  /** Files already uploaded for this message: a retry reuses them instead of uploading again. */
+  attachmentIds?: string[];
 }
 
 export interface ConversationState {
@@ -19,11 +21,12 @@ export interface ConversationState {
   notice: string | null;
   sending: boolean;
   pendingMessage: string | null;
+  pendingFiles: string[];
   failedMessages: FailedMessage[];
   start: () => Promise<void>;
-  startWithMessage: (content: string) => Promise<void>;
+  startWithMessage: (content: string, files?: File[]) => Promise<void>;
   restartFresh: () => Promise<void>;
-  sendMessage: (content: string) => Promise<void>;
+  sendMessage: (content: string, files?: File[]) => Promise<void>;
   sendStepResult: (outcome: StepOutcome) => Promise<void>;
   escalateNow: () => Promise<void>;
   retryFailedMessage: (id: number) => Promise<void>;
@@ -82,6 +85,31 @@ function describeError(err: unknown): string {
   return "Произошла ошибка. Попробуйте ещё раз.";
 }
 
+class UploadFailed extends Error {}
+
+function describeUpload(err: unknown, file: File): string {
+  if (err instanceof ApiError) {
+    const detail = typeof err.detail === "string" ? err.detail : null;
+    if (err.status === 413) return `${file.name}: файл больше 10 МБ`;
+    if (detail) return `${file.name}: ${detail}`;
+  }
+  if (err instanceof NetworkError) return "Не удаётся загрузить файл: нет связи с сервером. Текст и файлы сохранены.";
+  return `${file.name}: не удалось загрузить. Попробуйте ещё раз.`;
+}
+
+/** Upload one by one so a refusal names the exact file; the message is sent only after all succeed. */
+async function uploadAll(conversationId: string, files: File[]): Promise<string[]> {
+  const ids: string[] = [];
+  for (const file of files) {
+    try {
+      ids.push((await api.uploadAttachment(conversationId, file)).id);
+    } catch (err) {
+      throw new UploadFailed(describeUpload(err, file));
+    }
+  }
+  return ids;
+}
+
 export function useConversation(): ConversationState {
   const [phase, setPhase] = useState<Phase>("idle");
   const [conversation, setConversation] = useState<Conversation | null>(null);
@@ -89,14 +117,15 @@ export function useConversation(): ConversationState {
   const [notice, setNotice] = useState<string | null>(null);
   const [sending, setSending] = useState(false);
   const [pendingMessage, setPendingMessage] = useState<string | null>(null);
+  const [pendingFiles, setPendingFiles] = useState<string[]>([]);
   const [failedMessages, setFailedMessages] = useState<FailedMessage[]>([]);
   const abortRef = useRef<AbortController | null>(null);
   const mutationRef = useRef(false);
   const createdRef = useRef<Conversation | null>(null);
   const failedMessageIdRef = useRef(0);
 
-  const enqueueFailedMessage = useCallback((content: string) => {
-    const failed = { id: ++failedMessageIdRef.current, content };
+  const enqueueFailedMessage = useCallback((content: string, attachmentIds: string[] = []) => {
+    const failed = { id: ++failedMessageIdRef.current, content, attachmentIds };
     setFailedMessages((current) => [...current, failed]);
   }, []);
 
@@ -145,18 +174,21 @@ export function useConversation(): ConversationState {
     }
   }, []);
 
-  const startWithMessage = useCallback(async (content: string) => {
+  const startWithMessage = useCallback(async (content: string, files: File[] = []) => {
     if (mutationRef.current) return;
     mutationRef.current = true;
     setSending(true);
     setPendingMessage(content);
+    setPendingFiles(files.map((file) => file.name));
     setError(null);
     try {
       const created = createdRef.current ?? await api.createConversation();
       createdRef.current = created;
       storeId(created.id);
+      const attachmentIds = await uploadAll(created.id, files);
       const updated = await api.sendMessage(created.id, {
         content, expected_revision: created.revision,
+        ...(attachmentIds.length ? { attachment_ids: attachmentIds } : {}),
       });
       setConversation(updated);
       createdRef.current = null;
@@ -170,11 +202,14 @@ export function useConversation(): ConversationState {
           createdRef.current = null;
         }
       }
-      setError(describeError(err));
+      setError(err instanceof UploadFailed ? err.message : describeError(err));
+      // The composer keeps the text and files only when the send is reported as failed.
+      throw err;
     } finally {
       mutationRef.current = false;
       setSending(false);
       setPendingMessage(null);
+      setPendingFiles([]);
     }
   }, []);
 
@@ -225,21 +260,28 @@ export function useConversation(): ConversationState {
   }, []);
 
   const sendMessage = useCallback(
-    async (content: string) => {
+    async (content: string, files: File[] = [], reuseIds: string[] = []) => {
       if (!conversation || mutationRef.current) return;
       mutationRef.current = true;
       setSending(true);
       setPendingMessage(content);
+      setPendingFiles(files.map((file) => file.name));
       setError(null);
       const knownMessageIds = new Set(conversation.messages.map((message) => message.id));
+      let attachmentIds = reuseIds;
       try {
+        attachmentIds = [...reuseIds, ...await uploadAll(conversation.id, files)];
         const updated = await api.sendMessage(conversation.id, {
           content,
           expected_revision: conversation.revision,
+          ...(attachmentIds.length ? { attachment_ids: attachmentIds } : {}),
         });
         setConversation(updated);
       } catch (err) {
-        if (err instanceof ConflictError) {
+        if (err instanceof UploadFailed) {
+          // Nothing was sent: the composer keeps the text and the files for another try.
+          setError(err.message);
+        } else if (err instanceof ConflictError) {
           const fresh = await reloadAfterConflict(conversation.id);
           const alreadyCommitted = fresh?.messages.some(
             (message) =>
@@ -247,16 +289,17 @@ export function useConversation(): ConversationState {
               && message.content === content
               && !knownMessageIds.has(message.id),
           );
-          if (!alreadyCommitted) enqueueFailedMessage(content);
+          if (!alreadyCommitted) enqueueFailedMessage(content, attachmentIds);
         } else {
           setError(describeError(err));
-          enqueueFailedMessage(content);
+          enqueueFailedMessage(content, attachmentIds);
         }
         throw err;
       } finally {
         mutationRef.current = false;
         setSending(false);
         setPendingMessage(null);
+        setPendingFiles([]);
       }
     },
     [conversation, enqueueFailedMessage, reloadAfterConflict],
@@ -267,8 +310,7 @@ export function useConversation(): ConversationState {
     const failed = failedMessages.find((message) => message.id === id);
     if (!failed) return;
     setFailedMessages((current) => current.filter((message) => message.id !== id));
-    const content = failed.content;
-    await sendMessage(content).catch(() => undefined);
+    await sendMessage(failed.content, [], failed.attachmentIds ?? []).catch(() => undefined);
   }, [conversation, failedMessages, sendMessage]);
 
   const sendStepResult = useCallback(
@@ -360,6 +402,7 @@ export function useConversation(): ConversationState {
     notice,
     sending,
     pendingMessage,
+    pendingFiles,
     failedMessages,
     start,
     startWithMessage,

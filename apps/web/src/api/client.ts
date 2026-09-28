@@ -1,5 +1,6 @@
 import { ApiError, ConflictError, NetworkError, NotFoundError, ValidationError } from "./errors";
 import type {
+  Attachment,
   Conversation,
   Incident,
   IncidentBroadcastResult,
@@ -81,6 +82,24 @@ async function request<T>(
   }
 }
 
+/** Multipart upload: the browser sets the boundary, so no JSON content type here. */
+async function upload<T>(path: string, file: File): Promise<T> {
+  const body = new FormData();
+  body.append("file", file);
+  const response = await fetch(`${BASE_URL}${path}`, { method: "POST", body, credentials: "include" })
+    .catch((cause) => { throw new NetworkError("network_error", cause); });
+  const text = await response.text();
+  const parsed = text ? safeJsonParse(text) : undefined;
+  if (!response.ok) {
+    const detail = parsed && typeof parsed === "object" && "detail" in parsed ? parsed.detail : parsed;
+    if (response.status === 409) throw new ConflictError(detail);
+    if (response.status === 422) throw new ValidationError(detail);
+    if (response.status === 404) throw new NotFoundError(detail);
+    throw new ApiError(response.status, `http_${response.status}`, detail);
+  }
+  return parsed as T;
+}
+
 function safeJsonParse(text: string): unknown {
   try {
     return JSON.parse(text);
@@ -141,6 +160,14 @@ export const api = {
     );
   },
 
+  uploadAttachment(conversationId: string, file: File): Promise<Attachment> {
+    return upload(`/api/conversations/${conversationId}/attachments`, file);
+  },
+
+  uploadTicketAttachment(conversationId: string, file: File): Promise<Attachment> {
+    return upload(`/api/operator/tickets/${conversationId}/attachments`, file);
+  },
+
   rateConversation(id: string, rating: number, comment?: string): Promise<Conversation> {
     return request(`/api/conversations/${id}/rating`, {
       method: "POST", body: JSON.stringify({ rating, comment }),
@@ -159,9 +186,9 @@ export const api = {
     return request(`/api/operator/tickets/${id}/assign`, { method: "POST" });
   },
 
-  replyToTicket(id: string, content: string): Promise<OperatorTicket> {
+  replyToTicket(id: string, content: string, attachment_ids: string[] = []): Promise<OperatorTicket> {
     return request(`/api/operator/tickets/${id}/messages`, {
-      method: "POST", body: JSON.stringify({ content }),
+      method: "POST", body: JSON.stringify(attachment_ids.length ? { content, attachment_ids } : { content }),
     });
   },
 

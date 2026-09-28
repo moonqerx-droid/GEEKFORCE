@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { api } from "../../api/client";
-import { ConflictError } from "../../api/errors";
+import { ApiError, ConflictError } from "../../api/errors";
 import type { OperatorTicket, TicketScope } from "../../api/types";
 
 export const QUEUE_POLL_MS = 5000;
@@ -72,9 +72,10 @@ export function useTicket(id: string | null, onChanged: () => void) {
       setLoaded(await action());
       onChanged();
     } catch (err) {
+      const refused = err instanceof ApiError && (err.status === 413 || err.status === 415) && typeof err.detail === "string";
       setFailure({ id, message: err instanceof ConflictError
         ? "Обращение уже взял другой специалист или оно закрыто. Обновили карточку."
-        : "Не получилось выполнить действие. Попробуйте ещё раз." });
+        : refused ? `Файл не прикреплён: ${err.detail as string}` : "Не получилось выполнить действие. Попробуйте ещё раз." });
       if (id) api.getTicket(id).then(setLoaded).catch(() => undefined);
       throw err;
     } finally {
@@ -88,7 +89,12 @@ export function useTicket(id: string | null, onChanged: () => void) {
     busy,
     error,
     assign: () => (id ? run(() => api.assignTicket(id)) : Promise.resolve()),
-    reply: (content: string) => (id ? run(() => api.replyToTicket(id, content)) : Promise.resolve()),
+    reply: (content: string, files: File[] = []) => (id ? run(async () => {
+      // Upload first; a refused file stops the reply so nothing half-sent reaches the employee.
+      const ids: string[] = [];
+      for (const file of files) ids.push((await api.uploadTicketAttachment(id, file)).id);
+      return api.replyToTicket(id, content, ids);
+    }) : Promise.resolve()),
     resolve: (summary: string) => (id ? run(() => api.resolveTicket(id, summary)) : Promise.resolve()),
   };
 }

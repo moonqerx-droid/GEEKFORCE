@@ -1,5 +1,3 @@
-import { useState, type FormEvent, type KeyboardEvent } from "react";
-import { Button } from "../../components/Button";
 import "./WelcomeScreen.css";
 
 const EXAMPLES = [
@@ -9,75 +7,36 @@ const EXAMPLES = [
   "Нужен доступ к папке отдела на общем диске",
 ];
 
-export function WelcomeScreen({
-  busy,
-  onSubmit,
-  firstName,
-}: {
-  busy: boolean;
-  onSubmit: (content: string) => Promise<void>;
-  firstName?: string;
-}) {
-  const [value, setValue] = useState("");
+const PROMISES = [
+  ["Своими словами", "Названия систем и категории знать не нужно."],
+  ["Только нужные вопросы", "Если ответ уже есть в тексте, переспрашивать не будем."],
+  ["Без пересказа", "Если понадобится человек, он получит всю историю сразу."],
+] as const;
 
-  const submit = async (event?: FormEvent) => {
-    event?.preventDefault();
-    const trimmed = value.trim();
-    if (!trimmed || busy) return;
-    await onSubmit(trimmed);
-  };
-
-  const onKeyDown = (event: KeyboardEvent<HTMLTextAreaElement>) => {
-    if (event.key === "Enter" && !event.shiftKey && !event.nativeEvent.isComposing) {
-      event.preventDefault();
-      void submit();
-    }
-  };
-
+/** The empty chat: what to write and why it is safe to write it plainly. The composer sits below. */
+export function WelcomeScreen({ firstName, onExample }: { firstName?: string; onExample: (text: string) => void }) {
   return (
     <section className="welcome" aria-labelledby="welcome-title">
       <p className="welcome-greeting">{firstName ? `${firstName}, привет!` : "Привет!"}</p>
       <h1 id="welcome-title" className="welcome-title">Что случилось?</h1>
       <p className="welcome-lead">
-        Расскажите своими словами, как коллеге. Названия систем и категории знать не нужно — разберёмся вместе.
+        Расскажите, как коллеге, и приложите скриншот ошибки, если он есть. Дальше разберёмся вместе, по шагам.
       </p>
-
-      <form className="welcome-form" onSubmit={submit}>
-        <label htmlFor="welcome-input" className="visually-hidden">Опишите проблему</label>
-        <textarea
-          id="welcome-input"
-          className="welcome-input"
-          value={value}
-          onChange={(event) => setValue(event.target.value)}
-          onKeyDown={onKeyDown}
-          placeholder="Например: не открывается почта, пишет «нет подключения»…"
-          rows={4}
-          maxLength={4000}
-          autoFocus
-        />
-        <div className="welcome-form-bar">
-          <span className="welcome-form-hint">Enter — отправить, Shift+Enter — новая строка</span>
-          <Button type="submit" variant="primary" busy={busy} disabled={!value.trim()}>
-            Отправить
-          </Button>
-        </div>
-      </form>
-
+      <ul className="welcome-promises">
+        {PROMISES.map(([title, text]) => (
+          <li key={title}><strong>{title}</strong><span>{text}</span></li>
+        ))}
+      </ul>
       <div className="welcome-examples">
-        <p className="welcome-examples-title">Или начните с похожей ситуации</p>
+        <p className="welcome-examples-title">Похожие ситуации, чтобы начать</p>
         <div className="welcome-chips">
           {EXAMPLES.map((example) => (
-            <button key={example} type="button" className="welcome-chip" onClick={() => setValue(example)}>
+            <button key={example} type="button" className="welcome-chip" onClick={() => onExample(example)}>
               {example}
             </button>
           ))}
         </div>
       </div>
-
-      <p className="welcome-promise">
-        Если сами не справимся, обращение уйдёт специалисту вместе со всем, что вы уже рассказали.
-        Повторять ничего не придётся.
-      </p>
     </section>
   );
 }

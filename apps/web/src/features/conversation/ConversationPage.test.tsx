@@ -142,7 +142,7 @@ describe("ConversationPage status gating", () => {
     expect(screen.getByLabelText("Опишите проблему")).toHaveValue("Не работает VPN");
     await user.click(screen.getByRole("button", { name: "Отправить" }));
     expect(await screen.findByText("Какая ошибка?")).toBeInTheDocument();
-    expect(screen.getByText("Не работает VPN")).toBeInTheDocument();
+    expect(within(screen.getByRole("log", { name: "Ход диалога" })).getByText("Не работает VPN")).toBeInTheDocument();
     expect(creates).toBe(1);
     expect(sends).toBe(2);
   });

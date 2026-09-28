@@ -17,19 +17,17 @@ export function VerifyingPanel({ busy, onAnswer }: { busy: boolean; onAnswer: (t
   );
 }
 
+/** Pinned above the composer while people own the request: one line, not a second copy of the chat. */
 export function WaitingPanel({ conversation }: { conversation: Conversation }) {
   const card = conversation.escalation_card as { recommended_team?: string } | null;
   return (
-    <section className="panel panel-waiting" role="status" aria-labelledby="waiting-title">
-      <span className="panel-pulse" aria-hidden="true" />
-      <div>
-        <h2 id="waiting-title" className="panel-title">Передали специалисту</h2>
-        <p className="panel-text">
-          {card?.recommended_team ? `Команда «${card.recommended_team}» ` : "Специалист "}
-          уже видит карточку обращения. Пересказывать ничего не нужно — ответ появится здесь же.
-          Пока ждёте, можно дописать детали.
-        </p>
-      </div>
+    <section className="ribbon ribbon-waiting" role="status" aria-labelledby="waiting-title">
+      <span className="ribbon-pulse" aria-hidden="true" />
+      <p>
+        <strong id="waiting-title">Передали специалисту</strong>
+        {" "}{card?.recommended_team ? `Команда «${card.recommended_team}» уже видит карточку` : "Специалист уже видит карточку"}:
+        пересказывать ничего не нужно, ответ придёт сюда. Можно дописать детали или приложить скриншот.
+      </p>
     </section>
   );
 }
@@ -37,15 +35,13 @@ export function WaitingPanel({ conversation }: { conversation: Conversation }) {
 /** The request matched a known outage: nothing to check on the employee's side. */
 export function OutagePanel({ conversation }: { conversation: Conversation }) {
   return (
-    <section className="panel panel-outage" role="status" aria-labelledby="outage-title">
-      <span className="panel-pulse" aria-hidden="true" />
-      <div>
-        <h2 id="outage-title" className="panel-title">Похоже, это общий сбой</h2>
-        <p className="panel-text">
-          {conversation.service ?? "Сервис"} не работает у нескольких коллег, специалисты уже чинят.
-          Ничего проверять у себя не нужно: новости придут сюда, в этот чат.
-        </p>
-      </div>
+    <section className="ribbon ribbon-outage" role="status" aria-labelledby="outage-title">
+      <span className="ribbon-pulse" aria-hidden="true" />
+      <p>
+        <strong id="outage-title">Похоже, это общий сбой</strong>
+        {" "}{conversation.service ?? "Сервис"} не работает у нескольких коллег, специалисты уже чинят.
+        Ничего проверять у себя не нужно: новости придут сюда, в этот чат.
+      </p>
     </section>
   );
 }

@@ -1,41 +1,200 @@
 .composer {
-  position: sticky;
-  /* Clear of the window edge and an auto-hidden Dock. */
-  bottom: var(--space-5);
-  display: flex;
-  align-items: flex-end;
+  display: grid;
   gap: var(--space-2);
-  padding: 6px 6px 6px var(--space-4);
+  padding: var(--space-2);
   border: 1.5px solid var(--color-border);
-  border-radius: 24px;
+  border-radius: 20px;
   background: var(--color-surface);
-  box-shadow: var(--shadow-lift);
-  transition: border-color 160ms ease;
+  box-shadow: var(--shadow-md);
+  transition: border-color 160ms ease, box-shadow 160ms ease;
 }
 
 .composer:focus-within {
   border-color: var(--coral);
+  box-shadow: var(--shadow-lift);
 }
 
 .composer-human:focus-within {
   border-color: var(--sea);
 }
 
+.composer-row {
+  display: flex;
+  align-items: flex-end;
+  gap: var(--space-2);
+}
+
 .composer-textarea {
   flex: 1;
-  min-height: 44px;
-  max-height: 180px;
-  padding: 10px 0;
+  min-height: 42px;
+  padding: 10px 4px;
   border: 0;
   background: transparent;
   line-height: 1.45;
   resize: none;
 }
 
+.composer-large .composer-textarea {
+  min-height: 88px;
+  font-size: var(--font-size-md);
+}
+
 .composer-textarea:focus-visible {
   box-shadow: none;
 }
 
-.composer .btn {
-  min-height: 42px;
+.composer-file-input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  opacity: 0;
+}
+
+.composer-attach,
+.composer-send {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 42px;
+  height: 42px;
+  border: 0;
+  border-radius: 14px;
+}
+
+.composer-attach {
+  color: var(--ink-soft);
+  background: var(--paper);
+  cursor: pointer;
+}
+
+.composer-attach:hover {
+  color: var(--ink);
+  background: var(--paper-deep);
+}
+
+/* The real control is the visually hidden input; show its focus on the paperclip. */
+.composer-file-input:focus-visible + .composer-attach {
+  box-shadow: var(--focus-ring);
+}
+
+.composer-send {
+  color: #fff;
+  background: var(--coral);
+}
+
+.composer-send:hover:not(:disabled) {
+  background: var(--coral-deep);
+}
+
+.composer-send-human {
+  background: var(--sea);
+}
+
+.composer-send-human:hover:not(:disabled) {
+  background: #173946;
+}
+
+.composer-send:disabled {
+  background: var(--sand);
+  color: var(--ink-faint);
+}
+
+.composer-send[aria-busy="true"] {
+  cursor: progress;
+}
+
+.composer-files {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin: 0;
+  padding: 2px 2px 0;
+  list-style: none;
+}
+
+.composer-file {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  max-width: 240px;
+  padding: 4px 4px 4px 4px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--paper);
+}
+
+.composer-file-thumb,
+.composer-file-icon {
+  flex: none;
+  width: 44px;
+  height: 44px;
+  border-radius: var(--radius-sm);
+  object-fit: cover;
+}
+
+.composer-file-icon {
+  display: grid;
+  place-items: center;
+  background: var(--sea-wash);
+  color: var(--sea);
+}
+
+.composer-file-text {
+  display: grid;
+  min-width: 0;
+  line-height: 1.25;
+}
+
+.composer-file-name {
+  overflow: hidden;
+  font-size: var(--font-size-xs);
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.composer-file-size {
+  color: var(--ink-faint);
+  font-size: 11px;
+}
+
+.composer-file-remove {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  border: 0;
+  border-radius: 50%;
+  background: none;
+  color: var(--ink-soft);
+}
+
+.composer-file-remove:hover {
+  background: var(--paper-deep);
+  color: var(--ink);
+}
+
+.composer-problems {
+  padding: var(--space-2) var(--space-3);
+  border-left: 3px solid var(--color-danger);
+  border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+  background: var(--color-danger-bg);
+  color: var(--color-danger);
+  font-size: var(--font-size-xs);
+}
+
+.composer-hint {
+  padding: 0 var(--space-2) 2px;
+  color: var(--ink-faint);
+  font-size: 11.5px;
+}
+
+@media (max-width: 640px) {
+  .composer-hint {
+    display: none;
+  }
 }

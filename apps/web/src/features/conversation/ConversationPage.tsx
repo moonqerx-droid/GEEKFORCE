@@ -1,9 +1,10 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { PanelRight, UserRoundCheck } from "lucide-react";
+import type { Conversation } from "../../api/types";
 import { Spinner, ErrorState, Badge } from "../../components/primitives";
-import { Button } from "../../components/Button";
 import { CasePassport } from "../../components/CasePassport";
 import { DebugPanel } from "../../components/DebugPanel";
-import { STATUS_LABEL, STATUS_TONE } from "../../lib/labels";
+import { STATUS_LABEL, STATUS_TONE, formatDateTime } from "../../lib/labels";
 import { useAuth } from "../auth/AuthProvider";
 import { useConversation } from "./useConversation";
 import { WelcomeScreen } from "./WelcomeScreen";
@@ -22,147 +23,158 @@ const COMPOSER_PLACEHOLDER: Record<string, string> = {
   IN_PROGRESS: "Написать специалисту…",
 };
 
-export function ConversationPage() {
+function titleOf(conversation: Conversation): string {
+  return conversation.summary
+    ?? conversation.messages.find((message) => message.role === "user" && message.content)?.content
+    ?? "Новое обращение";
+}
+
+export function ConversationPage({ onActivity }: { onActivity?: (conversation: Conversation | null) => void }) {
   const conv = useConversation();
   const { user } = useAuth();
   const [draft, setDraft] = useState("");
+  const [cardOpen, setCardOpen] = useState(false);
+  const chatRef = useRef<HTMLElement>(null);
+  const scrollRef = useRef<HTMLDivElement>(null);
   const steps = useMemo(() => stepMarkers(conv.conversation), [conv.conversation]);
   const messageCount = conv.conversation?.messages.length ?? 0;
   const status = conv.conversation?.status;
+  const revision = conv.conversation?.revision;
 
-  // Keep the newest thing — message, step card or status panel — in view.
+  // Keep the newest thing — message, step card or status panel — in view inside the chat.
   useEffect(() => {
-    if (!messageCount) return;
-    window.requestAnimationFrame(() => {
-      window.scrollTo?.({ top: document.body.scrollHeight, behavior: "smooth" });
-    });
-  }, [messageCount, status]);
+    const node = scrollRef.current;
+    if (!node || (!messageCount && !conv.pendingMessage)) return;
+    window.requestAnimationFrame(() => node.scrollTo?.({ top: node.scrollHeight, behavior: "smooth" }));
+  }, [messageCount, status, conv.pendingMessage]);
+
+  // Let the list of requests on the left follow what happens here.
+  useEffect(() => {
+    onActivity?.(conv.conversation);
+    // Only the identity/progress of the conversation matters for the list.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [conv.conversation?.id, revision, messageCount]);
 
   if (conv.phase === "loading") {
-    return (
-      <div className="conv-page conv-page-center">
-        <Spinner label="Загружаем обращение…" />
-      </div>
-    );
+    return <div className="chat-page chat-page-center"><Spinner label="Загружаем обращение…" /></div>;
   }
 
   if (conv.phase === "error" && !conv.conversation) {
     return (
-      <div className="conv-page conv-page-center">
-        <ErrorState
-          title="Не удалось загрузить обращение"
-          description={conv.error ?? undefined}
-          onRetry={() => window.location.reload()}
-        />
-      </div>
-    );
-  }
-
-  if (!conv.conversation) {
-    return (
-      <div className="conv-page">
-        <div className="conv-main">
-          {conv.pendingMessage ? (
-            <div className="conv-chat">
-              <MessageThread messages={[]} pendingMessage={conv.pendingMessage} thinkingLabel="Помощник разбирается в ситуации" />
-            </div>
-          ) : null}
-          {/* Stays mounted while sending so a failed first message keeps its text. */}
-          <div hidden={Boolean(conv.pendingMessage)}>
-            <WelcomeScreen busy={conv.sending} onSubmit={conv.startWithMessage} firstName={user?.first_name} />
-          </div>
-          {conv.error ? <div role="alert" className="conv-alert">{conv.error}</div> : null}
-        </div>
-        <CasePassport conversation={null} audience="employee" />
+      <div className="chat-page chat-page-center">
+        <ErrorState title="Не удалось загрузить обращение" description={conv.error ?? undefined} onRetry={() => window.location.reload()} />
       </div>
     );
   }
 
   const c = conv.conversation;
-  const live = c.status === "ESCALATED" || c.status === "IN_PROGRESS";
-  const showComposer = c.status in COMPOSER_PLACEHOLDER;
-  const canCallSpecialist = !live && c.status !== "RESOLVED";
+  const live = c?.status === "ESCALATED" || c?.status === "IN_PROGRESS";
+  const showComposer = !c || c.status in COMPOSER_PLACEHOLDER;
+  const canCallSpecialist = c && !live && c.status !== "RESOLVED" && c.messages.length > 0;
 
   return (
-    <div className="conv-page">
-      <div className="conv-main">
-        <div className="conv-bar">
-          <Badge tone={STATUS_TONE[c.status]}>{STATUS_LABEL[c.status]}</Badge>
-          <div className="conv-bar-actions">
-            {canCallSpecialist ? (
-              <Button variant="ghost" busy={conv.sending} onClick={conv.escalateNow}>
-                Позвать специалиста
-              </Button>
+    <div className={`chat-page ${cardOpen ? "chat-page-card-open" : ""}`}>
+      <section className="chat" ref={chatRef} aria-label="Обращение">
+        {c ? (
+          <header className="chat-head">
+            <div className="chat-head-text">
+              <h1 className="chat-title">{titleOf(c)}</h1>
+              <p className="chat-meta">
+                <Badge tone={STATUS_TONE[c.status]}>{STATUS_LABEL[c.status]}</Badge>
+                <span>с {formatDateTime(c.created_at)}</span>
+                {c.assignee_name ? <span className="chat-meta-person">ведёт {c.assignee_name}</span> : null}
+              </p>
+            </div>
+            <div className="chat-head-actions">
+              {canCallSpecialist ? (
+                <button type="button" className="chat-action" disabled={conv.sending} onClick={conv.escalateNow}>
+                  <UserRoundCheck size={17} aria-hidden="true" />
+                  <span>Позвать специалиста</span>
+                </button>
+              ) : null}
+              <button type="button" className="chat-action chat-card-toggle" onClick={() => setCardOpen(true)}>
+                <PanelRight size={17} aria-hidden="true" />
+                <span>Карточка</span>
+              </button>
+            </div>
+          </header>
+        ) : null}
+
+        <div className="chat-scroll" ref={scrollRef}>
+          <div className="chat-column">
+            {conv.notice ? (
+              <div className="chat-notice" role="alert">
+                {conv.notice}
+                <button type="button" onClick={conv.dismissNotice} aria-label="Скрыть уведомление">×</button>
+              </div>
             ) : null}
-            {c.status !== "RESOLVED" ? (
-              <Button variant="ghost" disabled={conv.sending} onClick={conv.restartFresh}>
-                Новое обращение
-              </Button>
+
+            {!c && conv.pendingMessage == null ? (
+              <WelcomeScreen firstName={user?.first_name} onExample={setDraft} />
+            ) : null}
+
+            {c || conv.pendingMessage != null ? (
+              <MessageThread
+                messages={c?.messages ?? []}
+                pendingMessage={conv.pendingMessage}
+                pendingFiles={conv.pendingFiles}
+                failedMessages={conv.failedMessages}
+                onRetryFailed={(id) => void conv.retryFailedMessage(id)}
+                thinkingLabel={live ? "Отправляем специалисту" : c ? "Помощник думает" : "Помощник разбирается в ситуации"}
+                steps={steps}
+              />
+            ) : null}
+
+            {c?.status === "TROUBLESHOOTING" && c.current_step ? (
+              <StepCard step={c.current_step} number={c.completed_steps.length + 1} busy={conv.sending} onResult={conv.sendStepResult} />
+            ) : null}
+
+            {c?.status === "VERIFYING" ? (
+              <VerifyingPanel busy={conv.sending} onAnswer={(text) => void conv.sendMessage(text).catch(() => undefined)} />
+            ) : null}
+
+            {c?.status === "RESOLVED" ? (
+              <ResolvedPanel conversation={c} onRate={conv.rate} onRestart={conv.restartFresh} />
             ) : null}
           </div>
         </div>
 
-        {conv.notice ? (
-          <div className="conv-notice" role="alert">
-            {conv.notice}
-            <button type="button" onClick={conv.dismissNotice} aria-label="Скрыть уведомление">×</button>
+        <footer className="chat-foot">
+          <div className="chat-column">
+            {conv.error ? <div className="chat-alert" role="alert">{conv.error}</div> : null}
+            {c && live && c.incident_id ? <OutagePanel conversation={c} /> : null}
+            {c?.status === "ESCALATED" && !c.incident_id ? <WaitingPanel conversation={c} /> : null}
+            {showComposer ? (
+              <Composer
+                busy={conv.sending}
+                value={draft}
+                onValueChange={setDraft}
+                tone={live ? "human" : "assistant"}
+                label={c ? "Ваше сообщение" : "Опишите проблему"}
+                size={c ? "regular" : "large"}
+                placeholder={c ? COMPOSER_PLACEHOLDER[c.status] : "Например: не открывается почта, пишет «нет подключения»…"}
+                allowFiles
+                dropTarget={chatRef}
+                autoFocus={!c}
+                onSend={(text, files) => (c ? conv.sendMessage(text, files) : conv.startWithMessage(text, files))}
+              />
+            ) : null}
+            {!showComposer && draft ? (
+              <div className="chat-draft" role="status">
+                <strong>Черновик сохранён</strong>
+                <p>{draft}</p>
+              </div>
+            ) : null}
           </div>
-        ) : null}
-        {conv.error ? <div className="conv-alert" role="alert">{conv.error}</div> : null}
+        </footer>
+        <div className="chat-drop-hint" aria-hidden="true">Отпустите, чтобы прикрепить</div>
+      </section>
 
-        <div className="conv-chat">
-          <MessageThread
-            messages={c.messages}
-            pendingMessage={conv.pendingMessage}
-            failedMessages={conv.failedMessages}
-            onRetryFailed={(id) => void conv.retryFailedMessage(id)}
-            thinkingLabel={live ? "Отправляем специалисту" : "Помощник думает"}
-            steps={steps}
-          />
-
-          {c.status === "TROUBLESHOOTING" && c.current_step ? (
-            <StepCard
-              step={c.current_step}
-              number={c.completed_steps.length + 1}
-              busy={conv.sending}
-              onResult={conv.sendStepResult}
-            />
-          ) : null}
-
-          {c.status === "VERIFYING" ? (
-            <VerifyingPanel busy={conv.sending} onAnswer={(text) => void conv.sendMessage(text).catch(() => undefined)} />
-          ) : null}
-
-          {live && c.incident_id ? <OutagePanel conversation={c} /> : null}
-          {c.status === "ESCALATED" && !c.incident_id ? <WaitingPanel conversation={c} /> : null}
-
-          {c.status === "RESOLVED" ? (
-            <ResolvedPanel conversation={c} onRate={conv.rate} onRestart={conv.restartFresh} />
-          ) : null}
-        </div>
-
-        {showComposer ? (
-          <Composer
-            busy={conv.sending}
-            value={draft}
-            onValueChange={setDraft}
-            tone={live ? "human" : "assistant"}
-            placeholder={COMPOSER_PLACEHOLDER[c.status]}
-            onSend={conv.sendMessage}
-          />
-        ) : null}
-
-        {!showComposer && draft ? (
-          <div className="conv-draft" role="status">
-            <strong>Черновик сохранён</strong>
-            <p>{draft}</p>
-          </div>
-        ) : null}
-      </div>
-
-      <div className="conv-side">
+      {cardOpen ? <button type="button" className="chat-scrim" aria-label="Скрыть карточку" onClick={() => setCardOpen(false)} /> : null}
+      <div className={`chat-side ${cardOpen ? "chat-side-open" : ""}`}>
+        <button type="button" className="chat-side-close" onClick={() => setCardOpen(false)}>Скрыть карточку</button>
         <CasePassport conversation={c} audience="employee" />
-        <DebugPanel conversation={c} />
+        {c ? <DebugPanel conversation={c} /> : null}
       </div>
     </div>
   );

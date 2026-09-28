@@ -1,0 +1,127 @@
+.rail {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  border-right: 1px solid var(--color-border);
+  background: var(--paper);
+}
+
+.rail-new {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  margin: var(--space-4) var(--space-4) var(--space-3);
+  min-height: 42px;
+  border-radius: var(--radius-pill);
+  background: var(--coral);
+  color: #fff;
+  font-weight: 650;
+  text-decoration: none;
+}
+
+.rail-new:hover {
+  background: var(--coral-deep);
+}
+
+.rail-scroll {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 0 var(--space-3) var(--space-4);
+}
+
+.rail-group {
+  margin: var(--space-3) var(--space-2) var(--space-2);
+  color: var(--ink-faint);
+  font-size: var(--font-size-xs);
+  font-weight: 600;
+}
+
+.rail-note {
+  padding: var(--space-3) var(--space-2);
+  color: var(--ink-soft);
+  font-size: var(--font-size-sm);
+}
+
+.rail-list {
+  display: grid;
+  gap: 2px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.rail-item {
+  display: grid;
+  gap: 3px;
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-md);
+  color: inherit;
+  text-decoration: none;
+}
+
+.rail-item:hover {
+  background: var(--paper-deep);
+}
+
+.rail-item[aria-current="page"] {
+  background: var(--color-surface);
+  box-shadow: var(--shadow-sm), inset 3px 0 0 var(--coral);
+}
+
+.rail-item-top {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11.5px;
+}
+
+.rail-dot {
+  flex: none;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--coral);
+}
+
+.rail-item-waiting .rail-dot { background: var(--color-warning); }
+.rail-item-human .rail-dot { background: var(--sea); }
+.rail-item-done .rail-dot { background: var(--color-success); }
+
+.rail-status {
+  color: var(--ink-soft);
+  font-weight: 600;
+}
+
+.rail-item-human .rail-status { color: var(--sea); }
+.rail-item-waiting .rail-status { color: var(--color-warning); }
+
+.rail-time {
+  margin-left: auto;
+  color: var(--ink-faint);
+  font-variant-numeric: tabular-nums;
+}
+
+.rail-title {
+  display: -webkit-box;
+  overflow: hidden;
+  font-size: var(--font-size-sm);
+  font-weight: 650;
+  line-height: 1.3;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+}
+
+.rail-item-done .rail-title {
+  color: var(--ink-soft);
+  font-weight: 600;
+}
+
+.rail-last {
+  overflow: hidden;
+  color: var(--ink-faint);
+  font-size: var(--font-size-xs);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
