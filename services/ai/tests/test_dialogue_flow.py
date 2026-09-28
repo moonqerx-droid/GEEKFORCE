@@ -177,6 +177,7 @@ def test_unknown_issue_switches_to_the_area_the_employee_picks(simulate):
     ("1с тормозит", "Медленно работает 1С"),
     ("эксель долго открывает файлы", "Медленно работает Excel"),
     ("компьютер очень медленно работает", "Медленно работает компьютер"),
+    ("браузер жутко тормозит", "Медленно работает браузер"),
 ])
 def test_slowness_is_titled_by_what_is_slow(engine, message, title):
     analysis = engine.analyze(message)

@@ -998,7 +998,9 @@ def _summary(playbook: Playbook, service: str, symptoms: list[str], text: str = 
     elif playbook.id == "slow_performance":
         # «Медленно работает 1С» says it all; the symptom would only repeat it.
         whole = "весь компьютер" in symptoms
-        return f"Медленно работает {service}" if service != playbook.service else (
+        # «Медленно работает браузер», but «1С», «Excel» keep their spelling.
+        name = service if service.isascii() or any(ch.isupper() for ch in service[1:]) else service.lower()
+        return f"Медленно работает {name}" if service != playbook.service else (
             "Медленно работает компьютер" if whole else playbook.title)
     elif playbook.id == "unknown" and service != playbook.service:
         title = f"Проблема: {service} (готового сценария нет)"
