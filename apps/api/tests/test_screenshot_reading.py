@@ -66,3 +66,15 @@ def test_best_error_line_is_picked_from_noisy_text():
 def test_a_line_with_an_error_code_is_preferred():
     text = "Подключение VPN\nНе удалось подключиться к удалённому серверу.\nОшибка 809: сетевое подключение прервано."
     assert ocr.error_line(text) == "Ошибка 809: сетевое подключение прервано."
+
+
+def test_sympathy_comes_first_and_the_quote_has_one_full_stop(client, people, screen):
+    screen["text"] = "Microsoft Outlook\nНет подключения к Microsoft Exchange."
+    conversation_id = new_conversation(client)
+    attachment = upload(client, conversation_id).json()
+
+    reply = send(client, conversation_id, "да вы задолбали, опять почта не работает!!!",
+                 [attachment["id"]])["messages"][-1]["content"]
+
+    assert reply.startswith("Понимаю")
+    assert "«Нет подключения к Microsoft Exchange»." in reply

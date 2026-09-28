@@ -392,7 +392,7 @@ class TriageDialogueService(DialogueService):
         self._screenshot_facts = {self.SCREENSHOT_FACT: seen}
         if line:
             self._screenshot_facts["error_text"] = line
-            self._screenshot_intro = f"На скриншоте вижу: «{line}»."
+            self._screenshot_intro = f"На скриншоте вижу: «{line.rstrip('. ')}»."
         else:
             self._screenshot_intro = "Скриншот прочитан."
         self._merge_screenshot_facts(conversation)
@@ -409,7 +409,7 @@ class TriageDialogueService(DialogueService):
         self._merge_screenshot_facts(conversation)
         seen_intro = getattr(self, "_screenshot_intro", "")
         if seen_intro:
-            intro = f"{seen_intro} {intro}".strip()
+            intro = f"{intro} {seen_intro}".strip()  # sympathy first, then what was read
             self._screenshot_intro = ""
         decision = self.engine.decide(self._context(conversation))
         conversation.rag_source_ids = list(decision.source_ids)

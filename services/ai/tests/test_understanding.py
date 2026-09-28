@@ -57,3 +57,12 @@ def test_request_with_typos_is_classified_like_the_clean_one(kb):
 ])
 def test_other_device_works_is_found_with_a_word_in_between(text, expected):
     assert rules.extract_facts(text).get("other_device_works") == expected
+
+
+@pytest.mark.parametrize("text, expected", [
+    ("работаю удалённо", "remote"),
+    ("сижу дома", "remote"),
+    ("не удалось подключиться к удалённому серверу", None),
+])
+def test_remote_work_is_not_read_from_a_remote_server(text, expected):
+    assert rules.extract_facts(text).get("location") == expected
