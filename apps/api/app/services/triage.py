@@ -196,8 +196,10 @@ class TriageDialogueService(DialogueService):
                 conversation.playbook_id = analysis.recommended_playbook
                 match = None
                 try:
-                    with self.repository.session.begin_nested():
-                        match = self.incident_service.match_first_turn(conversation.id)
+                    # A question («раз в сколько дней меняем пароль?») is not a report of an outage.
+                    if not self.engine.answer_policy.is_information_question(content):
+                        with self.repository.session.begin_nested():
+                            match = self.incident_service.match_first_turn(conversation.id)
                 except Exception as error:
                     logger.exception(
                         "incident.detection_failed conversation_id=%s error=%s",

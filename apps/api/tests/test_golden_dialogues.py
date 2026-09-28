@@ -18,3 +18,5 @@ def test_golden_dialogues_meet_the_quality_bar():
     assert table["понимание"]["playbook"] >= 0.85, failures
     assert table["всего"]["clean"] >= 0.87, failures
     assert table["всего"]["questions"] <= 1.5, failures
+    # Questions to the knowledge base: the sentence that answers, or an honest «нет ответа».
+    assert table["вопросы"]["clean"] >= 0.9, failures

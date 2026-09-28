@@ -20,7 +20,7 @@ from .answer_policy import AnswerPolicy, AnswerRoute
 from .evidence import EvidenceValidator
 from .knowledge import KnowledgeBase
 from .llm import LLMClient, LLMError, LLMSettings
-from . import voice
+from . import answering, voice
 from .understanding import morph
 from .understanding.semantic import SemanticIndex, from_env as semantic_from_env
 from .retrieval import KnowledgeRetriever
@@ -207,6 +207,56 @@ class TriageEngine:
 
     def decide(self, context: ConversationContext) -> Decision:
         """Choose the flow with rules, then optionally improve only its wording."""
+        decision = self._decide_flow(context)
+        query = context.original_request or _first_user_message(context)
+        if (
+            not context.asked_facts and not context.completed_steps
+            and context.playbook_id not in _PROTECTED_PLAYBOOKS
+            and decision.answer_kind not in (AnswerKind.DOCUMENT, AnswerKind.GENERAL)
+            and self.answer_policy.is_information_question(query)
+            and (
+                decision.action == DecisionAction.ESCALATE
+                # Asking about an error makes no sense for a question — unless the scenario can
+                # still answer it with its steps («как подключиться к VPN?»).
+                or (decision.action == DecisionAction.ASK and (
+                    context.playbook_id in (None, "unknown") or self.answer_policy.requires_verified_source(query)
+                ))
+            )
+        ):
+            # A question with no source: say so plainly instead of troubleshooting it.
+            playbook = self.kb.get(context.playbook_id)
+            return self._escalate(playbook, "нет подтверждённого источника для ответа на вопрос").model_copy(update={
+                "playbook_id": playbook.id,
+                "message": ("В документах компании ответа на этот вопрос нет, а гадать я не буду. "
+                            f"Передаю вопрос {voice.to_whom(playbook.escalation_team)} — ответ придёт сюда."),
+            })
+        return decision
+
+    def _best_document(self, query: str) -> tuple[KnowledgeChunk, str] | None:
+        """The company fragment whose sentences answer the question best, with those sentences."""
+        best = None
+        with self._knowledge_lock:
+            candidates = self._company_chunks
+        # Company documents are few and short: read every fragment instead of trusting a
+        # keyword search to shortlist them («суточных» must still find «Суточные»).
+        for chunk in candidates:
+            # Only the safe excerpt: a line that tries to instruct the assistant is never quoted.
+            found = answering.focus(query, _safe_company_excerpt(chunk.text), chunk.title)
+            if found is not None and (best is None or found.coverage > best[1].coverage):
+                best = (chunk, found)
+        if best is None:
+            return None
+        chunk, found = best
+        text = found.text
+        if re.search(r"ошибк|что\s+(?:значит|означает)|что\s+делать", query, re.IGNORECASE):
+            # «Что значит ошибка 809?»: the explanation and the sentence after it — what to do.
+            parts = answering.sentences(_safe_company_excerpt(chunk.text))
+            chosen = [index for index, part in enumerate(parts) if part in text]
+            if chosen and chosen[-1] + 1 < len(parts):
+                text = f"{text} {parts[chosen[-1] + 1]}"
+        return chunk, text
+
+    def _decide_flow(self, context: ConversationContext) -> Decision:
         query = context.original_request or _first_user_message(context)
         if context.playbook_id not in _PROTECTED_PLAYBOOKS:
             matches = self.retriever.search(query, context.playbook_id)
@@ -214,13 +264,19 @@ class TriageEngine:
                 (match.chunk for match in matches if match.chunk.id.startswith("document:")),
                 None,
             )
-            if company is None and not context.completed_steps and self.answer_policy.asks_about_rules(query):
-                # A question about the rules, not a complaint: company documents count even
-                # when the words also fit a scenario («какие требования к паролю?»).
-                company = next(
-                    (match.chunk for match in self.retriever.search(query, None, documents_only=True)),
-                    None,
-                )
+            focused = None
+            last_step = context.completed_steps[-1].step_id if context.completed_steps else ""
+            asking = self.answer_policy.is_information_question(query) or self.answer_policy.asks_about_rules(query)
+            if asking and (not context.completed_steps or last_step.startswith("knowledge.document:")):
+                # A question, not a complaint: company documents count even when the words
+                # also fit a scenario («какие требования к паролю?»), and only the sentences
+                # that answer it are said.
+                best = self._best_document(query)
+                if best is not None:
+                    company, focused = best
+            elif company is not None:
+                found = answering.focus(query, _safe_company_excerpt(company.text), company.title)
+                focused = found.text if found else None
             if company is not None:
                 last = context.completed_steps[-1] if context.completed_steps else None
                 if last is not None and last.step_id == f"knowledge.{company.id}":
@@ -242,7 +298,7 @@ class TriageEngine:
                         playbook,
                         "ответ по корпоративному документу не решил вопрос",
                     ).model_copy(update={"playbook_id": playbook.id})
-                decision = _company_knowledge_decision(company)
+                decision = _company_knowledge_decision(company, focused)
                 if (
                     self.llm is not None
                     and self.llm.supports_response_rendering
@@ -865,7 +921,7 @@ def _general_guidance_decision(query: str) -> Decision:
     )
 
 
-def _company_knowledge_decision(chunk: KnowledgeChunk) -> Decision:
+def _company_knowledge_decision(chunk: KnowledgeChunk, focused: str | None = None) -> Decision:
     quote = _safe_company_excerpt(chunk.text)
     if not quote:
         return Decision(
@@ -883,6 +939,8 @@ def _company_knowledge_decision(chunk: KnowledgeChunk) -> Decision:
     first, _, rest = instruction.partition("\n")
     if rest.strip() and len(first.split()) <= 5 and not re.search(r"[.!?:;]$", first.strip()):
         instruction = rest.strip()
+    if focused:
+        instruction = focused  # just the sentences that answer the question
     step = Step(
         id=f"knowledge.{chunk.id}",
         title=f"По документу «{chunk.title}»",
@@ -973,6 +1031,19 @@ def _general_how_to_decision(topic: str) -> Decision:
             "general.how_to.zip_folder",
             "Нажмите папку правой кнопкой и выберите встроенное действие «Сжать» или «Отправить» → "
             "«Сжатая ZIP-папка». Не помещайте в архив пароли и секреты; исходная папка сохранится.",
+        ),
+        "screenshot": (
+            "general.how_to.screenshot",
+            "Windows: нажмите Win + Shift + S и выделите область — снимок попадёт в буфер обмена, "
+            "его можно сразу вставить в чат через Ctrl + V. macOS: Cmd + Shift + 4 и выделите "
+            "область — файл появится на рабочем столе. Скриншот ошибки можно прикрепить прямо к обращению.",
+        ),
+        "second_monitor": (
+            "general.how_to.second_monitor",
+            "Подключите монитор кабелем (HDMI или DisplayPort) и включите его. В Windows нажмите "
+            "Win + P и выберите «Расширить»; порядок экранов — в «Параметры» → «Система» → «Дисплей». "
+            "В macOS: «Системные настройки» → «Мониторы». Если монитор не определяется, проверьте "
+            "кабель и выбранный вход на самом мониторе.",
         ),
         "shared_calendar": (
             "general.how_to.shared_calendar",

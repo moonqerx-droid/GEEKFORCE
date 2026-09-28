@@ -210,7 +210,7 @@
   tags: [диалог]
 
 - id: vpn-cannot-do-step
-  say: ["не подключается vpn, пишет ошибка 809", "да", "@cannot"]
+  say: ["не подключается vpn, пишет ошибка 720", "да", "@cannot"]
   playbook: vpn_connection
   tags: [диалог]
 
@@ -824,3 +824,158 @@
   end: step
   expect_text: ["помогло"]
   tags: [диалог]
+
+# --- вопросы: ответ по документу — точный, без лишнего; без источника — честно ---
+
+- id: q-per-diem-abroad
+  say: ["Сколько суточных за границей?"]
+  end: answer
+  expect_text: ["2500"]
+  forbid_text: ["Авансовый"]
+  tags: [вопросы]
+
+- id: q-per-diem-russia
+  say: ["суточные по россии сколько"]
+  end: answer
+  expect_text: ["700"]
+  tags: [вопросы]
+
+- id: q-approve-when
+  say: ["За сколько дней надо согласовать командировку?"]
+  end: answer
+  expect_text: ["пять рабочих дней"]
+  tags: [вопросы]
+
+- id: q-approve-who
+  say: ["Кто согласует командировку?"]
+  end: answer
+  expect_text: ["руководитель подразделения"]
+  tags: [вопросы]
+
+- id: q-advance-report
+  say: ["Когда сдавать авансовый отчёт?"]
+  end: answer
+  expect_text: ["трёх рабочих дней"]
+  forbid_text: ["Суточные"]
+  tags: [вопросы]
+
+- id: q-vpn-client
+  say: ["Какой VPN-клиент использовать из дома?"]
+  end: answer
+  expect_text: ["Континент"]
+  tags: [вопросы]
+
+- id: q-password-period
+  say: ["Как часто менять пароль?"]
+  end: answer
+  expect_text: ["90 дней"]
+  forbid_text: ["SMS"]
+  tags: [вопросы]
+
+- id: q-password-length
+  say: ["Сколько символов должно быть в пароле?"]
+  end: answer
+  expect_text: ["10 символов"]
+  forbid_text: ["SMS"]
+  tags: [вопросы]
+
+- id: q-password-reset
+  say: ["Как сбросить забытый пароль?"]
+  expect_text: ["портал"]
+  forbid_text: ["Что именно пишет система"]
+  tags: [вопросы]
+
+- id: q-autoreply
+  say: ["Как настроить автоответ в outlook?"]
+  end: general
+  tags: [вопросы]
+
+- id: q-screenshot
+  say: ["Как сделать скриншот экрана?"]
+  end: general
+  expect_text: ["Shift"]
+  tags: [вопросы]
+
+- id: q-second-monitor
+  say: ["Как подключить второй монитор?"]
+  end: general
+  expect_text: ["Win + P"]
+  tags: [вопросы]
+
+- id: q-vacation
+  say: ["Сколько дней отпуска мне положено?"]
+  end: escalated
+  expect_text: ["в документах компании"]
+  tags: [вопросы]
+
+- id: q-2ndfl
+  say: ["Где взять справку 2-НДФЛ?"]
+  end: escalated
+  expect_text: ["в документах компании"]
+  tags: [вопросы]
+
+- id: q-guest-wifi
+  say: ["Какой пароль от гостевого wifi?"]
+  end: escalated
+  forbid_text: ["Что именно пишет система", "Правила паролей"]
+  tags: [вопросы]
+
+- id: q-why-vpn-is-a-complaint
+  say: ["Почему не подключается VPN?"]
+  playbook: vpn_connection
+  forbid_end: answer
+  tags: [вопросы]
+
+- id: q-what-to-do-printer-is-a-complaint
+  say: ["Что делать, если принтер не печатает?"]
+  playbook: printer
+  end: step
+  tags: [вопросы]
+
+# --- контрольные вопросы: написаны до изменений, под них не подгонять ---
+
+- id: qh-abroad
+  say: ["а суточные за рубежом какие?"]
+  end: answer
+  expect_text: ["2500"]
+  tags: [вопросы, контроль-вопросы]
+
+- id: qh-report-deadline
+  say: ["до какого срока отчитаться по командировке"]
+  end: answer
+  expect_text: ["трёх рабочих дней"]
+  tags: [вопросы, контроль-вопросы]
+
+- id: qh-vpn-client
+  say: ["каким клиентом подключаться к впн"]
+  end: answer
+  expect_text: ["Континент"]
+  tags: [вопросы, контроль-вопросы]
+
+- id: qh-min-length
+  say: ["минимальная длина пароля?"]
+  end: answer
+  expect_text: ["10 символов"]
+  tags: [вопросы, контроль-вопросы]
+
+- id: qh-period
+  say: ["раз в сколько дней пароль меняем"]
+  end: answer
+  expect_text: ["90 дней"]
+  tags: [вопросы, контроль-вопросы]
+
+- id: qh-who-approves
+  say: ["кто одобряет поездку в командировку"]
+  end: answer
+  expect_text: ["руководитель"]
+  tags: [вопросы, контроль-вопросы]
+
+- id: qh-mobile-compensation
+  say: ["положена ли мне компенсация за мобильную связь?"]
+  end: escalated
+  tags: [вопросы, контроль-вопросы]
+
+- id: qh-screenshot-slang
+  say: ["как заскринить экран"]
+  end: general
+  tags: [вопросы, контроль-вопросы]

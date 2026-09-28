@@ -27,6 +27,7 @@ from app.services.triage import TriageDialogueService
 from helpflow_ai import KnowledgeBase, TriageEngine
 
 GOLDEN = Path(__file__).resolve().parents[1] / "tests" / "golden" / "dialogues.yaml"
+DOCUMENTS = GOLDEN.with_name("documents.yaml")
 PROGRESS = {"TROUBLESHOOTING", "VERIFYING", "RESOLVED", "ESCALATED", "IN_PROGRESS"}
 BUTTONS = {"@helped": "helped", "@not_helped": "not_helped", "@cannot": "cannot_perform"}
 VAGUE_TITLE = "Проблема требует уточнения"
@@ -52,6 +53,8 @@ class Result:
 
 
 def _expected_end(status: str, answer_kind: str | None) -> str:
+    if status == "TROUBLESHOOTING" and answer_kind == "general":
+        return "general"
     if status == "RESOLVED":
         return "resolved"
     if status in {"ESCALATED", "IN_PROGRESS"}:
@@ -114,7 +117,8 @@ def play(service: TriageDialogueService, case: dict) -> Result:
     for phrase in case.get("forbid_text", []):
         if phrase.lower() in said:
             problems.append(f"помощник сказал лишнее: «{phrase}»")
-    last_turn = transcript[transcript.index(f"  → {case['say'][-1]}"):] if transcript else []
+    marker = f"  → {case['say'][-1]}"
+    last_turn = transcript[len(transcript) - transcript[::-1].index(marker) - 1:] if marker in transcript else []
     for phrase in case.get("expect_text", []):
         if not any(phrase.lower() in line.lower() for line in last_turn[1:]):
             problems.append(f"в ответ на последнюю реплику нет «{phrase}»")
@@ -141,6 +145,8 @@ def run(path: Path = GOLDEN, engine: TriageEngine | None = None) -> list[Result]
     results = []
     with Session(db, expire_on_commit=False) as session:
         service = TriageDialogueService(ConversationRepository(session), engine)
+        if DOCUMENTS.exists():  # company documents the golden questions are answered from
+            engine.set_company_fragments(yaml.safe_load(DOCUMENTS.read_text(encoding="utf-8")))
         for case in cases:
             results.append(play(service, case))
     return results

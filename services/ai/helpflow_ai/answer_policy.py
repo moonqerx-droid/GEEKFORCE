@@ -50,6 +50,8 @@ _GENERAL_HOW_TO_TOPICS: tuple[tuple[str, re.Pattern[str]], ...] = (
     ("wallpaper", re.compile(r"(?:обои|фон)\s+(?:рабоч\w*\s+)?стол|сменить\s+обои", re.IGNORECASE)),
     ("zip_folder", re.compile(r"(?:архив|заархив|zip|сжат).*папк|папк.*(?:архив|zip|сжат)", re.IGNORECASE)),
     ("shared_calendar", re.compile(r"(?:общ|совместн)\w*\s+календар|календар.*(?:общ|совместн)", re.IGNORECASE)),
+    ("screenshot", re.compile(r"скрин|снимок\s+экрана|screenshot", re.IGNORECASE)),
+    ("second_monitor", re.compile(r"(?:втор|дополнительн|внешн)\w*\s+(?:монитор|экран|дисплей)|проектор", re.IGNORECASE)),
 )
 _HARD_HOW_TO_BLOCK = re.compile(
     r"зарплат|преми|финанс|юрид|персональн\w* данн|безопасност|антивирус|"
@@ -65,6 +67,20 @@ _RULES_QUESTION = re.compile(
     r"(?:какие|каковы|какое|какой)\s+(?:требовани\w*|правил\w*|срок\w*|норм\w*|лимит\w*)|"
     r"(?:как\s+часто|сколько\s+(?:символов|дней|раз|рублей)|можно\s+ли|нужно\s+ли|положено\s+ли)",
     re.IGNORECASE,
+)
+
+
+_QUESTION_WORDS = re.compile(
+    r"^(?:а\s+|и\s+)?(?:как|что|какой|какая|какие|каким|какое|каков\w*|сколько|когда|кто|где|куда|"
+    r"откуда|зачем|можно ли|нужно ли|надо ли|положен\w*|разрешен\w*|минимальн\w*|максимальн\w*|"
+    r"до какого|за сколько|раз в сколько)(?![-\w])|(?<![-\w])(?:сколько|какой|какие|когда|кто|где|можно ли|нужно ли)(?![-\w])"
+)
+_MEANING_QUESTION = re.compile(r"что\s+(?:значит|означает)|что\s+это\s+за\s+ошибк")
+# Failure words: a question built around them is a complaint («почему не работает…»).
+_COMPLAINT = re.compile(
+    r"\bне\s+(?:работа|подключ|открыва|печата|запуска|грузит|загружа|приход|отправля|пуска|"
+    r"вид|слыш|могу|получа|включа|заход|синхрониз)|ошибк|сломал|завис|тормоз|вылета|пропал|"
+    r"отвал|глюч|лаг|что\s+делать|почему|не\s+так|помогите"
 )
 
 
@@ -88,6 +104,17 @@ class AnswerPolicy:
         return AnswerRoute.OPERATOR
 
     @staticmethod
+    def is_information_question(query: str) -> bool:
+        """«Сколько суточных за границей?», «Какой VPN-клиент ставить?» — a question to answer,
+        not a problem to troubleshoot. «Почему не подключается VPN?» is a complaint."""
+        text = query.strip().lower().replace("ё", "е")
+        if _MEANING_QUESTION.search(text):
+            return True  # «что значит ошибка 809?» asks for an explanation
+        if not (text.endswith("?") or _QUESTION_WORDS.search(text)):
+            return False
+        return not _COMPLAINT.search(text)
+
+    @staticmethod
     def asks_about_rules(query: str) -> bool:
         """«Какие требования к паролю?», «что сказано в регламенте…» — a question about
         company rules, answered from documents, not a complaint to troubleshoot."""
@@ -95,7 +122,8 @@ class AnswerPolicy:
 
     def procedural_route(self, query: str, playbook_id: str | None) -> AnswerRoute | None:
         """Classify explicit how-to requests before incident diagnostics start."""
-        if not _HOW_TO.search(query):
+        known_topic = self.general_how_to_topic(query) and self.is_information_question(query)
+        if not (_HOW_TO.search(query) or known_topic):
             return None
         topic = self.general_how_to_topic(query)
         if _ACCESS_CONTROL.search(query) or _DESTRUCTIVE.search(query) or _HARD_HOW_TO_BLOCK.search(query):
