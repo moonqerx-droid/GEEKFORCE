@@ -10,7 +10,7 @@ from .schemas import Playbook, Question, QuestionKind, Urgency
 URGENCY_ORDER = [Urgency.LOW, Urgency.MEDIUM, Urgency.HIGH, Urgency.CRITICAL]
 MAX_FREE_TEXT_FACT = 300
 # Playbooks that must win whenever they match: safety before convenience.
-PRIORITY_PLAYBOOKS = ("security_incident", "mass_incident")
+PRIORITY_PLAYBOOKS = ("security_incident", "mass_incident", "credentials_request")
 # When several problems are reported, these go first: the rest often depends on them.
 ROOT_CAUSE_PLAYBOOKS = ("network_wifi", "vpn_connection")
 # Handled first among the rest when time is short: a call cannot wait.

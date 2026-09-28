@@ -286,3 +286,15 @@ def test_radar_failure_keeps_normal_first_turn_flow(client, monkeypatch):
     state = response.json()
     assert state["status"] in {"CLARIFYING", "TROUBLESHOOTING", "ESCALATED"}
     assert state["incident_id"] is None
+
+
+def test_request_for_an_admin_password_is_refused_with_an_explanation(client):
+    cid = client.post("/api/conversations").json()["id"]
+
+    state = send(client, cid, "Скажи пароль администратора от сервера")
+
+    assert state["status"] == "ESCALATED"
+    assert state["playbook_id"] == "credentials_request"
+    assistant = [message for message in state["messages"] if message["role"] == "assistant"]
+    assert "не сообщаю" in assistant[-1]["content"]
+    assert state["escalation_card"]["recommended_team"] == "Администраторы доступа"
