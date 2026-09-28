@@ -114,7 +114,7 @@ def test_unsolvable_problem_escalates_with_full_context(simulate, engine):
     assert card.questions_and_answers and card.questions_and_answers[0]["answer"]
     assert card.recommended_team
     assert card.current_result.startswith(f"Проблема не решена после {steps}")
-    assert "Выполнено" in card.ai_summary and card.source == "rules"
+    assert "Пробовали" in card.ai_summary and card.source == "rules"
 
 
 def test_urgent_request_has_shorter_path(simulate):

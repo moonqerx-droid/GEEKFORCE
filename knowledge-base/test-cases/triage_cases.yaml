@@ -139,10 +139,10 @@ cases:
       questions_before_step: 0
 
   - name: устройство без сценария — сразу специалисту
-    message: Мышка перестала работать
+    message: Проектор в переговорке не включается
     expect:
       playbook: unknown
-      service: Мышь
-      facts: {service_name: Мышь}
+      service: Проектор
+      facts: {service_name: Проектор}
       questions_before_step: 0
       action_after_questions: escalate

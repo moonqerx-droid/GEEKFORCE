@@ -48,6 +48,23 @@ GENERAL_LEMMAS = """
 сообщить срок работа рабочий доступный недоступный сервер база клиент сделка отчёт бухгалтерия
 """.split()
 
+# IT slang and chat shorthand -> the plain word the playbooks use (from the codex/nlu branch).
+SLANG: dict[str, str] = {
+    "конектится": "подключается", "коннектится": "подключается",
+    "конектиться": "подключаться", "коннектиться": "подключаться",
+    "конектит": "подключает", "коннектит": "подключает",
+    "инет": "интернет", "инета": "интернета", "инете": "интернете", "инетом": "интернетом",
+    "залочена": "заблокирована", "залочен": "заблокирован", "залочили": "заблокировали",
+    "залочило": "заблокировало", "залочилась": "заблокировалась",
+    "мобила": "телефон", "мобилы": "телефона", "мобиле": "телефоне", "мобилу": "телефон",
+    "винда": "windows", "винду": "windows", "винды": "windows", "винде": "windows", "виндовс": "windows",
+    "залогиниться": "войти", "залогинится": "войти",
+    "форти": "forticlient", "фортиклиент": "forticlient",
+    "тимсе": "teams", "тимсы": "teams",
+    "учетка": "учетная запись", "учетку": "учетную запись", "учетки": "учетной записи",
+    "учетке": "учетной записи", "учеткой": "учетной записью",
+}
+
 _morph = None
 _by_letter: dict[str, list[str]] = {}
 _vocabulary: frozenset[str] = frozenset()
@@ -102,11 +119,12 @@ def vocabulary_from(playbooks: Iterable) -> frozenset[str]:
     """Every form of every word the playbooks use, plus everyday complaint words."""
     words: set[str] = set()
     for playbook in playbooks:
-        texts = [playbook.title, *playbook.keywords, *getattr(playbook, "examples", [])]
+        texts = [playbook.title, *playbook.keywords]
         texts += [hint for hints in playbook.symptoms_hints.values() for hint in hints]
         texts += [q.text for q in playbook.questions] + [s.title + " " + s.instruction for s in playbook.steps]
         for text in texts:
             words.update(_WORD_RE.findall(text.lower().replace("ё", "е")))
+        words.update(_example_words(playbook))
     words.update(GENERAL_LEMMAS)
     return _expand(frozenset(words))
 
@@ -120,9 +138,16 @@ def _expand(words: frozenset[str]) -> frozenset[str]:
 def base_words_from(playbooks: Iterable) -> frozenset[str]:
     words: set[str] = set(GENERAL_LEMMAS)
     for playbook in playbooks:
-        for text in [playbook.title, *playbook.keywords, *getattr(playbook, "examples", [])]:
+        for text in [playbook.title, *playbook.keywords]:
             words.update(_WORD_RE.findall(text.lower().replace("ё", "е")))
+        words.update(_example_words(playbook))
     return frozenset(words)
+
+
+def _example_words(playbook) -> set[str]:
+    """Examples are written with typos and slang on purpose: only dictionary words count."""
+    return {word for text in getattr(playbook, "examples", [])
+            for word in _WORD_RE.findall(text.lower().replace("ё", "е")) if is_known(word)}
 
 
 def use_playbooks(playbooks: Iterable) -> None:
@@ -147,6 +172,8 @@ def set_vocabulary(words: Iterable[str], base: Iterable[str] = ()) -> None:
 
 @lru_cache(maxsize=16384)
 def _correct_word(word: str) -> str:
+    if word in SLANG:
+        return SLANG[word]
     if len(word) < MIN_LENGTH or word in _vocabulary or is_known(word):
         return word
     limit = 1 if len(word) <= 7 else 2
@@ -165,9 +192,9 @@ def _correct_word(word: str) -> str:
 
 
 def correct(norm_text: str) -> str:
-    """Fix typos in a normalized text; quoted error messages are kept verbatim."""
+    """Fix typos and slang in a normalized text; quoted error messages are kept verbatim."""
     if not available() or not _vocabulary:
-        return norm_text
+        return _WORD_RE.sub(lambda m: SLANG.get(m.group(0), m.group(0)), norm_text)
     parts, last = [], 0
     for quoted in _QUOTED_RE.finditer(norm_text):
         parts.append(_WORD_RE.sub(lambda m: _correct_word(m.group(0)), norm_text[last:quoted.start()]))

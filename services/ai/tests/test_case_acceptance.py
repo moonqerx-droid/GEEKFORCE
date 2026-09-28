@@ -204,6 +204,17 @@ def test_printer_jam_that_does_not_clear_goes_to_specialist(simulate, engine):
     ("не включается монитор, горит оранжевая лампочка!!", "Монитор"),
     ("клава не печатает русские буквы", "Клавиатура"),
 ])
+def test_keyboard_mouse_and_monitor_have_their_own_scenario(simulate, message, subject):
+    sim = simulate(message)
+    assert sim.analysis.recommended_playbook == "peripherals"
+    assert sim.analysis.service == subject
+    assert sim.decision.action in (DecisionAction.ASK, DecisionAction.STEP)
+
+
+@pytest.mark.parametrize("message, subject", [
+    ("проектор в переговорке не включается", "Проектор"),
+    ("сканер не сканирует, лампочка мигает", "Сканер"),
+])
 def test_named_device_without_playbook_is_handed_off_at_once(simulate, engine, message, subject):
     sim = simulate(message)
     assert sim.analysis.recommended_playbook == "unknown"
@@ -276,6 +287,12 @@ def test_problems_are_worked_through_one_by_one(simulate):
         sim.answer("никакой ошибки нет")
     assert sim.decision.action == DecisionAction.STEP
     assert sim.decision.playbook_id == "email_outlook"
+    assert sim.decision.step.id == "check_web_mail"
+
+    # Mail in the browser is a way around, not a fix: Outlook itself is repaired next.
+    sim.step_result(StepOutcome.HELPED)
+    assert sim.decision.action == DecisionAction.STEP
+    assert sim.decision.step.id == "restart_outlook"
 
     sim.step_result(StepOutcome.HELPED)
     assert sim.decision.action == DecisionAction.ASK

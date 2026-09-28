@@ -68,6 +68,43 @@ OUTCOME_LABELS = {
     StepOutcome.CANNOT_DO: "не удалось выполнить",
 }
 _PROTECTED_PLAYBOOKS = {"credentials_request", "mass_incident", "security_incident"}
+# The named thing is the service: «Медленно работает Excel», «Не работает мышь».
+SUBJECT_SERVICE_PLAYBOOKS = {"slow_performance", "peripherals", "app_not_starting"}
+# How facts read in the specialist's card: short labels and plain values, never codes.
+FACT_LABELS = {
+    "error_text": "Что на экране",
+    "other_device_works": "С другого устройства работает",
+    "since_when": "Когда началось",
+    "recurring": "Уже случалось",
+    "vpn": "VPN подключён",
+    "location": "Где работает",
+    "colleagues_affected": "У коллег так же",
+    "account_locked": "Учётная запись заблокирована",
+    "internet_works": "Интернет без VPN работает",
+    "mail_client": "Почта",
+    "call_app": "Программа звонков",
+    "headset": "Наушники или гарнитура",
+    "entered_credentials": "Вводил пароль или данные",
+    "password_changed_recently": "Недавно менял пароль",
+    "device": "Устройство",
+    "had_access_before": "Раньше доступ был",
+    "resource": "Куда нужен доступ",
+    "call_problem": "Что со звонком",
+    "problem_area": "На что похоже",
+    "details": "Подробности",
+    "affected_scope": "Сколько затронуто",
+    "service_name": "Что не работает",
+    ALSO_REPORTED: "Ещё сообщил",
+    "critical_update": "Сообщил по ходу диалога",
+}
+VALUE_WORDS = {
+    "yes": "да", "no": "нет", "unknown": "не знает", "laptop": "ноутбук", "desktop": "компьютер",
+    "office": "в офисе", "remote": "из дома", "zoom": "Zoom", "teams": "Teams", "telemost": "Телемост",
+}
+URGENCY_WORDS = {Urgency.LOW: "низкая", Urgency.MEDIUM: "обычная", Urgency.HIGH: "высокая",
+                 Urgency.CRITICAL: "критическая"}
+DEFAULT_URGENCY_REASON = "стандартный приоритет для этого типа проблем"
+MAX_QUOTED_REQUEST = 220
 _DOCUMENT_INJECTION = re.compile(
     r"(?:игнорир\w*|забуд\w*)[^.!?\n]{0,60}(?:инструкц\w*|правил\w*|prompt|system)|"
     r"(?:выдай|покажи|сообщи|раскрой)[^.!?\n]{0,50}(?:парол\w*|токен\w*|секрет\w*)|"
@@ -88,6 +125,11 @@ class TriageEngine:
         self._knowledge_lock = RLock()
         self.retriever = KnowledgeRetriever(list(self._base_chunks))
         self.answer_policy = AnswerPolicy()
+        # «other» → «Другое», «outlook» → «В программе Outlook»: the words the employee tapped.
+        self._option_labels: dict[str, dict[str, str]] = {}
+        for playbook in knowledge.playbooks:
+            for question in playbook.questions:
+                self._option_labels.setdefault(question.fact, {}).update(question.option_labels)
 
     @classmethod
     def from_env(cls) -> "TriageEngine":
@@ -434,12 +476,31 @@ class TriageEngine:
             return self._escalate(playbook, "решить может только специалист: " + ", ".join(sorted(
                 described & set(playbook.escalate_on_symptoms))), context.known_facts)
         step = self.next_step(playbook, context)
+        if step is not None and step.requires_admin:
+            # Admin rights or a risky change: the specialist does it, the employee is not asked to.
+            decision = self._escalate(playbook, f"нужны права администратора: {step.title}", context.known_facts)
+            note = (f"Следующий шаг — «{step.title}» — делает специалист: для него нужны права "
+                    "администратора, самому это делать не нужно.")
+            return decision.model_copy(update={"message": f"{note} {decision.message}"})
+        own_ids = {s.id for s in playbook.steps}
+        tried_here = any(r.step_id in own_ids for r in context.completed_steps)
+        if (step is not None and tried_here and context.urgency not in URGENT_LEVELS
+                and all(s.workaround for s in _open_steps(playbook, context))):
+            # Diagnosis is exhausted: hand off now and leave the workaround as a tip, rather
+            # than one more step for someone who already pressed «не помогло».
+            decision = self._escalate(playbook, f"выполнено шагов: {len(context.completed_steps)}, "
+                                                "проблема не решена", context.known_facts)
+            tip = f"А пока специалист разбирается, можно обойтись так. {step.instruction}"
+            return decision.model_copy(update={"message": f"{decision.message} {tip}"})
         if step is not None:
             helped = after_workaround and last.outcome == StepOutcome.HELPED
             return _step_decision(step, AFTER_WORKAROUND_INTRO if helped else "",
                                   "следующий подходящий шаг сценария")
         tried = len(context.completed_steps)
-        return self._escalate(playbook, f"выполнено шагов: {tried}, проблема не решена")
+        if not tried:
+            return self._escalate(playbook, "для этого случая нет шагов, которые сотрудник может сделать сам",
+                                  context.known_facts)
+        return self._escalate(playbook, f"выполнено шагов: {tried}, проблема не решена", context.known_facts)
 
     def _render_decision(self, decision: Decision, context: ConversationContext) -> Decision:
         playbook = self.kb.get(decision.playbook_id or context.playbook_id)
@@ -625,7 +686,7 @@ class TriageEngine:
             ai_summary="",
             issues=issues,
         )
-        ai_summary, source = self._ai_summary(card)
+        ai_summary, source = self._ai_summary(card, context, playbook)
         return card.model_copy(update={"ai_summary": ai_summary, "source": source})
 
     # --- internals ----------------------------------------------------------
@@ -677,8 +738,8 @@ class TriageEngine:
             playbook = first
             plan = [plan[0], *[i for i in plan[1:] if i.playbook_id != first.id]]
         service = rules.detect_service(text, playbook)
-        if playbook.id == "slow_performance" and service == playbook.service:
-            service = rules.detect_subject(text) or service  # «эксель тормозит» → Excel
+        if playbook.id in SUBJECT_SERVICE_PLAYBOOKS and service == playbook.service:
+            service = rules.detect_subject(text) or service  # «эксель тормозит» → Excel, «мышка» → Мышь
         symptoms = rules.detect_symptoms(text, playbook)
         stated = rules.extract_facts(text)
         subject = rules.detect_subject(text) if playbook.id == "unknown" else None
@@ -769,8 +830,9 @@ class TriageEngine:
         answers = []
         for fact in ctx.asked_facts:
             question = self._question_for_fact(ctx, fact)
+            value = ctx.known_facts.get(fact)
             answers.append({"question": question.text if question else fact,
-                            "answer": ctx.known_facts.get(fact, "нет ответа")})
+                            "answer": self._fact_value(fact, value) if value is not None else "нет ответа"})
         return answers
 
     def _step_title(self, step_id: str) -> str:
@@ -791,7 +853,42 @@ class TriageEngine:
         return (f"Проблема не решена после {len(ctx.completed_steps)} шаг(ов); "
                 f"последний шаг «{self._step_title(last.step_id)}» — {verdict}")
 
-    def _ai_summary(self, card: EscalationCard) -> tuple[str, str]:
+    def _fact_value(self, fact: str, value: str) -> str:
+        return self._option_labels.get(fact, {}).get(value) or VALUE_WORDS.get(value, value)
+
+    def _template_summary(self, card: EscalationCard, ctx: ConversationContext, playbook: Playbook) -> str:
+        """Title, the employee's words, what we learned, what was tried, why it is handed off."""
+        parts = [f"{card.summary}."]
+        request = " ".join(card.original_request.split())
+        # «Странная штука с компьютером» as the title already is the employee's words.
+        if request and not request.lower().startswith(card.summary.lower().rstrip("…")):
+            if len(request) > MAX_QUOTED_REQUEST:
+                request = request[:MAX_QUOTED_REQUEST].rsplit(" ", 1)[0] + "…"
+            parts.append(f"Сотрудник пишет: «{request}».")
+        urgency = f"Срочность: {URGENCY_WORDS[card.urgency]}"
+        if card.urgency_reason and card.urgency_reason != DEFAULT_URGENCY_REASON:
+            urgency += f" — {card.urgency_reason}"
+        parts.append(urgency + ".")
+        if card.service.lower() not in card.summary.lower() and card.service != playbook.service:
+            parts.append(f"Сервис: {card.service}.")
+        facts = [f"{FACT_LABELS[fact]} — {self._fact_value(fact, value)}"
+                 for fact, value in card.known_facts.items() if fact in FACT_LABELS and value]
+        if facts:
+            parts.append("Уточнили: " + "; ".join(facts) + ".")
+        if card.performed_steps:
+            tried = "; ".join(f"{s['step']} — {s['result']}" for s in card.performed_steps)
+            if ctx.verification_failed:
+                tried += "; при проверке сотрудник ответил, что проблема осталась"
+            parts.append(f"Пробовали: {tried}.")
+        others = card.issues[1:]
+        if others:
+            labels = {"pending": "не разбирали", "in_progress": "в работе", "resolved": "решено"}
+            parts.append("Ещё в обращении: " + "; ".join(
+                f"{i.evidence or i.title} — {labels[i.status]}" for i in others) + ".")
+        parts.append(f"Почему передано: {_plain_reason(card.escalation_reason)}.")
+        return " ".join(parts)
+
+    def _ai_summary(self, card: EscalationCard, ctx: ConversationContext, playbook: Playbook) -> tuple[str, str]:
         if self.llm is not None and self.llm.supports_summaries:
             try:
                 raw = self.llm.chat_json(prompts.SUMMARY_SYSTEM,
@@ -801,7 +898,7 @@ class TriageEngine:
                     return summary, "llm"
             except LLMError as error:
                 logger.warning("LLM summary failed, using template: %s", error)
-        return _template_summary(card), "rules"
+        return self._template_summary(card, ctx, playbook), "rules"
 
 
 ROOT_CAUSE_INTROS = {
@@ -1089,7 +1186,8 @@ def _summary(playbook: Playbook, service: str, symptoms: list[str], text: str = 
 
 def _excerpt(text: str, limit: int = 70) -> str:
     """First sentence of the request as a title: «Странная штука с компьютером»."""
-    first = re.split(r"(?<=[.!?\n])\s+", text.strip(), maxsplit=1)[0].strip(" .!?,;:")
+    # A question keeps its «?»: «Сколько дней отпуска мне положено?» is a question, not a title.
+    first = re.split(r"(?<=[.!?\n])\s+", text.strip(), maxsplit=1)[0].strip(" .!,;:")
     if len(first) > limit:
         first = first[:limit].rsplit(" ", 1)[0].rstrip(" ,;:") + "…"
     return first[:1].upper() + first[1:]
@@ -1124,18 +1222,13 @@ def _coerce_llm_analysis(raw: dict[str, Any], base: Analysis) -> Analysis:
     return Analysis.model_validate({k: v for k, v in cleaned.items() if k in allowed})
 
 
-def _template_summary(card: EscalationCard) -> str:
-    reason = f" ({card.urgency_reason})" if card.urgency_reason else ""
-    parts = [f"{card.summary}. Сервис: {card.service}. Срочность: {card.urgency.value}{reason}."]
-    if card.known_facts:
-        parts.append("Известно: " + "; ".join(f"{k}: {v}" for k, v in card.known_facts.items()) + ".")
-    if card.performed_steps:
-        parts.append("Выполнено: " + "; ".join(f"{s['step']} — {s['result']}" for s in card.performed_steps) + ".")
-    others = card.issues[1:]
-    if others:
-        labels = {"pending": "не разбирали", "in_progress": "в работе", "resolved": "решено"}
-        parts.append("Другие проблемы из обращения: " + "; ".join(
-            f"{i.evidence or i.title} — {labels[i.status]}" for i in others) + ".")
-    parts.append(f"Текущий результат: {card.current_result}.")
-    parts.append(f"Причина передачи: {card.escalation_reason}.")
-    return " ".join(parts)
+_PLAIN_REASONS = (
+    (re.compile(r"^выполнено шагов: \d+, проблема не решена$"), "шаги не помогли"),
+    (re.compile(r"^сценарий требует (?:немедленного )?участия специалиста$"), "такие обращения сразу ведёт специалист"),
+    (re.compile(r"^не найден подтверждённый сценарий в базе знаний$"), "готового сценария нет"),
+)
+
+
+def _plain_reason(reason: str) -> str:
+    """The hand-off reason for a person: «шаги не помогли», not a step counter."""
+    return next((plain for pattern, plain in _PLAIN_REASONS if pattern.match(reason)), reason)

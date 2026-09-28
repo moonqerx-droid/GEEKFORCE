@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import re
 from dataclasses import dataclass
+from functools import lru_cache
+from itertools import dropwhile, takewhile
 
 from .schemas import Playbook, Question, QuestionKind, Urgency
 from .understanding import morph
@@ -23,7 +25,7 @@ GENERIC_SERVICE_PLAYBOOKS = {
 }
 
 SERVICE_ALIASES: dict[str, list[str]] = {
-    "CRM": ["crm", "црм", "срм", "битрикс", "bitrix", "amocrm", "salesforce"],
+    "CRM": ["crm", "црм", "срм", "битрикс", "bitrix", "amocrm", "salesforce", "салесфорс"],
     "Почта": ["почт", "outlook", "аутлук", "exchange"],
     "VPN": ["vpn", "впн"],
     "1С": ["1с", "1c"],
@@ -121,7 +123,17 @@ def contains(norm_text: str, keyword: str) -> bool:
     if re.search(r"(?<!\w)" + re.escape(keyword), norm_text):
         return True
     lemma_keyword = morph.lemmatize(keyword)
-    return re.search(r"(?<!\w)" + re.escape(lemma_keyword), morph.lemmatize(norm_text)) is not None
+    if re.search(r"(?<!\w)" + re.escape(lemma_keyword), morph.lemmatize(norm_text)):
+        return True
+    return " " in keyword and _phrase_re(keyword).search(norm_text) is not None
+
+
+@lru_cache(maxsize=2048)
+def _phrase_re(keyword: str) -> re.Pattern[str]:
+    """«подозрительн письм» = «подозрительное письмо»: every longer word of a phrase is a
+    stem; short ones («к», «от», «у») stay whole words."""
+    parts = [re.escape(word) + (r"\w*" if len(word) >= 4 else r"(?!\w)") for word in keyword.split(" ")]
+    return re.compile(r"(?<!\w)" + " ".join(parts))
 
 
 def _keyword_weight(keyword: str) -> int:
@@ -129,8 +141,64 @@ def _keyword_weight(keyword: str) -> int:
     return 2 if (" " in keyword or keyword.isdigit()) else 1
 
 
+# «никто в офисе не может»: a collective subject with a few words before the verb.
+_NOBODY_CAN_RE = re.compile(r"(?<!\w)никто(?: \S+){1,3} не (?:может|могут|получается|работает)(?!\w)")
+
+
+# «программа учёта не запускается»: a program named with a word or two before the failure.
+_PROGRAM_FAILS_RE = re.compile(
+    r"(?<!\w)(?:программ|приложени|word|ворд|excel|эксель|powerpoint|пауэрпоинт|acrobat|акробат|reader)\w*"
+    r"(?: \S+){0,3} (?:не (?:запуска|открыва|устанавлива|стартует)|перестал\w* (?:запуска|открыва)|"
+    r"выда\w* ошибк|закрыва|вылета|краш)"
+)
+
+
+# «в 1с кончились лицензии»: 1С and a sign-in sign anywhere in the message.
+_ONEC_RE = re.compile(r"(?<!\w)1[сc](?!\w)")
+_ONEC_LOGIN_RE = re.compile(r"лиценз|сеанс|авториз|списк\w* баз|баз\w*(?: \S+){0,2} в списке")
+
+
 def score_playbook(norm_text: str, playbook: Playbook) -> int:
-    return sum(_keyword_weight(kw) for kw in playbook.keywords if contains(norm_text, kw))
+    score = sum(_keyword_weight(kw) for kw in playbook.keywords if contains(norm_text, kw))
+    if playbook.id == "mass_incident" and _NOBODY_CAN_RE.search(norm_text):
+        score += 2
+    if playbook.id == "app_not_starting" and _PROGRAM_FAILS_RE.search(norm_text):
+        score += 2
+    if playbook.id == "onec_login" and _ONEC_RE.search(norm_text) and _ONEC_LOGIN_RE.search(norm_text):
+        score += 2
+    if playbook.id == "slow_performance" and _SLOW_SUBJECT_RE.search(norm_text):
+        score += 2
+    if playbook.id == "security_incident" and _social_engineering(norm_text):
+        score += 3
+    if playbook.id == "vpn_connection" and _REMOTE_RE.search(norm_text) and _WORK_NETWORK_RE.search(norm_text):
+        score += 3
+    return score
+
+
+# «система лагает», «комп висит»: the computer itself is slow (a call that lags is not).
+_SLOW_SUBJECT_RE = re.compile(
+    r"(?<!\w)(?:комп|компьютер|ноут|ноутбук|систем|windows|браузер|хром|chrome)\w*(?: \S+){0,2} "
+    r"(?:лага\w*|висит|виснет|тупит)")
+
+
+# Credentials or codes handed over where something looked off: phishing without a link.
+_GIVEAWAY_RE = re.compile(
+    r"(?:вв[её]л\w*|указал\w*|продиктова\w*|назва\w*|сказал\w*|сообщил\w*)(?: \S+){0,4} "
+    r"(?:парол\w*|логин\w*|данн\w*|код\w*)")
+_SUSPICIOUS_RE = re.compile(
+    r"странн|подозрит|похож\w* на наш|выглядел\w* как|поддельн|фейк|незнаком|якобы|адрес друг|звонил|позвонил")
+_PRETEND_RE = re.compile(r"якобы (?:от|из)(?!\w)")
+
+
+def _social_engineering(norm_text: str) -> bool:
+    if _PRETEND_RE.search(norm_text):
+        return True
+    return bool(_GIVEAWAY_RE.search(norm_text) and _SUSPICIOUS_RE.search(norm_text))
+
+
+# «из дома не пускает в корпоративную сеть»: the work network from outside is VPN.
+_REMOTE_RE = re.compile(r"из дома|\bдома\b|домашн|удален\w*|из командировки|не в офисе")
+_WORK_NETWORK_RE = re.compile(r"(?:корпоративн|рабоч)\w* сет")
 
 
 @dataclass(frozen=True)
@@ -367,7 +435,28 @@ def extract_facts(text: str) -> dict[str, str]:
     resource = _RESOURCE_RE.search(text)
     if resource:
         facts["resource"] = resource.group(1).strip()[:MAX_FREE_TEXT_FACT]
+    software = _software(text)
+    if software:
+        facts["software"] = software
     return facts
+
+
+# «нужно установить visio», «поставьте мне пожалуйста microsoft project», «лицензия на офис».
+_INSTALL_RE = re.compile(
+    r"(?:установ(?:ить|ите)|постав(?:ить|ьте)|лицензи\w*\s+на)\s+((?:\S+\s*){1,4})", re.IGNORECASE)
+_NOT_A_NAME = frozenset("мне мой мою нам пожалуйста плиз программу программа приложение софт на в во для "
+                        "рабочий рабочую рабочем компьютер комп ноутбук новый новую".split())
+
+
+def _software(text: str) -> str | None:
+    """The program asked for: up to two words after the install verb, without filler."""
+    match = _INSTALL_RE.search(text)
+    if not match:
+        return None
+    words = [w.strip(",.!?;:«»\"") for w in match.group(1).split()]
+    words = list(dropwhile(lambda w: w.lower() in _NOT_A_NAME, words))
+    name = list(takewhile(lambda w: w and w.lower() not in _NOT_A_NAME, words))[:2]
+    return " ".join(name)[:MAX_FREE_TEXT_FACT] or None
 
 
 def extract_error_text(text: str) -> str | None:
