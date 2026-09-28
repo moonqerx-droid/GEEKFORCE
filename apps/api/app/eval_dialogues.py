@@ -63,6 +63,31 @@ def _expected_end(status: str, answer_kind: str | None) -> str:
     return status.lower()
 
 
+# What a specialist should never have to decode in the hand-off summary.
+_RAW_IN_SUMMARY = re.compile(
+    r"\b(?:[a-z]+_[a-z_]+|unknown|yes|no|low|medium|high|critical|other|laptop|desktop|remote|office)\b"
+)
+
+
+def card_problems(card: dict, summary: str) -> list[str]:
+    """The hand-off card must read in ten seconds: plain words, the employee's own request,
+    nothing said twice."""
+    problems = []
+    raw = sorted(set(_RAW_IN_SUMMARY.findall(summary)))
+    if raw:
+        problems.append(f"в карточке служебные слова: {', '.join(raw)}")
+    request = (card.get("original_request") or "").strip()
+    if request and request[:40].lower() not in summary.lower():
+        problems.append("в карточке нет слов сотрудника")
+    answers = [qa.get("answer", "") for qa in card.get("questions_and_answers", [])]
+    if any(_RAW_IN_SUMMARY.fullmatch(a.strip()) for a in answers):
+        problems.append("в ответах карточки служебные значения")
+    sentences = [x.strip() for x in re.split(r"(?<=[.!?])\s+", summary) if x.strip()]
+    if len(sentences) != len(set(sentences)) or "Текущий результат" in summary and "Выполнено" in summary:
+        problems.append("в карточке повторы")
+    return problems
+
+
 def play(service: TriageDialogueService, case: dict) -> Result:
     conversation = service.create_conversation()
     service.repository.session.commit()
@@ -129,6 +154,8 @@ def play(service: TriageDialogueService, case: dict) -> Result:
             problems.append(f"мусорный факт {fact} = «{value}»")
     if conversation.status in PROGRESS and conversation.summary == VAGUE_TITLE:
         problems.append("заголовок «Проблема требует уточнения»")
+    if conversation.status in {"ESCALATED", "IN_PROGRESS"}:
+        problems += card_problems(conversation.escalation_card or {}, conversation.escalation_summary or "")
     return Result(case["id"], case.get("tags", []), conversation.playbook_id or "", conversation.status,
                   questions, problems, transcript)
 

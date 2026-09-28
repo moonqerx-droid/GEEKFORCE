@@ -61,7 +61,7 @@ def test_admin_step_is_handed_to_a_specialist_not_shown():
     assert decision.action == DecisionAction.ESCALATE
     assert "Переустановите драйвер принтера" in decision.message
     assert "администратор" in decision.message
-    assert "reinstall_driver" in decision.reason
+    assert "Переустановите драйвер принтера" in decision.reason
 
 
 def test_when_only_a_workaround_is_left_the_specialist_gets_it_and_the_employee_gets_the_tip():
