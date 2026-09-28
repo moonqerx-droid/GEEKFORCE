@@ -50,6 +50,8 @@ MAX_QUESTIONS = 3
 MAX_QUESTIONS_URGENT = 1
 MAX_RENDERED_MESSAGE_LENGTH = 1200
 URGENT_LEVELS = (Urgency.HIGH, Urgency.CRITICAL)
+# Fact holding a problem the employee added mid-dialogue.
+ALSO_REPORTED = "also_reported"
 # Meaning-based matching (see TriageEngine._with_meaning); cosine similarity of bge-m3.
 SEMANTIC_MIN = 0.70
 SEMANTIC_UNKNOWN_GAP = 0.05
@@ -104,6 +106,31 @@ class TriageEngine:
         if self.llm is not None and self.llm.supports_analysis:
             analysis = self._merge_llm(analysis, message, ctx)
         return self._finalize(analysis, ctx)
+
+    @staticmethod
+    def is_root_cause(playbook_id: str) -> bool:
+        return playbook_id in rules.ROOT_CAUSE_PLAYBOOKS
+
+    def reports_new_problem(self, message: str, context: ConversationContext) -> str | None:
+        """Playbook of a different problem named instead of an answer («а ещё интернет
+        пропал»), or None when the message is an answer to the current question."""
+        if not context.playbook_id or context.playbook_id == "unknown":
+            return None
+        norm = rules.understand(message)
+        if not rules.FAILURE_RE.search(norm):
+            return None
+        current = self.kb.get(context.playbook_id)
+        used = {q.fact for q in current.questions} | {
+            fact for step in current.steps for fact in (*step.when, *step.unless)
+        }
+        if set(rules.extract_facts(message)) & used:
+            # «VPN не подключён» while solving CRM access is an answer the scenario uses.
+            return None
+        other = rules.classify(message, self.kb.playbooks).playbook_id
+        if other in ("unknown", context.playbook_id, *rules.PRIORITY_PLAYBOOKS):
+            return None
+        plan = {issue.playbook_id for issue in self._issue_plan(context)}
+        return None if other in plan else other
 
     def absorb_answer(self, message: str, context: ConversationContext) -> dict[str, str]:
         """Facts learned from a user reply. Returns only new or updated facts."""
@@ -412,6 +439,8 @@ class TriageEngine:
 
     def next_question(self, playbook: Playbook, context: ConversationContext) -> Question | None:
         limit = MAX_QUESTIONS_URGENT if context.urgency in URGENT_LEVELS else MAX_QUESTIONS
+        if "problem_area" in context.asked_facts and playbook.id != "unknown":
+            limit = min(limit, 1)  # the area question already cost the employee one turn
         own_facts = {q.fact for q in playbook.questions}
         if len([fact for fact in context.asked_facts if fact in own_facts]) >= limit:
             return None
@@ -436,6 +465,9 @@ class TriageEngine:
         """
         primary = self.kb.get(ctx.playbook_id)
         request = ctx.original_request.strip()
+        if ctx.known_facts.get(ALSO_REPORTED):
+            # A problem named later in the dialogue joins the plan as if it had been said first.
+            request = f"{request}. {ctx.known_facts[ALSO_REPORTED]}"
         found = self._detect_issues(request, primary, ctx.urgency)
         if primary.id not in {issue.playbook_id for issue in found}:
             return [self._issue(primary.id, "", request)]

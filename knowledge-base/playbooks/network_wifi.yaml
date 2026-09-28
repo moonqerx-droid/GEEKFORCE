@@ -34,6 +34,8 @@ questions:
     kind: yes_no
     # "да, у коллег работает" means the problem is local -> colleagues_affected=no
     invert: true
+    # At home there are no colleagues nearby to compare with.
+    when_facts: {location: [office]}
 steps:
   - id: toggle_wifi
     title: Переподключите Wi-Fi

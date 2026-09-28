@@ -110,6 +110,19 @@ def play(service: TriageDialogueService, case: dict) -> Result:
     if case.get("end") and _expected_end(conversation.status, conversation.answer_kind) != case["end"]:
         problems.append(f"закончилось «{_expected_end(conversation.status, conversation.answer_kind)}», "
                         f"ждали «{case['end']}»")
+    said = " ".join(m.content for m in conversation.messages if m.role == "assistant").lower()
+    for phrase in case.get("forbid_text", []):
+        if phrase.lower() in said:
+            problems.append(f"помощник сказал лишнее: «{phrase}»")
+    last_turn = transcript[transcript.index(f"  → {case['say'][-1]}"):] if transcript else []
+    for phrase in case.get("expect_text", []):
+        if not any(phrase.lower() in line.lower() for line in last_turn[1:]):
+            problems.append(f"в ответ на последнюю реплику нет «{phrase}»")
+    for fact, value in case.get("expect_fact", {}).items():
+        if (conversation.known_facts or {}).get(fact) != value:
+            problems.append(f"факт {fact} = «{(conversation.known_facts or {}).get(fact)}», ждали «{value}»")
+    if case.get("forbid_end") and _expected_end(conversation.status, conversation.answer_kind) == case["forbid_end"]:
+        problems.append(f"закончилось «{case['forbid_end']}», а не должно")
     for fact, value in (conversation.known_facts or {}).items():
         text = str(value).strip().lower()
         if fact in TEXT_FACTS and (text in _BARE or (fact == "service_name" and _COMPLAINT.search(text))):

@@ -2,6 +2,7 @@
 
 import logging
 
+from helpflow_ai.engine import ALSO_REPORTED
 from helpflow_ai import AnswerKind, ConversationContext, DecisionAction, StepRecord, TriageEngine
 from sqlalchemy.orm.exc import StaleDataError
 
@@ -215,7 +216,30 @@ class TriageDialogueService(DialogueService):
                 else:
                     self._advance(conversation)
             elif previous_status == "CLARIFYING":
-                facts = self.engine.absorb_answer(content, self._context(conversation))
+                context = self._context(conversation)
+                added = self.engine.reports_new_problem(content, context)
+                if added is not None:
+                    # Not an answer but one more problem: keep it and say so instead of
+                    # filing «а ещё интернет пропал» as the error text.
+                    earlier = conversation.known_facts.get(ALSO_REPORTED)
+                    conversation.known_facts = {
+                        **conversation.known_facts,
+                        ALSO_REPORTED: f"{earlier}; {content.strip()}" if earlier else content.strip(),
+                    }
+                    title = self.engine.kb.get(added).title
+                    if self.engine.is_root_cause(added):
+                        # Without the internet the mail questions are pointless: switch to it;
+                        # the earlier problem stays in the plan and comes next.
+                        playbook = self.engine.kb.get(added)
+                        conversation.playbook_id = added
+                        conversation.service = playbook.service
+                        conversation.summary = f"{playbook.title}. Ещё: {conversation.summary}"
+                        intro = f"Записал и это: «{title}». Начнём с этого — от него часто зависит и остальное."
+                    else:
+                        intro = f"Записал и это: «{title}» — займёмся, когда закончим с текущей проблемой."
+                    self._advance(conversation, intro=intro)
+                    return self._commit(conversation)
+                facts = self.engine.absorb_answer(content, context)
                 conversation.known_facts = {**conversation.known_facts, **facts}
                 picked = facts.get("problem_area")
                 if (conversation.playbook_id == "unknown" and update.recommended_playbook == "unknown"
@@ -310,7 +334,7 @@ class TriageDialogueService(DialogueService):
             self.repository.session.rollback()
             raise
 
-    def _advance(self, conversation):
+    def _advance(self, conversation, intro: str = ""):
         decision = self.engine.decide(self._context(conversation))
         conversation.rag_source_ids = list(decision.source_ids)
         conversation.ai_fallback_reason = decision.fallback_reason
@@ -341,7 +365,7 @@ class TriageDialogueService(DialogueService):
         self._message(
             conversation,
             "assistant",
-            decision.message,
+            f"{intro} {decision.message}" if intro else decision.message,
             answer_kind=decision.answer_kind.value if decision.answer_kind else None,
             citations=[citation.model_dump(mode="json") for citation in decision.citations],
         )

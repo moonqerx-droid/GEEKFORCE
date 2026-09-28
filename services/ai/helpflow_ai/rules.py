@@ -163,7 +163,7 @@ _CONJUNCTION_SPLIT_RE = re.compile(
     r"\s+(?:а\s+(?:еще|ещё|также|вдобавок)|и\s+(?:еще|ещё)|(?:еще|ещё)\s+и|да\s+и|плюс|также|а|и|но)\s+",
     re.IGNORECASE,
 )
-_FAILURE_RE = re.compile(
+FAILURE_RE = _FAILURE_RE = re.compile(
     r"(?<!\w)(?:не|нет|ни)(?!\w)|отвал|пропа|ошибк|слома|глюч|тормоз|лага|вылета|завис|упал|"
     r"лежит|прерыва|разрыва|без доступа|замят|зажев|сбо[ий]"
 )
@@ -440,10 +440,14 @@ def parse_confirmation(text: str) -> bool | None:
     norm = understand(text)
     if _UNKNOWN_RE.search(norm):
         return None
-    if re.search(r"не (помог|работает|решен|получ|восстанов|открыва|заработал)|все еще|по-прежнему|опять", norm):
+    if re.search(r"не (помог|работает|решен|получ|восстанов|открыва|заработал|пуска|входит|выходит|могу|видит|печата|грузит)|"
+                 r"все еще|все равно|по-прежнему|опять|так и не|\bнет\b", norm):
         return False
     answer = _parse_yes_no(norm, invert=False)
-    if answer == "yes" or re.search(r"помогл|заработал|восстанов|получилось|решен|работает", norm):
+    if answer == "yes" or re.search(
+        r"помогл|заработал|восстанов|получилось|решен|работает|"
+        r"все (?:ок|окей|хорошо|норм\w*|отлично|супер)|\bнорм\w*\b|\bок\b|спасибо|благодарю", norm,
+    ):
         return True
     if answer == "no":
         return False

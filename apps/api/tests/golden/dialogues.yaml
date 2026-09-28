@@ -722,3 +722,70 @@
   say: ["амо срм не пускает с рабочего компьютера, а с телефона ок"]
   playbook: crm_login_device_specific
   tags: [понимание, контроль-3]
+
+# --- многоходовые: ответы живых людей по ходу разговора ------------------------
+
+- id: mt-wifi-home-no-colleagues
+  say: ["вайфай постоянно отваливается", "дома"]
+  playbook: network_wifi
+  end: step
+  forbid_text: ["коллег"]
+  tags: [диалог]
+
+- id: mt-slow-only-me
+  say: ["1с очень медленно работает", "нет, только у меня", "@not_helped", "@not_helped"]
+  playbook: slow_performance
+  end: escalated
+  forbid_text: ["у нескольких человек"]
+  tags: [диалог]
+
+- id: mt-thanks-means-yes
+  say: ["забыл пароль", "@helped", "спасибо, всё ок"]
+  playbook: password_login
+  end: resolved
+  tags: [диалог]
+
+- id: mt-works-now
+  say: ["меня не слышат в зуме", "гарнитура", "@helped", "всё отлично работает, спасибо"]
+  playbook: video_calls
+  end: resolved
+  tags: [диалог]
+
+- id: mt-still-broken
+  say: ["забыл пароль", "@helped", "спасибо, но всё равно не пускает"]
+  playbook: password_login
+  forbid_end: resolved
+  tags: [диалог]
+
+- id: mt-rude-vague
+  say: ["да вы задолбали, ничего не работает!!!", "Интернет или Wi-Fi", "в офисе"]
+  playbook: network_wifi
+  max_questions: 2
+  tags: [диалог]
+
+- id: mt-new-problem-mid-dialogue
+  say: ["не приходят письма", "а ещё интернет пропал совсем"]
+  playbook: network_wifi
+  expect_text: ["Начнём с этого", "в офисе"]
+  expect_fact: {also_reported: "а ещё интернет пропал совсем"}
+  tags: [диалог]
+
+- id: mt-new-problem-later
+  say: ["не подключается vpn", "а ещё принтер не печатает"]
+  playbook: vpn_connection
+  expect_text: ["займёмся, когда закончим"]
+  expect_fact: {also_reported: "а ещё принтер не печатает"}
+  tags: [диалог]
+
+- id: mt-answer-is-not-a-new-problem
+  say: ["не приходят письма", "в браузере"]
+  playbook: email_outlook
+  forbid_text: ["Записал и это"]
+  tags: [диалог]
+
+- id: mt-cause-is-an-answer
+  say: ["Не могу войти в CRM, через 20 минут встреча", "Ошибка соединения, VPN не подключён"]
+  playbook: crm_login_device_specific
+  end: step
+  forbid_text: ["Записал и это"]
+  tags: [диалог]
