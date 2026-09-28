@@ -789,3 +789,38 @@
   end: step
   forbid_text: ["Записал и это"]
   tags: [диалог]
+
+# --- текст во время шага: результат словами, вопрос «где это?», новая проблема ---
+
+- id: step-typed-helped
+  say: ["забыл пароль", "получилось, спасибо", "да"]
+  playbook: password_login
+  end: resolved
+  tags: [диалог]
+
+- id: step-typed-not-helped
+  say: ["принтер не печатает", "не помогло", "всё равно не печатает"]
+  playbook: printer
+  end: escalated
+  tags: [диалог]
+
+- id: step-typed-cannot
+  say: ["принтер не печатает", "а где найти настройки принтеров?"]
+  playbook: printer
+  end: step
+  expect_text: ["Очистите очередь печати"]
+  tags: [диалог]
+
+- id: step-typed-new-problem
+  say: ["принтер не печатает", "и ещё почта не открывается"]
+  playbook: printer
+  end: step
+  expect_text: ["Записал и это", "текущий шаг помог"]
+  tags: [диалог]
+
+- id: step-typed-unclear
+  say: ["принтер не печатает", "хм"]
+  playbook: printer
+  end: step
+  expect_text: ["помогло"]
+  tags: [диалог]

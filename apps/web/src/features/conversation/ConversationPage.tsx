@@ -22,6 +22,7 @@ import "./ConversationPage.css";
 const COMPOSER_PLACEHOLDER: Record<string, string> = {
   NEW: "Опишите, что случилось…",
   CLARIFYING: "Ответьте своими словами…",
+  TROUBLESHOOTING: "Или напишите, как прошло: «не нашёл, где это», «получилось»…",
   VERIFYING: "Или напишите, как сейчас…",
   ESCALATED: "Дописать детали для специалиста…",
   IN_PROGRESS: "Написать специалисту…",

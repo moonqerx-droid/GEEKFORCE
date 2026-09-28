@@ -435,6 +435,25 @@ def _parse_yes_no(norm: str, invert: bool) -> str:
     return answer
 
 
+# «Не нашёл, где это», «требует пароль администратора»: the step could not be done.
+_CANNOT_RE = re.compile(
+    r"не (?:могу|получается|выходит) (?:найти|открыть|сделать|выполнить|нажать|понять)|"
+    r"не наш(?:ел|ла|ли)|где (?:это|найти|находится|искать)|как (?:это )?(?:сделать|найти|открыть)|"
+    r"не понима|не понял|нет (?:такого|такой|такой кнопки|прав)|не вижу (?:такого|такой|кнопк|пункт)|"
+    r"(?:требует|просит|нужны) (?:права|прав|пароль администратора|администратор)"
+)
+
+
+def parse_step_outcome(text: str) -> str | None:
+    """A typed result of a troubleshooting step: helped / not_helped / cannot_perform."""
+    if _CANNOT_RE.search(understand(text)):
+        return "cannot_perform"
+    solved = parse_confirmation(text)
+    if solved is None:
+        return None
+    return "helped" if solved else "not_helped"
+
+
 def parse_confirmation(text: str) -> bool | None:
     """Interpret the answer to 'is the problem solved?'. None = unclear."""
     norm = understand(text)

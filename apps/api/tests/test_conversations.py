@@ -61,22 +61,33 @@ def test_escalation_endpoint_is_idempotent(client):
 
 def test_rejected_message_does_not_mutate_history(client):
     conversation_id = client.post("/api/conversations").json()["id"]
-    client.post(
-        f"/api/conversations/{conversation_id}/messages",
-        json={"content": "Не работает CRM, срочно"},
-    )
-    before = client.post(
-        f"/api/conversations/{conversation_id}/messages",
-        json={"content": "Ошибка соединения"},
-    ).json()
-
-    assert before["status"] == "TROUBLESHOOTING"
+    state = client.post(f"/api/conversations/{conversation_id}/messages", json={"content": "Забыл пароль"}).json()
+    client.post(f"/api/conversations/{conversation_id}/step-result",
+                json={"outcome": "helped", "step_code": state["current_step"]["code"]})
+    before = client.post(f"/api/conversations/{conversation_id}/messages", json={"content": "да"}).json()
+    assert before["status"] == "RESOLVED"
 
     rejected = client.post(
         f"/api/conversations/{conversation_id}/messages",
-        json={"content": "Лишнее сообщение во время шага"},
+        json={"content": "Лишнее сообщение после закрытия"},
     )
     after = client.get(f"/api/conversations/{conversation_id}").json()
 
     assert rejected.status_code == 409
     assert after["messages"] == before["messages"]
+
+
+def test_text_typed_during_a_step_is_read_as_its_result(client):
+    conversation_id = client.post("/api/conversations").json()["id"]
+    state = client.post(f"/api/conversations/{conversation_id}/messages",
+                        json={"content": "Принтер не печатает"}).json()
+    assert state["status"] == "TROUBLESHOOTING"
+    first_step = state["current_step"]["code"]
+
+    state = client.post(f"/api/conversations/{conversation_id}/messages",
+                        json={"content": "не помогло", "expected_revision": state["revision"]}).json()
+
+    assert [step["code"] for step in state["completed_steps"]] == [first_step]
+    assert state["completed_steps"][0]["outcome"] == "not_helped"
+    assert state["current_step"]["code"] != first_step
+    assert any(m["role"] == "user" and m["content"] == "не помогло" for m in state["messages"])

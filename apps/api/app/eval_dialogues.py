@@ -78,7 +78,7 @@ def play(service: TriageDialogueService, case: dict) -> Result:
                 break
             conversation = service.record_step_result(conversation.id, BUTTONS[turn])
         else:
-            if conversation.status not in {"NEW", "CLARIFYING", "VERIFYING"}:
+            if conversation.status not in {"NEW", "CLARIFYING", "VERIFYING", "TROUBLESHOOTING"}:
                 problems.append(f"реплика «{turn}» пришла в статусе {conversation.status}")
                 break
             conversation = service.handle_message(conversation.id, turn)

@@ -153,6 +153,8 @@ class TriageDialogueService(DialogueService):
             except Exception:
                 self.repository.session.rollback()
                 raise
+        if conversation.status == "TROUBLESHOOTING":
+            return self._typed_during_step(conversation, content)
         if conversation.status not in {"NEW", "CLARIFYING", "VERIFYING"}:
             raise DialogueConflict(f"messages are not accepted while status is {conversation.status}")
         try:
@@ -302,6 +304,37 @@ class TriageDialogueService(DialogueService):
             return []
         return self.engine.quick_replies(conversation.playbook_id, fact)
 
+    STEP_TEXT_UNCLEAR = (
+        "Не удалось понять, как прошёл шаг. Напишите «помогло» или «не помогло» — или нажмите кнопку "
+        "под шагом. Если выполнить его не получается, так и напишите: предложу другой путь."
+    )
+
+    def _typed_during_step(self, conversation, content):
+        """A message typed while a step is on screen: its result, one more problem, or neither."""
+        # Another problem first: «и ещё почта не открывается» is not «не помогло».
+        added = self.engine.reports_new_problem(content, self._context(conversation))
+        outcome = None if added is not None else self.engine.interpret_step_result(content)
+        try:
+            self._message(conversation, "user", content.strip())
+            if outcome is not None:
+                self._apply_step_outcome(conversation, StepOutcome(outcome))
+                return self._commit(conversation)
+            if added is not None:
+                earlier = conversation.known_facts.get(ALSO_REPORTED)
+                conversation.known_facts = {
+                    **conversation.known_facts,
+                    ALSO_REPORTED: f"{earlier}; {content.strip()}" if earlier else content.strip(),
+                }
+                title = self.engine.kb.get(added).title
+                self._message(conversation, "assistant",
+                              f"Записал и это: «{title}» — займёмся следом. А текущий шаг помог?")
+            else:
+                self._message(conversation, "assistant", self.STEP_TEXT_UNCLEAR)
+            return self._commit(conversation)
+        except Exception:
+            self.repository.session.rollback()
+            raise
+
     def record_step_result(self, conversation_id, outcome, *, expected_revision=None, step_code=None):
         conversation = self.get_conversation(conversation_id)
         self._check_revision(conversation, expected_revision)
@@ -309,30 +342,33 @@ class TriageDialogueService(DialogueService):
             raise DialogueConflict("active step changed; reload the conversation")
         if conversation.status != "TROUBLESHOOTING" or not conversation.current_step_code:
             raise DialogueConflict("step result requires an active TROUBLESHOOTING step")
-        parsed = StepOutcome(outcome)
         try:
-            conversation.steps.append(TroubleshootingStep(
-                code=conversation.current_step_code,
-                instruction=conversation.current_step_instruction,
-                outcome=parsed.value,
-                position=len(conversation.steps),
-            ))
-            conversation.verification_failed = False
-            if conversation.answer_kind == "document" and parsed == StepOutcome.HELPED:
-                # «Да, это ответ» on a company-document answer already is the confirmation;
-                # asking «решило ли это вопрос?» again would only make the employee click twice.
-                conversation.current_step_code = None
-                conversation.current_step_instruction = None
-                conversation.status = "RESOLVED"
-                conversation.resolved_at = utc_now()
-                conversation.resolved_by = "assistant"
-                self._message(conversation, "assistant", "Отлично, ответ нашёлся. Обращение закрыто — если появится новый вопрос, просто напишите.")
-                return self._commit(conversation)
-            self._advance(conversation)
+            self._apply_step_outcome(conversation, StepOutcome(outcome))
             return self._commit(conversation)
         except Exception:
             self.repository.session.rollback()
             raise
+
+    def _apply_step_outcome(self, conversation, parsed):
+        """Record the step's result and move on; the caller commits."""
+        conversation.steps.append(TroubleshootingStep(
+            code=conversation.current_step_code,
+            instruction=conversation.current_step_instruction,
+            outcome=parsed.value,
+            position=len(conversation.steps),
+        ))
+        conversation.verification_failed = False
+        if conversation.answer_kind == "document" and parsed == StepOutcome.HELPED:
+            # «Да, это ответ» on a company-document answer already is the confirmation;
+            # asking «решило ли это вопрос?» again would only make the employee click twice.
+            conversation.current_step_code = None
+            conversation.current_step_instruction = None
+            conversation.status = "RESOLVED"
+            conversation.resolved_at = utc_now()
+            conversation.resolved_by = "assistant"
+            self._message(conversation, "assistant", "Отлично, ответ нашёлся. Обращение закрыто — если появится новый вопрос, просто напишите.")
+            return
+        self._advance(conversation)
 
     def _advance(self, conversation, intro: str = ""):
         decision = self.engine.decide(self._context(conversation))

@@ -96,9 +96,8 @@ describe("ConversationPage status gating", () => {
         return HttpResponse.json(makeConversation({
           id: "status-change",
           revision: 2,
-          status: "TROUBLESHOOTING",
-          current_step: { code: "restart_vpn", instruction: "Перезапустите VPN-клиент" },
-          messages: [makeMessage("user", "VPN не работает")],
+          status: "RESOLVED",
+          messages: [makeMessage("user", "VPN не работает"), makeMessage("assistant", "Отлично, проблема решена. Обращение закрыто.")],
         }));
       }),
     );
@@ -111,8 +110,7 @@ describe("ConversationPage status gating", () => {
     await user.type(textarea, "Ошибка 720");
     releaseResponse?.();
 
-    expect(await screen.findByText("Перезапустите VPN-клиент")).toBeInTheDocument();
-    expect(screen.getByText("Черновик сохранён")).toBeInTheDocument();
+    expect(await screen.findByText("Черновик сохранён")).toBeInTheDocument();
     expect(screen.getByText("Ошибка 720")).toBeInTheDocument();
   });
 
@@ -146,7 +144,7 @@ describe("ConversationPage status gating", () => {
     expect(creates).toBe(1);
     expect(sends).toBe(2);
   });
-  it("shows outcome buttons only during TROUBLESHOOTING", async () => {
+  it("shows outcome buttons during TROUBLESHOOTING and still lets the employee type", async () => {
     withStoredConversation(
       makeConversation({
         id: "c1",
@@ -161,7 +159,8 @@ describe("ConversationPage status gating", () => {
     expect(screen.getByRole("button", { name: "Помогло" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Не помогло" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Не получается выполнить" })).toBeInTheDocument();
-    expect(screen.queryByLabelText("Ваше сообщение")).not.toBeInTheDocument();
+    // «Не нашёл, где это» is easier to type than to map onto a button.
+    expect(screen.getByLabelText("Ваше сообщение")).toHaveAttribute("placeholder", expect.stringContaining("как прошло"));
   });
 
   it("shows the message composer for NEW, CLARIFYING and VERIFYING", async () => {

@@ -183,6 +183,11 @@ class TriageEngine:
         return rules.parse_confirmation(message)
 
     @staticmethod
+    def interpret_step_result(message: str) -> str | None:
+        """What a typed message says about the current step, if anything."""
+        return rules.parse_step_outcome(message)
+
+    @staticmethod
     def is_greeting(message: str) -> bool:
         return rules.is_greeting_only(message)
 
