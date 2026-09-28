@@ -5,6 +5,8 @@ import type { Metrics, Urgency } from "../../api/types";
 import { ErrorState, Spinner } from "../../components/primitives";
 import { URGENCY_SHORT, formatMinutes, plural } from "../../lib/labels";
 import { ActiveIncidents } from "./ActiveIncidents";
+import { AdminTemplates } from "./AdminTemplates";
+import { SlaFact } from "./SlaFact";
 import { DailyChart } from "./DailyChart";
 import "./Admin.css";
 
@@ -78,6 +80,7 @@ export function AdminDashboard() {
           <span className="admin-fact-value">{formatMinutes(metrics.median_first_reply_minutes)}</span>
           <span className="admin-fact-label">до первого ответа специалиста</span>
         </div>
+        <SlaFact days={days} />
         <div className="admin-fact">
           <span className="admin-fact-value">{metrics.average_rating ? metrics.average_rating.toFixed(1).replace(".", ",") : "—"}</span>
           <span className="admin-fact-label">средняя оценка, {metrics.ratings_count} {plural(metrics.ratings_count, "оценка", "оценки", "оценок")}</span>
@@ -152,6 +155,7 @@ export function AdminDashboard() {
           </table>
         ) : <p className="admin-note">В команде пока нет специалистов. <Link to="/admin/team">Создать специалиста</Link></p>}
       </section>
+      <AdminTemplates />
     </div>
   );
 }

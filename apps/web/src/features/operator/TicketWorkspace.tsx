@@ -6,6 +6,9 @@ import { MessageThread } from "../conversation/MessageThread";
 import { Composer } from "../conversation/Composer";
 import { stepMarkers } from "../conversation/steps";
 import { formatDateTime } from "../../lib/labels";
+import { fillTemplate, slaOf } from "./operatorApi";
+import { formatDuration, slaView } from "./sla";
+import { TemplatePicker } from "./TemplatePicker";
 
 export function TicketWorkspace({
   ticket,
@@ -46,6 +49,8 @@ export function TicketWorkspace({
     );
   }
 
+  const sla = slaOf(ticket);
+  const slaText = slaView(sla);
   const takenByOther = Boolean(ticket.assignee_id && ticket.assignee_id !== currentUserId);
   const open = ticket.status === "ESCALATED" || ticket.status === "IN_PROGRESS";
   const canWrite = open && !takenByOther;
@@ -58,6 +63,11 @@ export function TicketWorkspace({
           <p className="workspace-sub">
             {ticket.owner_name ?? "Сотрудник"}, обращение от {formatDateTime(ticket.created_at)}
           </p>
+          {sla && slaText ? (
+            <p className={`workspace-sla sla-${slaText.tone}`}>
+              Первый ответ: норма {formatDuration(sla.target_minutes)}. {slaText.text}
+            </p>
+          ) : null}
         </div>
         <div className="workspace-actions">
         <Button variant="ghost" className="workspace-card-toggle" onClick={onShowCard}>Карточка</Button>
@@ -115,6 +125,12 @@ export function TicketWorkspace({
           </div>
         </form>
       ) : canWrite ? (
+        <>
+        <TemplatePicker onPick={(template) => {
+          const text = fillTemplate(template.body, ticket.owner_name);
+          setDraft((current) => (current.trim() ? `${current.trimEnd()}\n\n${text}` : text));
+          window.requestAnimationFrame(() => threadRef.current?.querySelector<HTMLTextAreaElement>("textarea")?.focus());
+        }} />
         <Composer
           busy={busy}
           value={draft}
@@ -127,6 +143,7 @@ export function TicketWorkspace({
           hint="Можно приложить скриншот с подсказкой, куда нажать: перетащите файл или вставьте через ⌘V / Ctrl+V."
           onSend={async (content, files) => { await onReply(content, files); }}
         />
+        </>
       ) : null}
     </section>
   );
