@@ -1,6 +1,6 @@
 from typing import Annotated, Literal
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
 from sqlalchemy.orm import Session
 
 from app.core.config import get_settings
@@ -14,7 +14,9 @@ from app.schemas.incident import (
     IncidentResolve,
 )
 from app.services.incidents import IncidentConflict, IncidentNotFound, IncidentService
-from app.schemas.conversation import ConversationRead, OperatorMessageCreate, OperatorTicket, ResolveCreate
+from app.schemas.conversation import AttachmentRead, ConversationRead, OperatorMessageCreate, OperatorTicket, ResolveCreate
+from app.services.attachments import AttachmentRejected, AttachmentService
+from app.api.routes.conversations import read_limited
 from app.api.dependencies.auth import require_operator
 from app.models.auth import User
 from app.services.dialogue import ConversationNotFound, DialogueConflict
@@ -80,7 +82,11 @@ def reply_to_ticket(
     service: ServiceDependency,
     user: OperatorDependency,
 ) -> OperatorTicket:
-    return run(lambda: service.reply(conversation_id, user, payload.content))
+    try:
+        attachments = AttachmentService(service.session).pending_for(conversation_id, payload.attachment_ids)
+    except AttachmentRejected as exc:
+        raise HTTPException(status_code=exc.status, detail=exc.message) from exc
+    return run(lambda: service.reply(conversation_id, user, payload.content, attachments))
 
 
 @router.post("/tickets/{conversation_id}/resolve", response_model=OperatorTicket)
@@ -156,3 +162,23 @@ def resolve_incident(
     return run_incident(lambda: service.resolve(
         incident_id, payload.message, payload.expected_revision, author=user,
     ))
+
+
+@router.post("/tickets/{conversation_id}/attachments", response_model=AttachmentRead, status_code=status.HTTP_201_CREATED)
+async def upload_ticket_attachment(
+    conversation_id: str,
+    service: ServiceDependency,
+    user: OperatorDependency,
+    file: Annotated[UploadFile, File()],
+) -> AttachmentRead:
+    try:
+        conversation = service.get(conversation_id)
+    except ConversationNotFound as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Ticket not found") from exc
+    if conversation.status not in {"ESCALATED", "IN_PROGRESS"}:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Обращение уже закрыто")
+    try:
+        attachment = AttachmentService(service.session).store(conversation, user, file.filename, await read_limited(file))
+    except AttachmentRejected as exc:
+        raise HTTPException(status_code=exc.status, detail=exc.message) from exc
+    return AttachmentRead.model_validate(attachment)

@@ -83,10 +83,12 @@ class OperatorService:
         self._take(conversation, user)
         return self._commit(conversation)
 
-    def reply(self, conversation_id: str, user: User, content: str) -> Conversation:
+    def reply(self, conversation_id: str, user: User, content: str, attachments=()) -> Conversation:
         conversation = self._load_for_action(conversation_id)
         self._take(conversation, user)
-        conversation.messages.append(Message(role="operator", content=content, author_id=user.id))
+        message = Message(role="operator", content=content, author_id=user.id)
+        message.attachments.extend(attachments)
+        conversation.messages.append(message)
         conversation.first_operator_reply_at = conversation.first_operator_reply_at or utc_now()
         return self._commit(conversation)
 

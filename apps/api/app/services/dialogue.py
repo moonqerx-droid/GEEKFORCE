@@ -31,7 +31,9 @@ class DialogueService:
         if expected_revision is not None and conversation.revision != expected_revision:
             raise DialogueConflict("conversation changed; reload it before retrying")
 
-    def handle_message(self, conversation_id: str, content: str, *, expected_revision=None) -> Conversation:
+    def handle_message(self, conversation_id: str, content: str, *, expected_revision=None, attachments=()) -> Conversation:
+        if attachments:
+            raise DialogueConflict("files are not supported in legacy conversations")
         conversation = self.get_conversation(conversation_id)
         self._check_revision(conversation, expected_revision)
         if conversation.status in {ConversationStatus.RESOLVED, ConversationStatus.ESCALATED}:

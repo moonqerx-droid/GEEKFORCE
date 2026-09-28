@@ -13,6 +13,7 @@ from app.api.routes.health import router as health_router
 from app.api.routes.operator import router as operator_router
 from app.api.routes.auth import router as auth_router
 from app.api.routes.admin import router as admin_router
+from app.api.routes.attachments import router as attachments_router
 from app.api.routes.profile import router as profile_router
 from app.db.base import Base
 from app.db.session import SessionLocal, engine
@@ -47,6 +48,7 @@ app.include_router(conversations_router)
 app.include_router(operator_router)
 app.include_router(auth_router)
 app.include_router(admin_router)
+app.include_router(attachments_router)
 app.include_router(profile_router)
 
 

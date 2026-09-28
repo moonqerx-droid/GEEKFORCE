@@ -1,7 +1,7 @@
 from datetime import datetime
 from enum import StrEnum
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 
 class ConversationStatus(StrEnum):
@@ -36,22 +36,39 @@ class StepOutcome(StrEnum):
 
 
 class MessageCreate(BaseModel):
-    content: str = Field(min_length=1, max_length=4000)
+    content: str = Field(default="", max_length=4000)
     expected_revision: int | None = Field(default=None, ge=1)
+    attachment_ids: list[str] = Field(default_factory=list, max_length=5)
 
     @field_validator("content")
     @classmethod
-    def content_must_not_be_blank(cls, value: str) -> str:
-        normalized = value.strip()
-        if not normalized:
-            raise ValueError("message must not be blank")
-        return normalized
+    def strip_content(cls, value: str) -> str:
+        return value.strip()
+
+    @model_validator(mode="after")
+    def text_or_files(self):
+        # A screenshot alone is a perfectly good message; an empty one is not.
+        if not self.content and not self.attachment_ids:
+            raise ValueError("message must contain text or a file")
+        return self
 
 
 class StepResultCreate(BaseModel):
     outcome: StepOutcome
     expected_revision: int | None = Field(default=None, ge=1)
     step_code: str | None = Field(default=None, min_length=1, max_length=120)
+
+
+class AttachmentRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: str
+    filename: str
+    content_type: str
+    size: int
+    kind: str
+    url: str
+    created_at: datetime
 
 
 class MessageRead(BaseModel):
@@ -62,6 +79,7 @@ class MessageRead(BaseModel):
     content: str
     created_at: datetime
     author_name: str | None = None
+    attachments: list[AttachmentRead] = Field(default_factory=list)
 
 
 class StepRead(BaseModel):
@@ -146,9 +164,19 @@ class RatingCreate(BaseModel):
 
 
 class OperatorMessageCreate(BaseModel):
-    content: str = Field(min_length=1, max_length=4000)
+    content: str = Field(default="", max_length=4000)
+    attachment_ids: list[str] = Field(default_factory=list, max_length=5)
 
-    _content = field_validator("content")(_strip_required)
+    @field_validator("content")
+    @classmethod
+    def strip_content(cls, value: str) -> str:
+        return value.strip()
+
+    @model_validator(mode="after")
+    def text_or_files(self):
+        if not self.content and not self.attachment_ids:
+            raise ValueError("message must contain text or a file")
+        return self
 
 
 class ResolveCreate(BaseModel):

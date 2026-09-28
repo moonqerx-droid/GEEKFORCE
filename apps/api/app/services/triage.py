@@ -52,8 +52,9 @@ class TriageDialogueService(DialogueService):
 
     def _context(self, conversation):
         return ConversationContext(
+            # A screenshot sent without words is not the request: skip empty messages.
             original_request=next((m.content for m in conversation.messages if (
-                m.role == "user" and self.engine.conversation_intent(m.content) not in {
+                m.role == "user" and m.content.strip() and self.engine.conversation_intent(m.content) not in {
                     "greeting", "help", "thanks",
                 }
             )), ""),
@@ -69,9 +70,19 @@ class TriageDialogueService(DialogueService):
             verification_failed=conversation.verification_failed,
         )
 
-    @staticmethod
-    def _message(conversation, role, content):
-        conversation.messages.append(Message(role=role, content=content))
+    ATTACHMENT_ONLY_REPLY = (
+        "Файл получил, спасибо. Напишите в двух словах, что на нём или что не работает — "
+        "так я быстрее разберусь."
+    )
+
+    def _message(self, conversation, role, content):
+        message = Message(role=role, content=content)
+        if role == "user" and getattr(self, "_pending_attachments", None):
+            # Files arrive with the employee's message in the same turn and transaction.
+            message.attachments.extend(self._pending_attachments)
+            self._pending_attachments = []
+        conversation.messages.append(message)
+        return message
 
     def _commit(self, conversation):
         # Touch the parent even when only a message/step changed, so the ORM
@@ -84,9 +95,12 @@ class TriageDialogueService(DialogueService):
             raise DialogueConflict("conversation changed; reload it before retrying") from exc
         return self.get_conversation(conversation.id)
 
-    def handle_message(self, conversation_id, content, *, expected_revision=None):
+    def handle_message(self, conversation_id, content, *, expected_revision=None, attachments=()):
         conversation = self.get_conversation(conversation_id)
         self._check_revision(conversation, expected_revision)
+        self._pending_attachments = list(attachments)
+        if not content.strip() and self._pending_attachments:
+            return self._attachment_only(conversation)
         if conversation.status in {"ESCALATED", "IN_PROGRESS"}:
             # A specialist owns the conversation now: keep the employee's words for them.
             try:
@@ -191,6 +205,19 @@ class TriageDialogueService(DialogueService):
                     self._advance(conversation)
                 else:
                     self._message(conversation, "assistant", "Подтвердите, пожалуйста, явно: проблема решена — да или нет?")
+            return self._commit(conversation)
+        except Exception:
+            self.repository.session.rollback()
+            raise
+
+    def _attachment_only(self, conversation):
+        """A screenshot with no words: keep it and ask for a short description, change nothing else."""
+        if conversation.status == "RESOLVED":
+            raise DialogueConflict("resolved conversation cannot accept files")
+        try:
+            self._message(conversation, "user", "")
+            if conversation.status not in {"ESCALATED", "IN_PROGRESS"}:
+                self._message(conversation, "assistant", self.ATTACHMENT_ONLY_REPLY)
             return self._commit(conversation)
         except Exception:
             self.repository.session.rollback()

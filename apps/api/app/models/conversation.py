@@ -95,6 +95,9 @@ class Message(Base):
 
     conversation: Mapped[Conversation] = relationship(back_populates="messages")
     author: Mapped[User | None] = relationship()
+    attachments: Mapped[list["Attachment"]] = relationship(
+        back_populates="message", order_by="Attachment.created_at", lazy="selectin",
+    )
 
     @property
     def author_name(self) -> str | None:
@@ -116,3 +119,4 @@ class TroubleshootingStep(Base):
 
 
 from app.models.auth import User  # noqa: E402
+from app.models.attachment import Attachment  # noqa: E402
