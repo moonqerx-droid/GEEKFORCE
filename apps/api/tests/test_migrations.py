@@ -35,7 +35,7 @@ def test_initial_migration_adopts_pre_alembic_database(tmp_path):
 
     assert inspect(engine).has_table("alembic_version")
     with engine.connect() as connection:
-        assert connection.scalar(text("SELECT version_num FROM alembic_version")) == "20260928_0012"
+        assert connection.scalar(text("SELECT version_num FROM alembic_version")) == "20260928_0013"
         assert connection.scalar(text("SELECT id FROM conversations WHERE id='preserved'")) == "preserved"
     inspector = inspect(engine)
     assert {"users", "auth_sessions", "email_tokens", "operator_invites"}.issubset(
@@ -197,3 +197,18 @@ def test_latest_schema_stores_answer_metadata_on_messages(tmp_path):
 
     assert columns["answer_kind"]["nullable"] is True
     assert columns["citations"]["nullable"] is True
+
+
+def test_reply_templates_migration_roundtrip(tmp_path):
+    database_url = f"sqlite:///{tmp_path / 'templates.db'}"
+    config = Config("alembic.ini")
+    config.set_main_option("sqlalchemy.url", database_url)
+    command.upgrade(config, "20260928_0012")
+    engine = create_engine(database_url)
+
+    command.upgrade(config, "head")
+    columns = {column["name"] for column in inspect(engine).get_columns("reply_templates")}
+    assert {"id", "title", "body", "created_by", "created_at", "updated_at"} <= columns
+
+    command.downgrade(config, "20260928_0012")
+    assert "reply_templates" not in inspect(engine).get_table_names()
