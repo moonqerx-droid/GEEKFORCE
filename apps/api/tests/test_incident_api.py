@@ -1,5 +1,6 @@
 import pytest
 
+from app.models import Conversation, Incident
 from app.repositories.conversations import ConversationRepository
 
 
@@ -12,12 +13,40 @@ def test_incident_list_orders_open_clusters(client, incident_factory):
     response = client.get("/api/operator/incidents")
 
     assert response.status_code == 200
-    assert [item["id"] for item in response.json()] == [large.id, small.id, active.id]
+    assert [item["id"] for item in response.json()] == [large.id, active.id]
     with_resolved = client.get("/api/operator/incidents?include_resolved=true")
     assert with_resolved.status_code == 200
     assert {item["id"] for item in with_resolved.json()} == {
-        resolved.id, active.id, small.id, large.id
+        resolved.id, active.id, large.id
     }
+    resolved_item = next(item for item in with_resolved.json() if item["id"] == resolved.id)
+    assert resolved_item["title"] == "CRM: проблема у 5 сотрудников"
+
+
+def test_incident_title_describes_a_problem_for_unique_employees(client, db_session):
+    incident = Incident(
+        status="CANDIDATE",
+        service="права доступа",
+        title="Права доступа не работает",
+        signature_tokens=["права", "доступа"],
+        similarity_threshold=0.55,
+    )
+    db_session.add(incident)
+    db_session.flush()
+    for index in range(3):
+        db_session.add(Conversation(
+            workflow_version="triage-v1",
+            status="ESCALATED",
+            service="Права доступа",
+            incident_id=incident.id,
+            owner_id=f"employee-{index}",
+        ))
+    db_session.flush()
+
+    [item] = client.get("/api/operator/incidents").json()
+
+    assert item["title"] == "Права доступа: проблема у 3 сотрудников"
+    assert "не работает" not in item["title"]
 
 
 def test_broadcast_reaches_every_member_once(client, candidate):

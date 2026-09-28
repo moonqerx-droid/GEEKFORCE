@@ -26,6 +26,33 @@ def test_three_similar_escalations_form_one_candidate(
     }
 
 
+def test_repeated_requests_need_three_unique_employees_to_form_a_candidate(
+    db_session, incident_service, crm_failure_factory
+):
+    first = crm_failure_factory()
+    first.owner_id = "employee-1"
+    assert incident_service.observe_escalated(first.id) is None
+
+    second = crm_failure_factory()
+    second.owner_id = "employee-1"
+    assert incident_service.observe_escalated(second.id) is None
+
+    third = crm_failure_factory()
+    third.owner_id = "employee-2"
+    assert incident_service.observe_escalated(third.id) is None
+    assert db_session.query(Incident).count() == 0
+
+    fourth = crm_failure_factory()
+    fourth.owner_id = "employee-3"
+    incident = incident_service.observe_escalated(fourth.id)
+
+    assert incident is not None
+    assert incident.title == "CRM: проблема у 3 сотрудников"
+    assert set(IncidentRepository(db_session).conversation_ids(incident.id)) == {
+        first.id, second.id, third.id, fourth.id,
+    }
+
+
 def test_reobserving_member_does_not_duplicate_membership(incident_service, candidate):
     before = incident_service.read(candidate.id).conversation_ids
 

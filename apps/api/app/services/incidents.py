@@ -27,6 +27,20 @@ def _aware(value):
     return value if value is None or value.tzinfo else value.replace(tzinfo=utc_now().tzinfo)
 
 
+def _employee_key(conversation) -> str:
+    return conversation.owner_id or conversation.id
+
+
+def _employee_noun(count: int) -> str:
+    if count % 10 == 1 and count % 100 != 11:
+        return "сотрудника"
+    return "сотрудников"
+
+
+def _incident_title(service: str, affected_employees: int) -> str:
+    return f"{service}: проблема у {affected_employees} {_employee_noun(affected_employees)}"
+
+
 class IncidentNotFound(LookupError):
     pass
 
@@ -62,13 +76,15 @@ class IncidentService:
             raise LookupError(incident_id)
         members = self.repository.conversations(incident.id)
         conversation_ids = [member.id for member in members]
+        affected_employees = len({_employee_key(member) for member in members})
+        service_label = next((member.service for member in members if member.service), None)
         latest = incident.updates[-1] if incident.updates else None
         seen = [_aware(member.escalated_at or member.created_at) for member in members]
         return IncidentRead(
             id=incident.id,
             status=incident.status,
             service=incident.service,
-            title=incident.title,
+            title=_incident_title(service_label or incident.service, affected_employees),
             signature_tokens=list(incident.signature_tokens),
             similarity_threshold=incident.similarity_threshold,
             revision=incident.revision,
@@ -78,8 +94,8 @@ class IncidentService:
             conversation_ids=conversation_ids,
             evidence_tokens=list(incident.signature_tokens),
             latest_update=IncidentUpdateRead.model_validate(latest) if latest else None,
-            service_label=next((member.service for member in members if member.service), None),
-            affected_employees=len({member.owner_id or member.id for member in members}),
+            service_label=service_label,
+            affected_employees=affected_employees,
             first_seen_at=min(seen) if seen else None,
             members=[
                 IncidentMember(
@@ -149,7 +165,10 @@ class IncidentService:
     def list_incidents(self, *, include_resolved: bool = False) -> list[IncidentRead]:
         incidents = self.repository.list_incidents(include_resolved=include_resolved)
         status_order = {"CANDIDATE": 0, "ACTIVE": 1, "RESOLVED": 2}
-        items = [self.read(incident.id) for incident in incidents]
+        items = [
+            item for incident in incidents
+            if (item := self.read(incident.id)).affected_employees >= self.min_cluster_size
+        ]
         return sorted(
             items,
             key=lambda item: (
@@ -269,7 +288,11 @@ class IncidentService:
             other = build_fingerprint(item)
             if other is not None and similarity(fingerprint, other).score >= self.threshold:
                 candidates.append((item, other))
-        if len(candidates) + 1 < self.min_cluster_size:
+        affected_employees = {
+            _employee_key(item)
+            for item, _ in candidates
+        } | {_employee_key(conversation)}
+        if len(affected_employees) < self.min_cluster_size:
             return None
 
         try:
@@ -357,9 +380,13 @@ class IncidentService:
     def _recompute_signature(self, incident: Incident) -> None:
         # Members are read back from the database: new links must be there first.
         self.repository.session.flush()
+        members = self.repository.conversations(incident.id)
         fingerprints = [
-            result for item in self.repository.conversations(incident.id)
+            result for item in members
             if (result := build_fingerprint(item)) is not None
         ]
         incident.signature_tokens = recompute_signature(fingerprints)
+        affected_employees = len({_employee_key(member) for member in members})
+        service_label = next((member.service for member in members if member.service), incident.service)
+        incident.title = _incident_title(service_label, affected_employees)
         incident.updated_at = utc_now()
