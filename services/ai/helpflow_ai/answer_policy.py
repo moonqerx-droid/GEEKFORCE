@@ -58,6 +58,16 @@ _HARD_HOW_TO_BLOCK = re.compile(
 )
 
 
+_RULES_QUESTION = re.compile(
+    r"(?:что\s+сказано|что\s+говорится|что\s+написано)\s+в\s+\w*|"
+    r"(?:по\s+(?:правилам|регламенту|политике|положению|инструкции))|"
+    r"(?:согласно|в\s+соответствии\s+с)\s+\w*|"
+    r"(?:какие|каковы|какое|какой)\s+(?:требовани\w*|правил\w*|срок\w*|норм\w*|лимит\w*)|"
+    r"(?:как\s+часто|сколько\s+(?:символов|дней|раз|рублей)|можно\s+ли|нужно\s+ли|положено\s+ли)",
+    re.IGNORECASE,
+)
+
+
 class AnswerPolicy:
     """Company evidence wins; unsupported risky questions always reach a human."""
 
@@ -76,6 +86,12 @@ class AnswerPolicy:
         if _LOW_RISK.search(query):
             return AnswerRoute.GENERAL
         return AnswerRoute.OPERATOR
+
+    @staticmethod
+    def asks_about_rules(query: str) -> bool:
+        """«Какие требования к паролю?», «что сказано в регламенте…» — a question about
+        company rules, answered from documents, not a complaint to troubleshoot."""
+        return bool(_RULES_QUESTION.search(query))
 
     def procedural_route(self, query: str, playbook_id: str | None) -> AnswerRoute | None:
         """Classify explicit how-to requests before incident diagnostics start."""

@@ -5,6 +5,7 @@ from __future__ import annotations
 import re
 
 from .schemas import KnowledgeChunk, KnowledgeMatch
+from .understanding import morph
 
 TOKEN_RE = re.compile(r"[a-zа-яё0-9]+", re.IGNORECASE)
 MIN_SCORE = 0.18
@@ -16,8 +17,21 @@ _RU_SUFFIXES = tuple(sorted({
 }, key=len, reverse=True))
 
 
+# Question words and particles: «какие требования к паролю» is about «требование пароль».
+_FUNCTION_WORDS = frozenset(
+    "как какой каков что где когда сколько почему зачем ли же бы а и или но к в во на по о об "
+    "от до для за из с со у при про это мне меня мой наш нужно надо можно должный быть".split()
+)
+
+
 def _tokens(text: str) -> set[str]:
-    return {_stem(token.casefold()) for token in TOKEN_RE.findall(text)}
+    return {_normal(token.casefold()) for token in TOKEN_RE.findall(text)}
+
+
+def _normal(token: str) -> str:
+    """Dictionary form when the word is known («паролю» → «пароль»), else a light stem."""
+    lemma = morph.lemma(token.replace("ё", "е"))
+    return lemma if lemma != token.replace("ё", "е") else _stem(token)
 
 
 def _stem(token: str) -> str:
@@ -48,8 +62,9 @@ class KnowledgeRetriever:
         query: str,
         playbook_id: str | None,
         limit: int = 4,
+        documents_only: bool = False,
     ) -> list[KnowledgeMatch]:
-        query_tokens = _tokens(query)
+        query_tokens = _tokens(query) - _FUNCTION_WORDS or _tokens(query)
         if not query_tokens or limit < 1:
             return []
 
@@ -57,6 +72,8 @@ class KnowledgeRetriever:
         prefix = f"{playbook_id}." if playbook_id else ""
         query_phrase = _normalized_phrase(query)
         for chunk in self._chunks:
+            if documents_only and not chunk.id.startswith("document:"):
+                continue
             title_tokens = _tokens(chunk.title)
             body_tokens = _tokens(chunk.text)
             keyword_tokens = _tokens(" ".join(chunk.keywords))

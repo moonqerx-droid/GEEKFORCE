@@ -238,3 +238,47 @@ def test_document_answer_removes_every_injection_line(kb) -> None:
         "Проезд оплачивается по подтверждающим документам.",
         "Отчёт сдаётся в течение трёх рабочих дней.",
     )
+
+
+PASSWORD_POLICY = {
+    "source_id": "document:password-policy:0",
+    "title": "Правила паролей",
+    "text": "Пароль от рабочей учётной записи меняется раз в 90 дней. Новый пароль — не короче "
+            "10 символов, с заглавной и строчной буквами и цифрой.",
+}
+
+
+def _ask(engine, text):
+    analysis = engine.analyze(text)
+    return engine.decide(ConversationContext(
+        original_request=text, playbook_id=analysis.recommended_playbook,
+        known_facts=analysis.known_facts,
+    ))
+
+
+@pytest.mark.parametrize("question", [
+    "Как часто нужно менять пароль по правилам?",
+    "Какие требования к паролю?",
+    "Что сказано в документе «Правила паролей» про длину пароля?",
+    "Сколько символов должно быть в пароле по регламенту?",
+])
+def test_questions_about_company_rules_get_the_document_even_inside_a_scenario(kb, question) -> None:
+    engine = TriageEngine(kb)
+    engine.set_company_fragments([PASSWORD_POLICY])
+
+    decision = _ask(engine, question)
+
+    assert decision.answer_kind == AnswerKind.DOCUMENT, decision.message
+    assert decision.citations[0].source_id == "document:password-policy:0"
+
+
+@pytest.mark.parametrize("complaint", [
+    "Не могу войти, пароль не подходит",
+    "Забыл пароль",
+    "Учётная запись заблокирована",
+])
+def test_password_complaints_still_follow_the_scenario(kb, complaint) -> None:
+    engine = TriageEngine(kb)
+    engine.set_company_fragments([PASSWORD_POLICY])
+
+    assert _ask(engine, complaint).answer_kind != AnswerKind.DOCUMENT

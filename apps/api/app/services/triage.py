@@ -2,7 +2,7 @@
 
 import logging
 
-from helpflow_ai import ConversationContext, DecisionAction, StepRecord, TriageEngine
+from helpflow_ai import AnswerKind, ConversationContext, DecisionAction, StepRecord, TriageEngine
 from sqlalchemy.orm.exc import StaleDataError
 
 from app.models.conversation import Conversation, Message, TroubleshootingStep, utc_now
@@ -334,6 +334,10 @@ class TriageDialogueService(DialogueService):
             conversation.current_step_instruction = decision.message
         else:
             conversation.status = "VERIFYING"
+        if decision.answer_kind == AnswerKind.DOCUMENT and decision.citations and not conversation.steps:
+            # A question about the rules is not a «Проблема со входом»: name what was asked about.
+            document = decision.citations[0].title.split(" — ")[0]
+            conversation.summary = f"Вопрос по документу «{document}»"
         self._message(
             conversation,
             "assistant",

@@ -181,6 +181,13 @@ class TriageEngine:
                 (match.chunk for match in matches if match.chunk.id.startswith("document:")),
                 None,
             )
+            if company is None and not context.completed_steps and self.answer_policy.asks_about_rules(query):
+                # A question about the rules, not a complaint: company documents count even
+                # when the words also fit a scenario («какие требования к паролю?»).
+                company = next(
+                    (match.chunk for match in self.retriever.search(query, None, documents_only=True)),
+                    None,
+                )
             if company is not None:
                 last = context.completed_steps[-1] if context.completed_steps else None
                 if last is not None and last.step_id == f"knowledge.{company.id}":

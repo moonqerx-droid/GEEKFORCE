@@ -22,6 +22,7 @@ from app.db.session import SessionLocal, engine
 from app.core.config import get_settings
 from app import models  # noqa: F401 -- registers SQLAlchemy tables
 from app.services.admin import bootstrap_admin
+from app.api.routes.conversations import get_triage_engine
 
 
 @asynccontextmanager
@@ -30,6 +31,9 @@ async def lifespan(_: FastAPI):
     settings = get_settings()
     with SessionLocal() as session:
         bootstrap_admin(session, email=settings.admin_email, password=settings.admin_password)
+    # Build the engine now: its meaning index starts embedding in the background, so the
+    # first employees after a restart do not get the keywords-only path.
+    get_triage_engine()
     yield
 
 

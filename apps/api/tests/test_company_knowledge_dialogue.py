@@ -178,3 +178,11 @@ def test_rejecting_a_document_answer_still_reaches_a_specialist(client, admin):
 
     assert response.status_code == 200, response.text
     assert response.json()["status"] == "ESCALATED"
+
+
+def test_a_document_answer_is_titled_by_the_document_not_by_a_problem(client, admin):
+    upload_markdown(client)
+    _, result = ask(client, "Как подключиться к VPN? Клиент пишет ошибку 809.")
+
+    assert result["answer_kind"] == "document"
+    assert result["summary"] == "Вопрос по документу «Инструкция VPN»"
