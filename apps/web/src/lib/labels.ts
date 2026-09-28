@@ -89,6 +89,7 @@ export const FACT_LABEL: Record<string, string> = {
   problem_area: "Похоже на",
   details: "Подробности",
   also_reported: "Ещё сообщил",
+  screenshot_text: "Текст на скриншоте",
 };
 
 const FACT_VALUE: Record<string, string> = {

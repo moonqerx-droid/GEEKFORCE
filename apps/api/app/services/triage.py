@@ -2,6 +2,7 @@
 
 import logging
 
+from app.services import ocr
 from helpflow_ai.engine import ALSO_REPORTED
 from helpflow_ai import AnswerKind, ConversationContext, DecisionAction, StepRecord, TriageEngine
 from sqlalchemy.orm.exc import StaleDataError
@@ -85,7 +86,7 @@ class TriageDialogueService(DialogueService):
                 m.role == "user" and m.content.strip() and self.engine.conversation_intent(m.content) not in {
                     "greeting", "help", "thanks",
                 }
-            )), ""),
+            )), "") or conversation.known_facts.get(self.SCREENSHOT_FACT, ""),
             messages=[{"role": m.role, "content": m.content} for m in conversation.messages],
             known_facts=conversation.known_facts,
             asked_facts=conversation.asked_facts,
@@ -99,7 +100,7 @@ class TriageDialogueService(DialogueService):
         )
 
     ATTACHMENT_ONLY_REPLY = (
-        "Файл получил, спасибо. Напишите в двух словах, что на нём или что не работает — "
+        "Файл получен, спасибо. Напишите в двух словах, что на нём или что не работает — "
         "так я быстрее разберусь."
     )
 
@@ -132,12 +133,17 @@ class TriageDialogueService(DialogueService):
         conversation = self.get_conversation(conversation_id)
         self._check_revision(conversation, expected_revision)
         self._pending_attachments = list(attachments)
+        typed = content.strip()
+        seen = self._read_screenshots(conversation, self._pending_attachments)
+        if seen:
+            # The engine reads the words and the screenshot; history keeps what was typed.
+            content = f"{typed}. {seen}" if typed else seen
         if not content.strip() and self._pending_attachments:
             return self._attachment_only(conversation)
         if conversation.status in {"ESCALATED", "IN_PROGRESS"}:
             # A specialist owns the conversation now: keep the employee's words for them.
             try:
-                self._message(conversation, "user", content.strip())
+                self._message(conversation, "user", typed)
                 return self._commit(conversation)
             except Exception:
                 self.repository.session.rollback()
@@ -147,19 +153,19 @@ class TriageDialogueService(DialogueService):
             if conversation.status == "RESOLVED":
                 raise DialogueConflict("resolved conversation cannot be escalated")
             try:
-                self._message(conversation, "user", content.strip())
+                self._message(conversation, "user", typed)
                 self._escalate(conversation, "пользователь запросил специалиста")
                 return self._commit(conversation)
             except Exception:
                 self.repository.session.rollback()
                 raise
         if conversation.status == "TROUBLESHOOTING":
-            return self._typed_during_step(conversation, content)
+            return self._typed_during_step(conversation, content, typed)
         if conversation.status not in {"NEW", "CLARIFYING", "VERIFYING"}:
             raise DialogueConflict(f"messages are not accepted while status is {conversation.status}")
         try:
             previous_status = conversation.status
-            self._message(conversation, "user", content.strip())
+            self._message(conversation, "user", typed)
             if intent in self.SMALLTALK_REPLIES:
                 self._message(conversation, "assistant", self.SMALLTALK_REPLIES[intent])
                 return self._commit(conversation)
@@ -182,6 +188,7 @@ class TriageDialogueService(DialogueService):
                 analysis = self.engine.analyze(content)
                 for field in ("summary", "service", "symptoms", "urgency_reason", "known_facts", "missing_facts", "confidence"):
                     setattr(conversation, field, getattr(analysis, field))
+                self._merge_screenshot_facts(conversation)
                 conversation.urgency = "normal" if analysis.urgency.value == "medium" else analysis.urgency.value
                 conversation.playbook_id = analysis.recommended_playbook
                 match = None
@@ -309,13 +316,13 @@ class TriageDialogueService(DialogueService):
         "под шагом. Если выполнить его не получается, так и напишите: предложу другой путь."
     )
 
-    def _typed_during_step(self, conversation, content):
+    def _typed_during_step(self, conversation, content, typed=None):
         """A message typed while a step is on screen: its result, one more problem, or neither."""
         # Another problem first: «и ещё почта не открывается» is not «не помогло».
         added = self.engine.reports_new_problem(content, self._context(conversation))
         outcome = None if added is not None else self.engine.interpret_step_result(content)
         try:
-            self._message(conversation, "user", content.strip())
+            self._message(conversation, "user", content.strip() if typed is None else typed)
             if outcome is not None:
                 self._apply_step_outcome(conversation, StepOutcome(outcome))
                 return self._commit(conversation)
@@ -370,7 +377,38 @@ class TriageDialogueService(DialogueService):
             return
         self._advance(conversation)
 
+    SCREENSHOT_FACT = "screenshot_text"
+
+    def _read_screenshots(self, conversation, attachments) -> str | None:
+        """Text of attached screenshots; also files it into the case for the specialist."""
+        self._screenshot_facts, self._screenshot_intro = {}, ""
+        texts = [ocr.read_text(item.data, item.content_type) for item in attachments]
+        seen = "\n".join(text for text in texts if text)
+        if not seen:
+            return None
+        line = ocr.error_line(seen)
+        self._screenshot_facts = {self.SCREENSHOT_FACT: seen}
+        if line:
+            self._screenshot_facts["error_text"] = line
+            self._screenshot_intro = f"На скриншоте вижу: «{line}»."
+        else:
+            self._screenshot_intro = "Скриншот прочитан."
+        self._merge_screenshot_facts(conversation)
+        return seen
+
+    def _merge_screenshot_facts(self, conversation):
+        facts = getattr(self, "_screenshot_facts", None)
+        if facts:
+            # What the employee typed wins over what OCR read.
+            conversation.known_facts = {**facts, **conversation.known_facts,
+                                        self.SCREENSHOT_FACT: facts[self.SCREENSHOT_FACT]}
+
     def _advance(self, conversation, intro: str = ""):
+        self._merge_screenshot_facts(conversation)
+        seen_intro = getattr(self, "_screenshot_intro", "")
+        if seen_intro:
+            intro = f"{seen_intro} {intro}".strip()
+            self._screenshot_intro = ""
         decision = self.engine.decide(self._context(conversation))
         conversation.rag_source_ids = list(decision.source_ids)
         conversation.ai_fallback_reason = decision.fallback_reason

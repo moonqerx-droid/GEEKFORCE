@@ -7,6 +7,11 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 
 WORKDIR /app
 
+# Tesseract reads error text from attached screenshots (Russian and English).
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends tesseract-ocr tesseract-ocr-rus tesseract-ocr-eng \
+    && rm -rf /var/lib/apt/lists/*
+
 COPY apps/api/requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
