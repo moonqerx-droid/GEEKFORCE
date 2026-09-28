@@ -162,6 +162,26 @@ class TriageEngine:
                 None,
             )
             if company is not None:
+                last = context.completed_steps[-1] if context.completed_steps else None
+                if last is not None and last.step_id == f"knowledge.{company.id}":
+                    if last.outcome == StepOutcome.HELPED and not context.verification_failed:
+                        return Decision(
+                            action=DecisionAction.VERIFY,
+                            message="Проверьте, пожалуйста: ответ из документа решил ваш вопрос?",
+                            reason="ответ по корпоративному документу помог",
+                            source_ids=[company.id],
+                            answer_kind=AnswerKind.DOCUMENT,
+                            citations=[Citation(
+                                source_id=company.id,
+                                title=company.title,
+                                quote=_safe_company_excerpt(company.text),
+                            )],
+                        )
+                    playbook = self.kb.get(context.playbook_id or "unknown")
+                    return self._escalate(
+                        playbook,
+                        "ответ по корпоративному документу не решил вопрос",
+                    ).model_copy(update={"playbook_id": playbook.id})
                 decision = _company_knowledge_decision(company)
                 if (
                     self.llm is not None
@@ -781,17 +801,20 @@ def _company_knowledge_decision(chunk: KnowledgeChunk) -> Decision:
 
 
 def _safe_company_excerpt(text: str) -> str:
-    """Return one verbatim span while excluding a line that tries to control the assistant."""
+    """Return one verbatim span while excluding every assistant-control line."""
     source = text.strip()
-    injection = _DOCUMENT_INJECTION.search(source)
-    if injection is None:
-        excerpt = source
-    else:
-        line_start = source.rfind("\n", 0, injection.start()) + 1
-        next_break = source.find("\n", injection.end())
-        line_end = len(source) if next_break < 0 else next_break + 1
-        candidates = (source[:line_start].strip(), source[line_end:].strip())
-        excerpt = max(candidates, key=len)
+    safe_blocks: list[str] = []
+    current: list[str] = []
+    for line in source.splitlines(keepends=True):
+        if _DOCUMENT_INJECTION.search(line):
+            if current:
+                safe_blocks.append("".join(current).strip())
+                current = []
+            continue
+        current.append(line)
+    if current:
+        safe_blocks.append("".join(current).strip())
+    excerpt = max((block for block in safe_blocks if block), key=len, default="")
     if len(excerpt) <= 900:
         return excerpt
     return excerpt[:900].rsplit(" ", 1)[0].rstrip() or excerpt[:900]
