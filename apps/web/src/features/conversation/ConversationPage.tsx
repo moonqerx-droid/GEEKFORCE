@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { PanelRight, UserRoundCheck } from "lucide-react";
-import type { Conversation } from "../../api/types";
+import type { Conversation, Message } from "../../api/types";
 import { Spinner, ErrorState, Badge } from "../../components/primitives";
 import { CasePassport } from "../../components/CasePassport";
 import { DebugPanel } from "../../components/DebugPanel";
@@ -11,6 +11,9 @@ import { WelcomeScreen } from "./WelcomeScreen";
 import { MessageThread } from "./MessageThread";
 import { stepMarkers } from "./steps";
 import { StepCard } from "./StepCard";
+import { useTabNotice } from "../../lib/useTabNotice";
+
+const NO_MESSAGES: Message[] = [];
 import { QuickReplies } from "./QuickReplies";
 import { Composer } from "./Composer";
 import { OutagePanel, VerifyingPanel, ResolvedPanel, WaitingPanel } from "./StatusPanels";
@@ -55,6 +58,8 @@ export function ConversationPage({ onActivity }: { onActivity?: (conversation: C
     // Only the identity/progress of the conversation matters for the list.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [conv.conversation?.id, revision, messageCount]);
+
+  useTabNotice(conv.conversation?.messages ?? NO_MESSAGES);
 
   if (conv.phase === "loading") {
     return <div className="chat-page chat-page-center"><Spinner label="Загружаем обращение…" /></div>;
