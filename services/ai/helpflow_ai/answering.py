@@ -24,7 +24,8 @@ _FUNCTION = frozenset(
     "а и или но же ли бы не ни то это как какой каков что где когда куда откуда кто сколько "
     "почему зачем чем чего кому к в во на по о об от до для за из с со у при про над под "
     "мне меня мой моя мои наш наша свой нужно надо можно должный быть есть вообще сейчас "
-    "подсказать сказать скажи подскажи пожалуйста такой весь всё все раз".split()
+    "подсказать сказать скажи подскажи пожалуйста такой весь всё все раз "
+    "он она оно они его ее их это этот эта спасибо понятно ясно если тогда еще ещё".split()
 )
 STEM = 5
 # Share of the question's meaningful words a sentence must cover to count as an answer.
@@ -49,8 +50,21 @@ def content_words(text: str) -> list[str]:
     return list(dict.fromkeys(word for word in words if word not in _FUNCTION and len(word) > 1))
 
 
+# How a question names what a rule states: «какой длины» is answered by «не короче 10 символов».
+_RELATED = {
+    "длина": {"символ", "короткий", "длинный"},
+    "размер": {"символ", "мб", "гб"},
+    "стоимость": {"рубль"},
+    "сумма": {"рубль"},
+    "граница": {"рубеж"},
+    "заграница": {"рубеж"},
+}
+
+
 def _matches(word: str, pool: set[str], stems: set[str]) -> bool:
-    return word in pool or (len(word) >= STEM and word[:STEM] in stems)
+    if word in pool or (len(word) >= STEM and word[:STEM] in stems):
+        return True
+    return any(related in pool for related in _RELATED.get(word, ()))
 
 
 def sentences(text: str) -> list[str]:
@@ -85,7 +99,9 @@ def focus(question: str, text: str, title: str = "", limit: int = 2) -> Focus | 
     if not scored:
         return None
     best_total = max(item[1] for item in scored)
-    if best_total < MIN_COVERAGE:
+    if best_total < MIN_COVERAGE or max(item[0] for item in scored) == 0:
+        # The title alone is not an answer: «как оформить больничный?» shares only the word
+        # «Оформление» with a travel-approval rule.
         return None
     best_own = max(item[0] for item in scored)
     ranked = sorted((item for item in scored if item[0] >= best_own * 0.8), reverse=True)[:limit]

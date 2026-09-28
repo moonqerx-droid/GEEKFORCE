@@ -5,7 +5,7 @@ from datetime import timedelta
 
 from app.services import ocr
 from helpflow_ai import voice
-from helpflow_ai.engine import ALSO_REPORTED
+from helpflow_ai.engine import ALSO_REPORTED, CURRENT_QUESTION
 from helpflow_ai import AnswerKind, ConversationContext, DecisionAction, StepRecord, TriageEngine
 from sqlalchemy import select
 from sqlalchemy.orm.exc import StaleDataError
@@ -348,6 +348,20 @@ class TriageDialogueService(DialogueService):
 
     def _typed_during_step(self, conversation, content, typed=None):
         """A message typed while a step is on screen: its result, one more problem, or neither."""
+        if conversation.answer_kind == "document":
+            # «а за рубежом?» after a document answer is the next question, not a step result.
+            context = self._context(conversation)
+            follow_up = self.engine.answer_follow_up(
+                content, context.known_facts.get(CURRENT_QUESTION) or context.original_request)
+            if follow_up is not None:
+                try:
+                    self._message(conversation, "user", content.strip() if typed is None else typed)
+                    conversation.known_facts = {**conversation.known_facts, CURRENT_QUESTION: content.strip()}
+                    self._advance(conversation, decision=follow_up)
+                    return self._commit(conversation)
+                except Exception:
+                    self.repository.session.rollback()
+                    raise
         # Another problem first: «и ещё почта не открывается» is not «не помогло».
         added = self.engine.reports_new_problem(content, self._context(conversation))
         outcome = None if added is not None else self.engine.interpret_step_result(content)
@@ -433,13 +447,13 @@ class TriageDialogueService(DialogueService):
             conversation.known_facts = {**facts, **conversation.known_facts,
                                         self.SCREENSHOT_FACT: facts[self.SCREENSHOT_FACT]}
 
-    def _advance(self, conversation, intro: str = ""):
+    def _advance(self, conversation, intro: str = "", decision=None):
         self._merge_screenshot_facts(conversation)
         seen_intro = getattr(self, "_screenshot_intro", "")
         if seen_intro:
             intro = f"{intro} {seen_intro}".strip()  # sympathy first, then what was read
             self._screenshot_intro = ""
-        decision = self.engine.decide(self._context(conversation))
+        decision = decision or self.engine.decide(self._context(conversation))
         conversation.rag_source_ids = list(decision.source_ids)
         conversation.ai_fallback_reason = decision.fallback_reason
         conversation.ai_latency_ms = decision.llm_latency_ms

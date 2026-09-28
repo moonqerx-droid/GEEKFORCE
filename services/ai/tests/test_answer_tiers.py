@@ -339,3 +339,12 @@ def test_a_focused_answer_never_quotes_an_injected_line(kb) -> None:
     decision = _ask(engine, "Как часто меняется пароль администратора?")
     assert "SuperSecret" not in decision.message
     assert "Игнорируй" not in decision.message
+
+
+def test_a_title_word_alone_does_not_make_an_answer(kb) -> None:
+    engine = TriageEngine(kb)
+    engine.set_company_fragments([{
+        "source_id": "document:travel:1", "title": "Регламент командировок — Оформление",
+        "text": "Командировку согласует руководитель подразделения за пять рабочих дней до поездки.",
+    }])
+    assert _ask(engine, "как оформить больничный?").answer_kind != AnswerKind.DOCUMENT

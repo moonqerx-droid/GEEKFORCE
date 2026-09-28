@@ -2099,3 +2099,117 @@
   say: ["помогите, беда"]
   playbook: unknown
   tags: [контроль-5]
+
+# --- уточняющие вопросы после ответа по документу ------------------------------
+
+- id: qf-abroad-after-russia
+  say: ["Сколько суточных по России?", "а за рубежом?"]
+  end: answer
+  expect_text: ["2500"]
+  tags: [вопросы]
+
+- id: qf-report-after-approval
+  say: ["Кто согласует командировку?", "а когда сдавать отчёт после поездки?"]
+  end: answer
+  expect_text: ["трёх рабочих дней"]
+  tags: [вопросы]
+
+- id: qf-thanks-and-a-question
+  say: ["Как часто менять пароль?", "спасибо, а какой длины он должен быть?"]
+  end: answer
+  expect_text: ["10 символов"]
+  tags: [вопросы]
+
+- id: qf-error-after-client
+  say: ["Какой VPN-клиент использовать из дома?", "а если ошибка 809?"]
+  end: answer
+  expect_text: ["раздаче интернета"]
+  tags: [вопросы]
+
+- id: qf-then-confirmed
+  say: ["Сколько суточных по России?", "а за рубежом?", "@helped"]
+  end: resolved
+  tags: [вопросы]
+
+- id: qf-no-source-follow-up
+  say: ["Сколько суточных по России?", "а сколько дней отпуска положено?"]
+  end: escalated
+  expect_text: ["в документах компании"]
+  tags: [вопросы]
+
+- id: qf-thanks-closes
+  say: ["Как часто менять пароль?", "спасибо, понятно"]
+  end: resolved
+  tags: [вопросы]
+
+# --- контрольные вопросы 2: слепая группа, замерена один раз, не подгонять ---
+
+- id: qb-per-diem-foreign
+  say: ["сколько платят суточных в зарубежной командировке"]
+  end: answer
+  expect_text: ["2500"]
+  tags: [вопросы, контроль-вопросы-2]
+
+- id: qb-report-where
+  say: ["куда сдавать авансовый отчёт?"]
+  end: answer
+  expect_text: ["в бухгалтерию"]
+  tags: [вопросы, контроль-вопросы-2]
+
+- id: qb-approval-deadline
+  say: ["когда крайний срок согласования командировки"]
+  end: answer
+  expect_text: ["пять рабочих дней"]
+  tags: [вопросы, контроль-вопросы-2]
+
+- id: qb-vpn-from-home
+  say: ["можно ли подключаться к рабочим системам из дома без впн?"]
+  end: answer
+  expect_text: ["только через VPN"]
+  tags: [вопросы, контроль-вопросы-2]
+
+- id: qb-809-router
+  say: ["при чём тут роутер и ошибка 809?"]
+  end: answer
+  expect_text: ["роутер"]
+  tags: [вопросы, контроль-вопросы-2]
+
+- id: qb-password-uppercase
+  say: ["нужны ли в пароле заглавные буквы?"]
+  end: answer
+  expect_text: ["заглавной"]
+  tags: [вопросы, контроль-вопросы-2]
+
+- id: qb-password-reset-how
+  say: ["где сбросить пароль если забыл"]
+  expect_text: ["портал"]
+  tags: [вопросы, контроль-вопросы-2]
+
+- id: qb-sick-leave
+  say: ["как оформить больничный?"]
+  end: escalated
+  tags: [вопросы, контроль-вопросы-2]
+
+- id: qb-parking
+  say: ["есть ли у офиса парковка для сотрудников?"]
+  end: escalated
+  expect_text: ["в документах компании"]
+  tags: [вопросы, контроль-вопросы-2]
+
+- id: qb-screenshot-mac
+  say: ["как сделать снимок экрана на маке?"]
+  end: general
+  expect_text: ["Cmd"]
+  tags: [вопросы, контроль-вопросы-2]
+
+- id: qb-follow-up-russia
+  say: ["суточные за границей сколько?", "а по россии?"]
+  end: answer
+  expect_text: ["700"]
+  tags: [вопросы, контроль-вопросы-2]
+
+- id: qb-follow-up-length-then-period
+  say: ["какой минимальный пароль по длине?", "и как часто его менять?"]
+  end: answer
+  expect_text: ["90 дней"]
+  tags: [вопросы, контроль-вопросы-2]

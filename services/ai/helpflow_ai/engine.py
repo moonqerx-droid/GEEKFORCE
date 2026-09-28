@@ -55,6 +55,7 @@ URGENT_LEVELS = (Urgency.HIGH, Urgency.CRITICAL)
 ALSO_REPORTED = "also_reported"
 # Meaning-based matching (see TriageEngine._with_meaning); cosine similarity of bge-m3.
 SEMANTIC_MIN = 0.70
+SEMANTIC_QUESTION_MIN = 0.75  # «можно поставить телеграм?» 0.76 → install; «парковка?» 0.71 → no
 SEMANTIC_UNKNOWN_GAP = 0.05
 SEMANTIC_SWITCH_GAP = 0.06
 SEMANTIC_SAFETY_MIN = 0.75
@@ -250,7 +251,7 @@ class TriageEngine:
     def decide(self, context: ConversationContext) -> Decision:
         """Choose the flow with rules, then optionally improve only its wording."""
         decision = self._decide_flow(context)
-        query = context.original_request or _first_user_message(context)
+        query = _current_question(context)
         if (
             not context.asked_facts and not context.completed_steps
             and context.playbook_id not in _PROTECTED_PLAYBOOKS
@@ -273,6 +274,29 @@ class TriageEngine:
                             f"Передаю вопрос {voice.to_whom(playbook.escalation_team)} — ответ придёт сюда."),
             })
         return decision
+
+    def answer_follow_up(self, message: str, previous: str = "") -> Decision | None:
+        """A new question typed right after a document answer («а за рубежом?»): its answer
+        from the documents, an honest «нет ответа», or None if it is not a question."""
+        if not (message.strip().endswith("?") or self.answer_policy.is_information_question(message)):
+            return None
+        best = self._best_document(message)
+        if best is None and previous and len(answering.content_words(message)) <= 2:
+            # Only a short elliptical follow-up («а для руководителей?») borrows the previous
+            # question — and the answer must still speak to its own words.
+            joined = self._best_document(f"{previous} {message}")
+            if joined is not None and answering.focus(message, joined[1]) is not None:
+                best = joined
+        if best is not None:
+            return _company_knowledge_decision(*best)
+        if self.answer_policy.is_information_question(message):
+            playbook = self.kb.get("unknown")
+            return self._escalate(playbook, "нет подтверждённого источника для ответа на вопрос").model_copy(update={
+                "playbook_id": playbook.id,
+                "message": ("В документах компании ответа на этот вопрос нет, а гадать я не буду. "
+                            f"Передаю вопрос {voice.to_whom(playbook.escalation_team)} — ответ придёт сюда."),
+            })
+        return None
 
     def _best_document(self, query: str) -> tuple[KnowledgeChunk, str] | None:
         """The company fragment whose sentences answer the question best, with those sentences."""
@@ -299,7 +323,7 @@ class TriageEngine:
         return chunk, text
 
     def _decide_flow(self, context: ConversationContext) -> Decision:
-        query = context.original_request or _first_user_message(context)
+        query = _current_question(context)
         if context.playbook_id not in _PROTECTED_PLAYBOOKS:
             matches = self.retriever.search(query, context.playbook_id)
             company = next(
@@ -691,7 +715,8 @@ class TriageEngine:
 
     # --- internals ----------------------------------------------------------
 
-    def _with_meaning(self, text: str, found: rules.Classification) -> rules.Classification:
+    def _with_meaning(self, text: str, found: rules.Classification,
+                      minimum: float = None) -> rules.Classification:
         """Let the embedding model correct the keywords when it is clearly more certain.
 
         Thresholds come from the golden dialogues: where the two disagree, the model is
@@ -699,6 +724,7 @@ class TriageEngine:
         safety scenarios are never overridden, and a mass outage is never inferred from
         meaning alone (it needs «у всех»-type evidence).
         """
+        minimum = SEMANTIC_MIN if minimum is None else minimum
         ranked = self.semantic.rank(text) if self.semantic is not None else None
         if not ranked:
             return found
@@ -710,9 +736,9 @@ class TriageEngine:
             confident = best >= SEMANTIC_SAFETY_MIN and gap >= SEMANTIC_SAFETY_GAP
             return rules.Classification(top, 0.9) if confident else found
         if found.playbook_id == "unknown":
-            confident = best >= SEMANTIC_MIN and gap >= SEMANTIC_UNKNOWN_GAP
+            confident = best >= minimum and gap >= SEMANTIC_UNKNOWN_GAP
         else:
-            confident = (best >= SEMANTIC_MIN and gap >= SEMANTIC_SWITCH_GAP
+            confident = (best >= minimum and gap >= SEMANTIC_SWITCH_GAP
                          and found.confidence < 0.9)
         return rules.Classification(top, round(min(0.95, best), 2)) if confident else found
 
@@ -722,7 +748,11 @@ class TriageEngine:
         keep_playbook = ctx.playbook_id and self.kb.has(ctx.playbook_id)
         classification = rules.classify(text, self.kb.playbooks)
         if not keep_playbook:
-            classification = self._with_meaning(text, classification)
+            # A question («есть ли у офиса парковка?») must not become troubleshooting by a
+            # loose resemblance: it needs a clearly closer match than a complaint does.
+            question = self.answer_policy.is_information_question(text)
+            classification = self._with_meaning(text, classification,
+                                                minimum=SEMANTIC_QUESTION_MIN if question else SEMANTIC_MIN)
         playbook = self.kb.get(ctx.playbook_id if keep_playbook else classification.playbook_id)
         urgency, reason = rules.detect_urgency(text, playbook)
         if keep_playbook:
@@ -1016,6 +1046,15 @@ def _general_guidance_decision(query: str) -> Decision:
         reason="низкорисковая обратимая общая рекомендация",
         answer_kind=AnswerKind.GENERAL,
     )
+
+
+CURRENT_QUESTION = "current_question"
+
+
+def _current_question(context: ConversationContext) -> str:
+    """The question being answered: the latest follow-up, else the first request."""
+    return (context.known_facts.get(CURRENT_QUESTION)
+            or context.original_request or _first_user_message(context))
 
 
 def _company_knowledge_decision(chunk: KnowledgeChunk, focused: str | None = None) -> Decision:
