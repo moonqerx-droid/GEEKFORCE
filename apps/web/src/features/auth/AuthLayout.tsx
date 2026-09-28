@@ -8,7 +8,7 @@ export function AuthLayout({ title, subtitle, children }: { title: string; subti
     <main className="auth-shell">
       <section className="auth-story" aria-label="О HelpFlow">
         <Link to="/" className="auth-brand">
-          <img src="/brand/helpflow-logo-512.png" alt="" />
+          <img src="/brand/helpflow-mark.svg" alt="" />
           <span>HelpFlow</span>
         </Link>
         <div className="auth-story-copy">

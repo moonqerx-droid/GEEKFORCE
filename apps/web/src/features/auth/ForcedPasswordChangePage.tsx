@@ -15,7 +15,7 @@ export function ForcedPasswordChangePage() {
   return (
     <main className="forced">
       <div className="forced-card">
-        <img className="forced-logo" src="/brand/helpflow-logo-512.png" alt="" aria-hidden="true" />
+        <img className="forced-logo" src="/brand/helpflow-mark.svg" alt="" aria-hidden="true" />
         <h1 className="forced-title">Задайте постоянный пароль</h1>
         <p className="forced-lead">
           {user ? `${user.first_name}, в` : "В"}аш аккаунт создан или сброшен руководителем поддержки с временным паролем.

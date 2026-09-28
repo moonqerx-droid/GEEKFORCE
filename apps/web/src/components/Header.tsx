@@ -47,7 +47,7 @@ export function Header({ role, name, onLogout }: HeaderProps) {
   return (
     <header className="app-header">
       <Link to={homePathFor(role)} className="app-header-brand">
-        <img className="app-header-logo" src="/brand/helpflow-logo-512.png" alt="" aria-hidden="true" />
+        <img className="app-header-logo" src="/brand/helpflow-mark.svg" alt="" aria-hidden="true" />
         <span>HelpFlow</span>
       </Link>
       <nav className="app-header-nav" aria-label="Разделы">

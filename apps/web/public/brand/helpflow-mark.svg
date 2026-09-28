@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="HelpFlow">
+  <!-- The letter H: the left leg is a speech bubble (a message); a path leads from the
+       problem (ink dot) to the solution (sea-green dot, people from support). -->
+  <defs>
+    <clipPath id="hf-letter">
+      <rect x="93" y="96" width="326" height="302"/>
+    </clipPath>
+  </defs>
+  <path fill="#e8572a" d="M137 96h36a44 44 0 0 1 44 44v230a44 44 0 0 1-44 44h-26l-40 32c-10 8-24 1-24-12V140a44 44 0 0 1 44-44Z"/>
+  <rect fill="#e8572a" x="295" y="96" width="124" height="302" rx="44"/>
+  <g clip-path="url(#hf-letter)">
+    <path d="M160 300C236 300 272 232 352 232" fill="none" stroke="#e8572a" stroke-width="150" stroke-linecap="round"/>
+  </g>
+  <path d="M160 300C236 300 272 232 352 232" fill="none" stroke="#ffffff" stroke-width="100" stroke-linecap="round"/>
+  <circle cx="160" cy="300" r="34" fill="#2a211b"/>
+  <circle cx="352" cy="232" r="34" fill="#1f4a5a"/>
+</svg>
