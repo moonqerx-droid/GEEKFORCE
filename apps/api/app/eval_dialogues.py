@@ -139,7 +139,9 @@ def play(service: TriageDialogueService, case: dict) -> Result:
     for phrase in case.get("forbid_text", []):
         if phrase.lower() in said:
             problems.append(f"помощник сказал лишнее: «{phrase}»")
-    last_turn = transcript[transcript.index(f"  → {case['say'][-1]}"):] if transcript else []
+    marker = f"  → {case['say'][-1]}"
+    # The dialogue may have ended before the last line was said: nothing to check then.
+    last_turn = transcript[len(transcript) - transcript[::-1].index(marker) - 1:] if marker in transcript else []
     for phrase in case.get("expect_text", []):
         if not any(phrase.lower() in line.lower() for line in last_turn[1:]):
             problems.append(f"в ответ на последнюю реплику нет «{phrase}»")

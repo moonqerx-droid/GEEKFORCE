@@ -67,6 +67,8 @@ OUTCOME_LABELS = {
     StepOutcome.CANNOT_DO: "не удалось выполнить",
 }
 _PROTECTED_PLAYBOOKS = {"credentials_request", "mass_incident", "security_incident"}
+# The named thing is the service: «Медленно работает Excel», «Не работает мышь».
+SUBJECT_SERVICE_PLAYBOOKS = {"slow_performance", "peripherals", "app_not_starting"}
 # How facts read in the specialist's card: short labels and plain values, never codes.
 FACT_LABELS = {
     "error_text": "Что на экране",
@@ -419,7 +421,7 @@ class TriageEngine:
         step = self.next_step(playbook, context)
         if step is not None and step.requires_admin:
             # Admin rights or a risky change: the specialist does it, the employee is not asked to.
-            decision = self._escalate(playbook, f"нужны права администратора: {step.title}")
+            decision = self._escalate(playbook, f"нужны права администратора: {step.title}", context.known_facts)
             note = (f"Следующий шаг — «{step.title}» — делает специалист: для него нужны права "
                     "администратора, самому это делать не нужно.")
             return decision.model_copy(update={"message": f"{note} {decision.message}"})
@@ -430,7 +432,7 @@ class TriageEngine:
             # Diagnosis is exhausted: hand off now and leave the workaround as a tip, rather
             # than one more step for someone who already pressed «не помогло».
             decision = self._escalate(playbook, f"выполнено шагов: {len(context.completed_steps)}, "
-                                                "проблема не решена")
+                                                "проблема не решена", context.known_facts)
             tip = f"А пока специалист разбирается, можно обойтись так. {step.instruction}"
             return decision.model_copy(update={"message": f"{decision.message} {tip}"})
         if step is not None:
@@ -439,8 +441,9 @@ class TriageEngine:
                                   "следующий подходящий шаг сценария")
         tried = len(context.completed_steps)
         if not tried:
-            return self._escalate(playbook, "для этого случая нет шагов, которые сотрудник может сделать сам")
-        return self._escalate(playbook, f"выполнено шагов: {tried}, проблема не решена")
+            return self._escalate(playbook, "для этого случая нет шагов, которые сотрудник может сделать сам",
+                                  context.known_facts)
+        return self._escalate(playbook, f"выполнено шагов: {tried}, проблема не решена", context.known_facts)
 
     def _render_decision(self, decision: Decision, context: ConversationContext) -> Decision:
         playbook = self.kb.get(decision.playbook_id or context.playbook_id)
@@ -678,8 +681,8 @@ class TriageEngine:
             playbook = first
             plan = [plan[0], *[i for i in plan[1:] if i.playbook_id != first.id]]
         service = rules.detect_service(text, playbook)
-        if playbook.id == "slow_performance" and service == playbook.service:
-            service = rules.detect_subject(text) or service  # «эксель тормозит» → Excel
+        if playbook.id in SUBJECT_SERVICE_PLAYBOOKS and service == playbook.service:
+            service = rules.detect_subject(text) or service  # «эксель тормозит» → Excel, «мышка» → Мышь
         symptoms = rules.detect_symptoms(text, playbook)
         stated = rules.extract_facts(text)
         subject = rules.detect_subject(text) if playbook.id == "unknown" else None

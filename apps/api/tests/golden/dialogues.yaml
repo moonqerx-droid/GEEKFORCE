@@ -1579,3 +1579,140 @@
   say: ["в письме был архив с паролем, я его распаковал"]
   playbook: security_incident
   tags: [контроль-4]
+
+# --- Новые сценарии answers-v2: 1С, периферия, запуск и установка программ -------------
+# Фразы написаны до сценариев и не повторяют ни контроль-4, ни examples.
+
+- id: new-1c-license-short
+  say: ["в 1с кончились лицензии"]
+  playbook: onec_login
+  tags: [понимание, новые]
+- id: new-1c-cant-login
+  say: ["не пускает в 1с бухгалтерию, пароль вроде правильный"]
+  playbook: onec_login
+  tags: [понимание, новые]
+- id: new-1c-session
+  say: ["1с пишет что сеанс уже открыт, а я никуда не заходил"]
+  playbook: onec_login
+  tags: [понимание, новые]
+- id: new-1c-no-base
+  say: ["при запуске 1с нет нашей базы в списке"]
+  playbook: onec_login
+  tags: [понимание, новые]
+- id: new-1c-zup
+  say: ["не могу зайти в зуп, говорит пользователь не найден"]
+  playbook: onec_login
+  tags: [понимание, новые]
+- id: new-1c-slow-stays-slow
+  say: ["1с тормозит при проведении документов"]
+  playbook: slow_performance
+  tags: [понимание, новые]
+- id: new-1c-down-stays-service
+  say: ["1с не отвечает, сервер недоступен"]
+  playbook: service_unavailable
+  tags: [понимание, новые]
+- id: new-periph-mouse
+  say: ["мышка не реагирует"]
+  playbook: peripherals
+  tags: [понимание, новые]
+- id: new-periph-keyboard-keys
+  say: ["на клаве не работают некоторые кнопки"]
+  playbook: peripherals
+  tags: [понимание, новые]
+- id: new-periph-monitor-black
+  say: ["монитор чёрный, хотя системник работает"]
+  playbook: peripherals
+  tags: [понимание, новые]
+- id: new-periph-second-screen
+  say: ["не могу подключить второй экран к ноутбуку"]
+  playbook: peripherals
+  tags: [понимание, новые]
+- id: new-periph-layout
+  say: ["клавиатура печатает только английские буквы"]
+  playbook: peripherals
+  tags: [понимание, новые]
+- id: new-periph-cursor
+  say: ["курсор дёргается и прыгает по экрану"]
+  playbook: peripherals
+  tags: [понимание, новые]
+- id: new-app-word-crash
+  say: ["ворд закрывается сам через минуту после открытия"]
+  playbook: app_not_starting
+  tags: [понимание, новые]
+- id: new-app-wont-launch
+  say: ["программа для отчётов не запускается, ничего не происходит"]
+  playbook: app_not_starting
+  tags: [понимание, новые]
+- id: new-app-install-error
+  say: ["при установке обновления программы вылезает ошибка и всё откатывается"]
+  playbook: app_not_starting
+  tags: [понимание, новые]
+- id: new-app-excel-error
+  say: ["excel при запуске пишет что произошла ошибка"]
+  playbook: app_not_starting
+  tags: [понимание, новые]
+- id: new-app-teams-stays-calls
+  say: ["тимс не запускается, а скоро созвон"]
+  playbook: video_calls
+  tags: [понимание, новые]
+- id: new-install-need
+  say: ["нужна программа для работы с чертежами"]
+  playbook: software_install
+  tags: [понимание, новые]
+- id: new-install-please
+  say: ["установите пожалуйста 7-zip"]
+  playbook: software_install
+  tags: [понимание, новые]
+- id: new-install-license
+  say: ["нужна лицензия на офис, пишет что пробный период закончился"]
+  playbook: software_install
+  tags: [понимание, новые]
+- id: new-install-can-i
+  say: ["можно мне поставить телеграм на рабочий комп?"]
+  playbook: software_install
+  tags: [понимание, новые]
+- id: new-install-vpn-connection-stays-vpn
+  say: ["не могу установить соединение с впн"]
+  playbook: vpn_connection
+  tags: [понимание, новые]
+
+- id: new-dialog-1c-license
+  say: ["1с пишет нет свободной лицензии", "@not_helped"]
+  playbook: onec_login
+  end: escalated
+  max_questions: 0
+  expect_text: ["специалист"]
+  tags: [диалог, новые]
+- id: new-dialog-1c-vague
+  say: ["не могу войти в 1с", "пишет неправильное имя пользователя или пароль"]
+  playbook: onec_login
+  end: step
+  max_questions: 1
+  tags: [диалог, новые]
+- id: new-dialog-mouse-wireless
+  say: ["мышь не работает", "беспроводная"]
+  playbook: peripherals
+  end: step
+  expect_text: ["батарейк"]
+  max_questions: 1
+  tags: [диалог, новые]
+- id: new-dialog-monitor
+  say: ["монитор не показывает картинку"]
+  playbook: peripherals
+  end: step
+  max_questions: 0
+  expect_text: ["кабель"]
+  tags: [диалог, новые]
+- id: new-dialog-app-steps
+  say: ["программа учёта не запускается", "ничего не пишет", "@not_helped", "@not_helped"]
+  playbook: app_not_starting
+  end: escalated
+  tags: [диалог, новые]
+- id: new-dialog-install
+  say: ["нужно установить visio", "@not_helped"]
+  playbook: software_install
+  end: escalated
+  max_questions: 0
+  expect_text: ["администратор"]
+  expect_fact: {software: "visio"}
+  tags: [диалог, новые]

@@ -21,4 +21,4 @@ def test_golden_dialogues_meet_the_quality_bar():
     assert table["понимание"]["playbook"] >= 0.85, failures
     assert core["всего"]["clean"] >= 0.87, failures
     assert core["всего"]["questions"] <= 1.5, failures
-    assert table["контроль-4"]["playbook"] >= 0.68, failures
+    assert table["контроль-4"]["playbook"] >= 0.88, failures

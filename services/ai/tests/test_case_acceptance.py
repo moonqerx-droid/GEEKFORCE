@@ -204,6 +204,17 @@ def test_printer_jam_that_does_not_clear_goes_to_specialist(simulate, engine):
     ("не включается монитор, горит оранжевая лампочка!!", "Монитор"),
     ("клава не печатает русские буквы", "Клавиатура"),
 ])
+def test_keyboard_mouse_and_monitor_have_their_own_scenario(simulate, message, subject):
+    sim = simulate(message)
+    assert sim.analysis.recommended_playbook == "peripherals"
+    assert sim.analysis.service == subject
+    assert sim.decision.action in (DecisionAction.ASK, DecisionAction.STEP)
+
+
+@pytest.mark.parametrize("message, subject", [
+    ("проектор в переговорке не включается", "Проектор"),
+    ("сканер не сканирует, лампочка мигает", "Сканер"),
+])
 def test_named_device_without_playbook_is_handed_off_at_once(simulate, engine, message, subject):
     sim = simulate(message)
     assert sim.analysis.recommended_playbook == "unknown"

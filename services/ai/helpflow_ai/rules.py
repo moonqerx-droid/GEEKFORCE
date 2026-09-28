@@ -5,6 +5,7 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass
 from functools import lru_cache
+from itertools import dropwhile, takewhile
 
 from .schemas import Playbook, Question, QuestionKind, Urgency
 from .understanding import morph
@@ -144,9 +145,24 @@ def _keyword_weight(keyword: str) -> int:
 _NOBODY_CAN_RE = re.compile(r"(?<!\w)никто(?: \S+){1,3} не (?:может|могут|получается|работает)(?!\w)")
 
 
+# «программа учёта не запускается»: a program named with a word or two before the failure.
+_PROGRAM_FAILS_RE = re.compile(
+    r"(?<!\w)(?:программ|приложени)\w*(?: \S+){0,2} не (?:запуска|открыва|устанавлива|стартует)"
+)
+
+
+# «в 1с кончились лицензии»: 1С and a sign-in sign anywhere in the message.
+_ONEC_RE = re.compile(r"(?<!\w)1[сc](?!\w)")
+_ONEC_LOGIN_RE = re.compile(r"лиценз|сеанс|авториз|списк\w* баз|баз\w*(?: \S+){0,2} в списке")
+
+
 def score_playbook(norm_text: str, playbook: Playbook) -> int:
     score = sum(_keyword_weight(kw) for kw in playbook.keywords if contains(norm_text, kw))
     if playbook.id == "mass_incident" and _NOBODY_CAN_RE.search(norm_text):
+        score += 2
+    if playbook.id == "app_not_starting" and _PROGRAM_FAILS_RE.search(norm_text):
+        score += 2
+    if playbook.id == "onec_login" and _ONEC_RE.search(norm_text) and _ONEC_LOGIN_RE.search(norm_text):
         score += 2
     return score
 
@@ -383,7 +399,28 @@ def extract_facts(text: str) -> dict[str, str]:
     resource = _RESOURCE_RE.search(text)
     if resource:
         facts["resource"] = resource.group(1).strip()[:MAX_FREE_TEXT_FACT]
+    software = _software(text)
+    if software:
+        facts["software"] = software
     return facts
+
+
+# «нужно установить visio», «поставьте мне пожалуйста microsoft project», «лицензия на офис».
+_INSTALL_RE = re.compile(
+    r"(?:установ(?:ить|ите)|постав(?:ить|ьте)|лицензи\w*\s+на)\s+((?:\S+\s*){1,4})", re.IGNORECASE)
+_NOT_A_NAME = frozenset("мне мой мою нам пожалуйста плиз программу программа приложение софт на в во для "
+                        "рабочий рабочую рабочем компьютер комп ноутбук новый новую".split())
+
+
+def _software(text: str) -> str | None:
+    """The program asked for: up to two words after the install verb, without filler."""
+    match = _INSTALL_RE.search(text)
+    if not match:
+        return None
+    words = [w.strip(",.!?;:«»\"") for w in match.group(1).split()]
+    words = list(dropwhile(lambda w: w.lower() in _NOT_A_NAME, words))
+    name = list(takewhile(lambda w: w and w.lower() not in _NOT_A_NAME, words))[:2]
+    return " ".join(name)[:MAX_FREE_TEXT_FACT] or None
 
 
 def extract_error_text(text: str) -> str | None:
