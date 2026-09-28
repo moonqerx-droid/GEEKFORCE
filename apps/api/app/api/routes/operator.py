@@ -14,7 +14,10 @@ from app.schemas.incident import (
     IncidentResolve,
 )
 from app.services.incidents import IncidentConflict, IncidentNotFound, IncidentService
+from app.core.security import utc_now
 from app.schemas.conversation import AttachmentRead, ConversationRead, OperatorMessageCreate, OperatorTicket, ResolveCreate
+from app.schemas.sla import OperatorTicketWithSla, SlaRead
+from app.services.sla import sla_for
 from app.services.attachments import AttachmentRejected, AttachmentService
 from app.api.routes.conversations import read_limited
 from app.api.dependencies.auth import require_operator
@@ -34,16 +37,18 @@ def get_operator_service(db: Annotated[Session, Depends(get_db)]) -> OperatorSer
 ServiceDependency = Annotated[OperatorService, Depends(get_operator_service)]
 
 
-def to_ticket(conversation) -> OperatorTicket:
+def to_ticket(conversation) -> OperatorTicketWithSla:
     serialized = ConversationRead.from_model(conversation)
     original_request = next(
         (message.content for message in conversation.messages if message.role == "user"), "",
     )
-    return OperatorTicket(
+    sla = sla_for(conversation, utc_now())
+    return OperatorTicketWithSla(
         **serialized.model_dump(),
         original_request=original_request,
         owner_name=conversation.owner_name,
         owner_department=conversation.owner_department,
+        sla=SlaRead(**sla.__dict__) if sla else None,
     )
 
 
@@ -56,32 +61,32 @@ def run(action):
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
 
 
-@router.get("/tickets", response_model=list[OperatorTicket])
+@router.get("/tickets", response_model=list[OperatorTicketWithSla])
 def list_tickets(
     service: ServiceDependency,
     user: OperatorDependency,
     scope: Literal["queue", "mine", "resolved"] = "queue",
-) -> list[OperatorTicket]:
+) -> list[OperatorTicketWithSla]:
     return [to_ticket(item) for item in service.list(scope, user)]
 
 
-@router.get("/tickets/{conversation_id}", response_model=OperatorTicket)
-def get_ticket(conversation_id: str, service: ServiceDependency, _user: OperatorDependency) -> OperatorTicket:
+@router.get("/tickets/{conversation_id}", response_model=OperatorTicketWithSla)
+def get_ticket(conversation_id: str, service: ServiceDependency, _user: OperatorDependency) -> OperatorTicketWithSla:
     return run(lambda: service.get(conversation_id))
 
 
-@router.post("/tickets/{conversation_id}/assign", response_model=OperatorTicket)
-def assign_ticket(conversation_id: str, service: ServiceDependency, user: OperatorDependency) -> OperatorTicket:
+@router.post("/tickets/{conversation_id}/assign", response_model=OperatorTicketWithSla)
+def assign_ticket(conversation_id: str, service: ServiceDependency, user: OperatorDependency) -> OperatorTicketWithSla:
     return run(lambda: service.assign(conversation_id, user))
 
 
-@router.post("/tickets/{conversation_id}/messages", response_model=OperatorTicket)
+@router.post("/tickets/{conversation_id}/messages", response_model=OperatorTicketWithSla)
 def reply_to_ticket(
     conversation_id: str,
     payload: OperatorMessageCreate,
     service: ServiceDependency,
     user: OperatorDependency,
-) -> OperatorTicket:
+) -> OperatorTicketWithSla:
     try:
         attachments = AttachmentService(service.session).pending_for(conversation_id, payload.attachment_ids)
     except AttachmentRejected as exc:
@@ -89,13 +94,13 @@ def reply_to_ticket(
     return run(lambda: service.reply(conversation_id, user, payload.content, attachments))
 
 
-@router.post("/tickets/{conversation_id}/resolve", response_model=OperatorTicket)
+@router.post("/tickets/{conversation_id}/resolve", response_model=OperatorTicketWithSla)
 def resolve_ticket(
     conversation_id: str,
     payload: ResolveCreate,
     service: ServiceDependency,
     user: OperatorDependency,
-) -> OperatorTicket:
+) -> OperatorTicketWithSla:
     return run(lambda: service.resolve(conversation_id, user, payload.summary))
 
 
