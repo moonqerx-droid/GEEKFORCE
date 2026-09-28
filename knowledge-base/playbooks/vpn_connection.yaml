@@ -3,7 +3,7 @@ title: Не подключается VPN
 service: VPN
 default_urgency: medium
 escalation_team: Сетевые администраторы
-keywords: [vpn, впн, впэн, anyconnect, forticlient, fortinet, openvpn, cisco, туннел, удалённ доступ, удаленн доступ]
+keywords: [vpn, впн, впэн, anyconnect, forticlient, fortinet, openvpn, cisco, туннел, удалённ доступ, удаленн доступ, к впн, к vpn]
 examples:
   - не подключается vpn
   - впн отваливается

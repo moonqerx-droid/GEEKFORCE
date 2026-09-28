@@ -17,8 +17,8 @@ def test_golden_dialogues_meet_the_quality_bar():
     # Dialogue behaviour is fully under our control: every golden dialogue must be clean.
     assert table["диалог"]["clean"] == 1.0, failures
     # Understanding of free wording on keywords, lemmas and typo correction alone (CI has
-    # no Ollama). With meaning-based matching (`--semantic`) the same set scores ~97%.
-    assert table["понимание"]["playbook"] >= 0.85, failures
+    # no Ollama). With meaning-based matching (`--semantic`) the same set scores ~100%.
+    assert table["понимание"]["playbook"] >= 0.90, failures
     assert core["всего"]["clean"] >= 0.87, failures
     assert core["всего"]["questions"] <= 1.5, failures
-    assert table["контроль-4"]["playbook"] >= 0.88, failures
+    assert table["контроль-4"]["playbook"] >= 0.95, failures

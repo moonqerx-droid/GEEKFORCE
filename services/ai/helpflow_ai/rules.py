@@ -25,7 +25,7 @@ GENERIC_SERVICE_PLAYBOOKS = {
 }
 
 SERVICE_ALIASES: dict[str, list[str]] = {
-    "CRM": ["crm", "црм", "срм", "битрикс", "bitrix", "amocrm", "salesforce"],
+    "CRM": ["crm", "црм", "срм", "битрикс", "bitrix", "amocrm", "salesforce", "салесфорс"],
     "Почта": ["почт", "outlook", "аутлук", "exchange"],
     "VPN": ["vpn", "впн"],
     "1С": ["1с", "1c"],
@@ -147,7 +147,9 @@ _NOBODY_CAN_RE = re.compile(r"(?<!\w)никто(?: \S+){1,3} не (?:может|
 
 # «программа учёта не запускается»: a program named with a word or two before the failure.
 _PROGRAM_FAILS_RE = re.compile(
-    r"(?<!\w)(?:программ|приложени)\w*(?: \S+){0,2} не (?:запуска|открыва|устанавлива|стартует)"
+    r"(?<!\w)(?:программ|приложени|word|ворд|excel|эксель|powerpoint|пауэрпоинт|acrobat|акробат|reader)\w*"
+    r"(?: \S+){0,3} (?:не (?:запуска|открыва|устанавлива|стартует)|перестал\w* (?:запуска|открыва)|"
+    r"выда\w* ошибк|закрыва|вылета|краш)"
 )
 
 
@@ -164,7 +166,39 @@ def score_playbook(norm_text: str, playbook: Playbook) -> int:
         score += 2
     if playbook.id == "onec_login" and _ONEC_RE.search(norm_text) and _ONEC_LOGIN_RE.search(norm_text):
         score += 2
+    if playbook.id == "slow_performance" and _SLOW_SUBJECT_RE.search(norm_text):
+        score += 2
+    if playbook.id == "security_incident" and _social_engineering(norm_text):
+        score += 3
+    if playbook.id == "vpn_connection" and _REMOTE_RE.search(norm_text) and _WORK_NETWORK_RE.search(norm_text):
+        score += 3
     return score
+
+
+# «система лагает», «комп висит»: the computer itself is slow (a call that lags is not).
+_SLOW_SUBJECT_RE = re.compile(
+    r"(?<!\w)(?:комп|компьютер|ноут|ноутбук|систем|windows|браузер|хром|chrome)\w*(?: \S+){0,2} "
+    r"(?:лага\w*|висит|виснет|тупит)")
+
+
+# Credentials or codes handed over where something looked off: phishing without a link.
+_GIVEAWAY_RE = re.compile(
+    r"(?:вв[её]л\w*|указал\w*|продиктова\w*|назва\w*|сказал\w*|сообщил\w*)(?: \S+){0,4} "
+    r"(?:парол\w*|логин\w*|данн\w*|код\w*)")
+_SUSPICIOUS_RE = re.compile(
+    r"странн|подозрит|похож\w* на наш|выглядел\w* как|поддельн|фейк|незнаком|якобы|адрес друг|звонил|позвонил")
+_PRETEND_RE = re.compile(r"якобы (?:от|из)(?!\w)")
+
+
+def _social_engineering(norm_text: str) -> bool:
+    if _PRETEND_RE.search(norm_text):
+        return True
+    return bool(_GIVEAWAY_RE.search(norm_text) and _SUSPICIOUS_RE.search(norm_text))
+
+
+# «из дома не пускает в корпоративную сеть»: the work network from outside is VPN.
+_REMOTE_RE = re.compile(r"из дома|\bдома\b|домашн|удален\w*|из командировки|не в офисе")
+_WORK_NETWORK_RE = re.compile(r"(?:корпоративн|рабоч)\w* сет")
 
 
 @dataclass(frozen=True)
