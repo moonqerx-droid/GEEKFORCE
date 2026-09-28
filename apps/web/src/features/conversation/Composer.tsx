@@ -31,7 +31,9 @@ export function Composer({
   size = "regular",
   dropTarget,
   autoFocus = false,
+  hint = "Скриншот ошибки часто ускоряет решение: прикрепите его, перетащите сюда или вставьте через ⌘V / Ctrl+V.",
 }: {
+  hint?: string;
   busy: boolean;
   placeholder: string;
   onSend: (content: string, files: File[]) => Promise<void>;
@@ -219,11 +221,7 @@ export function Composer({
           <SendHorizontal size={19} aria-hidden="true" />
         </button>
       </div>
-      {allowFiles ? (
-        <p className="composer-hint">
-          Скриншот ошибки часто ускоряет решение: прикрепите его, перетащите сюда или вставьте через ⌘V / Ctrl+V.
-        </p>
-      ) : null}
+      {allowFiles && hint ? <p className="composer-hint">{hint}</p> : null}
     </form>
   );
 }

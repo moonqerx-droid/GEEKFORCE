@@ -124,6 +124,7 @@ export function TicketWorkspace({
           placeholder="Ответить сотруднику…"
           allowFiles
           dropTarget={threadRef}
+          hint="Можно приложить скриншот с подсказкой, куда нажать: перетащите файл или вставьте через ⌘V / Ctrl+V."
           onSend={async (content, files) => { await onReply(content, files); }}
         />
       ) : null}
