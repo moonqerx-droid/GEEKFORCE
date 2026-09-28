@@ -309,8 +309,9 @@ def detect_urgency(text: str, playbook: Playbook) -> tuple[Urgency, str]:
 _FACT_PATTERNS: list[tuple[str, str, str]] = [
     # (fact, value, regex over normalized text); first match per fact wins
     ("other_device_works", "yes",
-     r"(с|на|через) (телефон|смартфон|мобильн|друг\w* (компьютер|ноутбук|устройств))\w*,? "
-     r"(все |всё )?(работает|норм|открывается|заходит|пускает|ок)"),
+     # Up to two words may sit in between («с телефона CRM открывается»), but never «не».
+     r"(с|на|через) (телефон|смартфон|мобильн|друг\w* (компьютер|ноутбук|устройств))\w*,?"
+     r"(?: (?!не\b|тоже\b)[\w-]+){0,2},? (все |всё )?(работает|норм\w*|открывается|заходит|пускает|ок)"),
     ("since_when", "вчера работало, сегодня нет", r"вчера (все |всё )?работал\w*"),
     ("since_when", "с сегодняшнего дня", r"с утра|сегодня"),
     ("recurring", "yes", r"\b(опять|снова|в который раз|уже не первый раз)\b"),

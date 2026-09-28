@@ -46,3 +46,14 @@ def test_request_with_typos_is_classified_like_the_clean_one(kb):
     clean = rules.classify("Вчера всё работало, сегодня не могу зайти в систему с ноутбука, а с телефона открывается", kb.playbooks)
     typos = rules.classify("Вчера всё ранботало, сигодня не могу зайти в систему с ноутбука, а с телефона открыватся", kb.playbooks)
     assert typos.playbook_id == clean.playbook_id == "crm_login_device_specific"
+
+
+@pytest.mark.parametrize("text, expected", [
+    ("С телефона CRM открывается, с ноутбука нет", "yes"),
+    ("с телефона всё работает", "yes"),
+    ("через телефон битрикс нормально открывается", "yes"),
+    ("с телефона не открывается", None),
+    ("с телефона тоже не работает", None),
+])
+def test_other_device_works_is_found_with_a_word_in_between(text, expected):
+    assert rules.extract_facts(text).get("other_device_works") == expected

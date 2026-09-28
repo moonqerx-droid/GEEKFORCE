@@ -166,7 +166,9 @@ export function ConversationPage({ onActivity }: { onActivity?: (conversation: C
                 tone={live ? "human" : "assistant"}
                 label={c ? "Ваше сообщение" : "Опишите проблему"}
                 size={c ? "regular" : "large"}
-                placeholder={c ? COMPOSER_PLACEHOLDER[c.status] : "Например: не открывается почта, пишет «нет подключения»…"}
+                placeholder={c ? (c.status === "TROUBLESHOOTING" && c.answer_kind === "document"
+                  ? "Или напишите своими словами…"
+                  : COMPOSER_PLACEHOLDER[c.status]) : "Например: не открывается почта, пишет «нет подключения»…"}
                 allowFiles
                 dropTarget={chatRef}
                 autoFocus={!c}
