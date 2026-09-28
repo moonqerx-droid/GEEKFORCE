@@ -18,6 +18,7 @@ TIME_CRITICAL_PLAYBOOKS = ("video_calls",)
 # Playbooks whose service name is refined from the text (e.g. CRM vs "рабочая система").
 GENERIC_SERVICE_PLAYBOOKS = {
     "service_unavailable", "mass_incident", "access_rights", "unknown", "crm_login_device_specific",
+    "slow_performance",
 }
 
 SERVICE_ALIASES: dict[str, list[str]] = {

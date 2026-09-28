@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import pytest
+
 from helpflow_ai import ConversationContext, DecisionAction, StepOutcome
 
 DEMO = "Не могу войти в CRM с ноутбука, но с телефона работает. Через 20 минут встреча."
@@ -169,3 +171,14 @@ def test_unknown_issue_switches_to_the_area_the_employee_picks(simulate):
     assert sim.decision.question.fact == "details"
     sim.answer("при включении пищит и чёрный экран")
     assert sim.decision.action == DecisionAction.ESCALATE
+
+
+@pytest.mark.parametrize("message, title", [
+    ("1с тормозит", "Медленно работает 1С"),
+    ("эксель долго открывает файлы", "Медленно работает Excel"),
+    ("компьютер очень медленно работает", "Медленно работает компьютер"),
+])
+def test_slowness_is_titled_by_what_is_slow(engine, message, title):
+    analysis = engine.analyze(message)
+    assert analysis.recommended_playbook == "slow_performance"
+    assert analysis.summary == title

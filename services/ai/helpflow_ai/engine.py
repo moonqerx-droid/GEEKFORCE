@@ -535,6 +535,8 @@ class TriageEngine:
             playbook = first
             plan = [plan[0], *[i for i in plan[1:] if i.playbook_id != first.id]]
         service = rules.detect_service(text, playbook)
+        if playbook.id == "slow_performance" and service == playbook.service:
+            service = rules.detect_subject(text) or service  # «эксель тормозит» → Excel
         symptoms = rules.detect_symptoms(text, playbook)
         stated = rules.extract_facts(text)
         subject = rules.detect_subject(text) if playbook.id == "unknown" else None
@@ -904,6 +906,11 @@ def _general_how_to_decision(topic: str) -> Decision:
 def _summary(playbook: Playbook, service: str, symptoms: list[str], text: str = "") -> str:
     if playbook.id == "service_unavailable":
         title = f"Недоступен сервис {service}"
+    elif playbook.id == "slow_performance":
+        # «Медленно работает 1С» says it all; the symptom would only repeat it.
+        whole = "весь компьютер" in symptoms
+        return f"Медленно работает {service}" if service != playbook.service else (
+            "Медленно работает компьютер" if whole else playbook.title)
     elif playbook.id == "unknown" and service != playbook.service:
         title = f"Проблема: {service} (готового сценария нет)"
     elif playbook.id == "unknown" and _excerpt(text):
