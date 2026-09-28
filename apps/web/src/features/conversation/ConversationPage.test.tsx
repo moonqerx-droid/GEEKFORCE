@@ -263,8 +263,8 @@ describe("ConversationPage during a known outage", () => {
     }));
     render(<ConversationPage />);
 
-    const banner = await screen.findByRole("status", { name: "Похоже, это общий сбой" });
-    expect(banner).toHaveTextContent("VPN не работает у нескольких коллег, специалисты уже чинят.");
+    const banner = await screen.findByRole("status", { name: "Сбой уже чинят" });
+    expect(banner).toHaveTextContent("Вы в списке затронутых: когда специалисты напишут про VPN, сообщение появится здесь.");
     expect(screen.queryByText("Передали специалисту")).not.toBeInTheDocument();
   });
 });

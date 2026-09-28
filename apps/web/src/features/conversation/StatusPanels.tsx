@@ -38,9 +38,9 @@ export function OutagePanel({ conversation }: { conversation: Conversation }) {
     <section className="ribbon ribbon-outage" role="status" aria-labelledby="outage-title">
       <span className="ribbon-pulse" aria-hidden="true" />
       <p>
-        <strong id="outage-title">Похоже, это общий сбой</strong>
-        {" "}{conversation.service ?? "Сервис"} не работает у нескольких коллег, специалисты уже чинят.
-        Ничего проверять у себя не нужно: новости придут сюда, в этот чат.
+        <strong id="outage-title">Сбой уже чинят</strong>
+        {" "}Вы в списке затронутых: когда специалисты напишут про {conversation.service ?? "сервис"}, сообщение
+        появится здесь. Можно просто подождать.
       </p>
     </section>
   );

@@ -241,6 +241,11 @@
 }
 
 @media (max-width: 760px) {
+  .incident .workspace-head {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
   .admin-incident {
     grid-template-columns: 1fr;
   }
