@@ -1,24 +1,18 @@
 """Adapter from ready company documents to chunks the AI retriever can use.
 
-Not wired into TriageEngine here: the integration picks `as_engine_chunk()` or the
-fields it needs. Source ids have the form `document:<document_id>:<position>`.
+TriageDialogueService hands `as_retrieved_fragment()` of every ready chunk to the engine
+on each request. Source ids have the form `document:<document_id>:<position>`.
 """
 
 from __future__ import annotations
 
-import logging
 import re
 from dataclasses import dataclass
 
-from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.models.knowledge import KnowledgeDocument
 from app.repositories.knowledge import KnowledgeRepository
 
-logger = logging.getLogger(__name__)
-# engine id -> ready documents it was last given, to skip reloading unchanged knowledge
-_synced: dict[int, tuple] = {}
 
 DEFAULT_SERVICE = "Документы компании"
 DEFAULT_TEAM = "Service Desk L1"
@@ -88,25 +82,3 @@ def company_knowledge_chunks(session: Session) -> list[CompanyKnowledgeChunk]:
 def _keywords(title: str) -> tuple[str, ...]:
     tokens = (token.casefold().replace("ё", "е") for token in _TOKEN.findall(title))
     return tuple(dict.fromkeys(token for token in tokens if len(token) > 2 and token not in _STOP_WORDS))
-
-
-def sync_engine_knowledge(engine, session: Session) -> None:
-    """Give the engine the fragments of ready documents; reload only when they changed.
-
-    A failure here never breaks the dialogue: the engine keeps what it had.
-    """
-    try:
-        signature = tuple(session.execute(
-            select(KnowledgeDocument.id, KnowledgeDocument.revision)
-            .where(KnowledgeDocument.status == "ready")
-            .order_by(KnowledgeDocument.id)
-        ).all())
-        if _synced.get(id(engine)) == signature:
-            return
-        engine.set_company_fragments([
-            {"source_id": chunk.id, "title": chunk.title[:300], "text": chunk.text[:20_000]}
-            for chunk in company_knowledge_chunks(session)
-        ])
-        _synced[id(engine)] = signature
-    except Exception:
-        logger.exception("knowledge.sync_failed")
