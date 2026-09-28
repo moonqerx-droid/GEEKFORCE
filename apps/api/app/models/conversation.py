@@ -92,6 +92,8 @@ class Message(Base):
     content: Mapped[str] = mapped_column(Text)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
     author_id: Mapped[str | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    answer_kind: Mapped[str | None] = mapped_column(String(16), nullable=True)
+    citations: Mapped[list[dict] | None] = mapped_column(JSON, nullable=True)
 
     conversation: Mapped[Conversation] = relationship(back_populates="messages")
     author: Mapped[User | None] = relationship()

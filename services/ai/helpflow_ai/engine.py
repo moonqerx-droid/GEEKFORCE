@@ -56,6 +56,13 @@ OUTCOME_LABELS = {
     StepOutcome.NOT_HELPED: "не помогло",
     StepOutcome.CANNOT_DO: "не удалось выполнить",
 }
+_PROTECTED_PLAYBOOKS = {"credentials_request", "mass_incident", "security_incident"}
+_DOCUMENT_INJECTION = re.compile(
+    r"(?:игнорир\w*|забуд\w*)[^.!?\n]{0,60}(?:инструкц\w*|правил\w*|prompt|system)|"
+    r"(?:выдай|покажи|сообщи|раскрой)[^.!?\n]{0,50}(?:парол\w*|токен\w*|секрет\w*)|"
+    r"(?:ignore|forget)[^.!?\n]{0,60}(?:instructions?|rules?|prompt)",
+    re.IGNORECASE,
+)
 
 
 class TriageEngine:
@@ -148,6 +155,24 @@ class TriageEngine:
     def decide(self, context: ConversationContext) -> Decision:
         """Choose the flow with rules, then optionally improve only its wording."""
         query = context.original_request or _first_user_message(context)
+        if context.playbook_id not in _PROTECTED_PLAYBOOKS:
+            matches = self.retriever.search(query, context.playbook_id)
+            company = next(
+                (match.chunk for match in matches if match.chunk.id.startswith("document:")),
+                None,
+            )
+            if company is not None:
+                decision = _company_knowledge_decision(company)
+                if (
+                    self.llm is not None
+                    and self.llm.supports_response_rendering
+                    and (
+                        not self.llm.prefers_deterministic_playbooks
+                        or self.llm.renders_company_answers_synchronously
+                    )
+                ):
+                    return self._render_decision(decision, context)
+                return decision
         procedural_route = self.answer_policy.procedural_route(query, context.playbook_id)
         if procedural_route == AnswerRoute.GENERAL:
             return _general_how_to_decision(
@@ -725,8 +750,18 @@ def _general_guidance_decision(query: str) -> Decision:
 
 
 def _company_knowledge_decision(chunk: KnowledgeChunk) -> Decision:
-    quote = chunk.text.strip()[:900]
-    # Shown to the employee as text: Markdown heading marks and blank lines go, the words stay.
+    quote = _safe_company_excerpt(chunk.text)
+    if not quote:
+        return Decision(
+            action=DecisionAction.ESCALATE,
+            message=(
+                "В найденном документе есть непроверяемые управляющие инструкции, поэтому "
+                "я не буду использовать его как ответ и передам вопрос специалисту."
+            ),
+            reason="корпоративный фрагмент отклонён safety gate",
+            answer_kind=AnswerKind.HANDOFF,
+        )
+    # Render Markdown as readable chat text while keeping the evidence quote verbatim.
     instruction = re.sub(r"\n{2,}", "\n", re.sub(r"(?m)^#{1,6}\s+", "", quote)).strip()
     step = Step(
         id=f"knowledge.{chunk.id}",
@@ -743,6 +778,23 @@ def _company_knowledge_decision(chunk: KnowledgeChunk) -> Decision:
         # The citation stays verbatim: it is the evidence.
         citations=[Citation(source_id=chunk.id, title=chunk.title, quote=quote)],
     )
+
+
+def _safe_company_excerpt(text: str) -> str:
+    """Return one verbatim span while excluding a line that tries to control the assistant."""
+    source = text.strip()
+    injection = _DOCUMENT_INJECTION.search(source)
+    if injection is None:
+        excerpt = source
+    else:
+        line_start = source.rfind("\n", 0, injection.start()) + 1
+        next_break = source.find("\n", injection.end())
+        line_end = len(source) if next_break < 0 else next_break + 1
+        candidates = (source[:line_start].strip(), source[line_end:].strip())
+        excerpt = max(candidates, key=len)
+    if len(excerpt) <= 900:
+        return excerpt
+    return excerpt[:900].rsplit(" ", 1)[0].rstrip() or excerpt[:900]
 
 
 def _answer_citations(answer: GroundedAnswer, matches: list[KnowledgeMatch]) -> list[Citation]:

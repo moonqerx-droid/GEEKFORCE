@@ -81,6 +81,13 @@ class MessageRead(BaseModel):
     created_at: datetime
     author_name: str | None = None
     attachments: list[AttachmentRead] = Field(default_factory=list)
+    answer_kind: Literal["playbook", "document", "general", "handoff"] | None = None
+    citations: list["CitationRead"] = Field(default_factory=list)
+
+    @field_validator("citations", mode="before")
+    @classmethod
+    def nullable_citations_are_an_empty_list(cls, value):
+        return value or []
 
 
 class StepRead(BaseModel):

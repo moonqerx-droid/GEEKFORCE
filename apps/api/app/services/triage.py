@@ -12,6 +12,7 @@ from app.repositories.incidents import IncidentRepository
 from app.schemas.conversation import StepOutcome
 from app.services.dialogue import DialogueConflict, DialogueService
 from app.services.incidents import IncidentService
+from app.services.company_knowledge import company_knowledge_chunks
 
 
 logger = logging.getLogger(__name__)
@@ -38,6 +39,10 @@ class TriageDialogueService(DialogueService):
     ):
         self.repository = repository
         self.engine = engine
+        self.engine.set_company_fragments([
+            chunk.as_retrieved_fragment()
+            for chunk in company_knowledge_chunks(repository.session)
+        ])
         settings = get_settings()
         self.incident_service = incident_service or IncidentService(
             IncidentRepository(repository.session),
@@ -97,8 +102,13 @@ class TriageDialogueService(DialogueService):
         "так я быстрее разберусь."
     )
 
-    def _message(self, conversation, role, content):
-        message = Message(role=role, content=content)
+    def _message(self, conversation, role, content, *, answer_kind=None, citations=None):
+        message = Message(
+            role=role,
+            content=content,
+            answer_kind=answer_kind,
+            citations=list(citations or []) if role == "assistant" else None,
+        )
         if role == "user" and getattr(self, "_pending_attachments", None):
             # Files arrive with the employee's message in the same turn and transaction.
             message.attachments.extend(self._pending_attachments)
@@ -193,7 +203,12 @@ class TriageDialogueService(DialogueService):
                     )
                     conversation.escalation_card = card.model_dump(mode="json")
                     conversation.escalation_summary = card.ai_summary
-                    self._message(conversation, "assistant", self._outage_notice(conversation, match))
+                    self._message(
+                        conversation,
+                        "assistant",
+                        self._outage_notice(conversation, match),
+                        answer_kind="handoff",
+                    )
                     return self._commit(conversation)
                 if analysis.should_escalate:
                     self._escalate(conversation, "сценарий требует немедленного участия специалиста")
@@ -291,7 +306,13 @@ class TriageDialogueService(DialogueService):
             conversation.current_step_instruction = decision.message
         else:
             conversation.status = "VERIFYING"
-        self._message(conversation, "assistant", decision.message)
+        self._message(
+            conversation,
+            "assistant",
+            decision.message,
+            answer_kind=decision.answer_kind.value if decision.answer_kind else None,
+            citations=[citation.model_dump(mode="json") for citation in decision.citations],
+        )
 
     def _escalate(self, conversation, reason, message=None):
         card = self.engine.build_escalation_card(self._context(conversation), reason)
@@ -305,7 +326,9 @@ class TriageDialogueService(DialogueService):
         message = message or f"Обращение передано специалисту ({card.recommended_team}) вместе с собранным контекстом."
         if playbook.safety_notice and playbook.safety_notice not in message:
             message = f"{playbook.safety_notice} {message}"
-        self._message(conversation, "assistant", message)
+        conversation.answer_kind = "handoff"
+        conversation.citations = []
+        self._message(conversation, "assistant", message, answer_kind="handoff")
         try:
             with self.repository.session.begin_nested():
                 self.incident_service.observe_escalated(conversation.id)

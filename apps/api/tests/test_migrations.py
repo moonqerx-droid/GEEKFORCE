@@ -35,7 +35,7 @@ def test_initial_migration_adopts_pre_alembic_database(tmp_path):
 
     assert inspect(engine).has_table("alembic_version")
     with engine.connect() as connection:
-        assert connection.scalar(text("SELECT version_num FROM alembic_version")) == "20260928_0010"
+        assert connection.scalar(text("SELECT version_num FROM alembic_version")) == "20260928_0012"
         assert connection.scalar(text("SELECT id FROM conversations WHERE id='preserved'")) == "preserved"
     inspector = inspect(engine)
     assert {"users", "auth_sessions", "email_tokens", "operator_invites"}.issubset(
@@ -182,3 +182,18 @@ def test_knowledge_migration_roundtrip_and_integrity(tmp_path):
 
     command.downgrade(config, "20260928_0009")
     assert {"knowledge_documents", "knowledge_chunks"}.isdisjoint(inspect(engine).get_table_names())
+
+
+def test_latest_schema_stores_answer_metadata_on_messages(tmp_path):
+    database_url = f"sqlite:///{tmp_path / 'message-meta.db'}"
+    config = Config("alembic.ini")
+    config.set_main_option("sqlalchemy.url", database_url)
+
+    command.upgrade(config, "head")
+    columns = {
+        column["name"]: column
+        for column in inspect(create_engine(database_url)).get_columns("messages")
+    }
+
+    assert columns["answer_kind"]["nullable"] is True
+    assert columns["citations"]["nullable"] is True

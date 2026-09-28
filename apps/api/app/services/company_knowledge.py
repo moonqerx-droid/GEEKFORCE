@@ -52,6 +52,14 @@ class CompanyKnowledgeChunk:
             "escalation_team": DEFAULT_TEAM,
         }
 
+    def as_retrieved_fragment(self) -> dict:
+        """Minimal public contract accepted by ``TriageEngine`` at runtime."""
+        return {
+            "source_id": self.id,
+            "title": self.title,
+            "text": self.text,
+        }
+
 
 def source_id(document_id: str, position: int) -> str:
     return f"document:{document_id}:{position}"
