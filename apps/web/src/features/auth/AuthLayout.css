@@ -236,39 +236,97 @@
   font-size: var(--font-size-sm);
 }
 
-.auth-demo-accounts {
-  margin-top: var(--space-5);
-  padding: var(--space-4);
-  border: 1px dashed var(--color-border-strong);
-  border-radius: var(--radius-md);
+/* One click per role: the fastest way to see the product from each side. */
+.auth-quick {
+  display: grid;
+  gap: var(--space-2);
+  margin-top: var(--space-6);
+  padding-top: var(--space-5);
+  border-top: 1px solid var(--color-border);
+}
+
+.auth-quick-title {
+  font-size: var(--font-size-md);
+}
+
+.auth-quick-text {
   color: var(--ink-soft);
   font-size: var(--font-size-sm);
 }
 
-.auth-demo-accounts p {
-  margin-bottom: var(--space-2);
-}
-
-.auth-demo-accounts ul {
-  display: flex;
-  flex-wrap: wrap;
+.auth-quick-list {
+  display: grid;
   gap: var(--space-2);
-  margin: 0;
+  margin: var(--space-1) 0 0;
   padding: 0;
   list-style: none;
 }
 
-.auth-demo-accounts button {
-  padding: 5px 12px;
+.auth-quick-role {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  width: 100%;
+  padding: 10px 14px;
   border: 1px solid var(--color-border);
-  border-radius: var(--radius-pill);
+  border-radius: var(--radius-md);
   background: var(--color-surface);
-  font-size: var(--font-size-xs);
-  font-weight: 600;
+  color: var(--ink);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: border-color 150ms var(--ease), box-shadow 150ms var(--ease);
 }
 
-.auth-demo-accounts button:hover {
+.auth-quick-role:hover:not(:disabled) {
   border-color: var(--coral);
+  box-shadow: var(--shadow-sm, 0 1px 3px rgb(42 33 27 / 10%));
+}
+
+.auth-quick-role:focus-visible {
+  outline: 3px solid var(--coral-deep);
+  outline-offset: 2px;
+}
+
+.auth-quick-role:disabled {
+  opacity: 0.6;
+  cursor: progress;
+}
+
+.auth-quick-icon {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: var(--coral-wash);
+  color: var(--coral-deep);
+}
+
+.auth-quick-list li:nth-child(2) .auth-quick-icon {
+  background: var(--sea-wash);
+  color: var(--sea);
+}
+
+.auth-quick-list li:nth-child(3) .auth-quick-icon {
+  background: color-mix(in srgb, var(--blue) 12%, transparent);
+  color: var(--blue);
+}
+
+.auth-quick-body {
+  display: grid;
+  gap: 1px;
+}
+
+.auth-quick-name {
+  font-size: var(--font-size-sm);
+  font-weight: 700;
+}
+
+.auth-quick-what {
+  color: var(--ink-soft);
+  font-size: var(--font-size-xs);
 }
 
 @media (max-width: 900px) {

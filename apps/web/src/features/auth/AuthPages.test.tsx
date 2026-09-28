@@ -34,6 +34,27 @@ describe("auth pages", () => {
     expect(await screen.findByText(/вход выполнен/i)).toBeInTheDocument();
   });
 
+  it("signs in as a demo role with one click", async () => {
+    let body: Record<string, unknown> | undefined;
+    server.use(http.post("*/api/auth/login", async ({ request }) => {
+      body = await request.json() as Record<string, unknown>;
+      return HttpResponse.json({ id: "u1", email: "anna@helpflow.demo", first_name: "Анна", last_name: "Смирнова", role: "operator", department: "it", email_verified: true, must_change_password: false });
+    }));
+    renderPage(<LoginPage />);
+    const demo = screen.getByRole("region", { name: "Быстрый вход" });
+    expect(demo).toHaveTextContent("Сотрудник");
+    expect(demo).toHaveTextContent("Руководитель поддержки");
+    await userEvent.click(screen.getByRole("button", { name: /Войти как специалист/ }));
+    await vi.waitFor(() => expect(body).toMatchObject({ email: "anna@helpflow.demo", password: "DemoPass123" }));
+  });
+
+  it("explains that demo data is missing when a demo login fails", async () => {
+    server.use(http.post("*/api/auth/login", () => HttpResponse.json({ detail: "bad" }, { status: 401 })));
+    renderPage(<LoginPage />);
+    await userEvent.click(screen.getByRole("button", { name: /Войти как сотрудник/ }));
+    expect(await screen.findByRole("status")).toHaveTextContent("seed_demo");
+  });
+
   it("registers an invited operator with the token from the link and signs them in", async () => {
     let registered: Record<string, unknown> | undefined;
     let loggedIn = false;
