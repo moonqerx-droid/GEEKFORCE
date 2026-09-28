@@ -105,6 +105,24 @@ def lemmatize(norm_text: str) -> str:
     return _WORD_RE.sub(lambda match: lemma(match.group(0)), norm_text)
 
 
+@lru_cache(maxsize=65536)
+def _lemma_with_person(word: str) -> str:
+    """Like `lemma`, but a verb keeps its person: «вижу» → «видеть·1», «видят» → «видеть·3»."""
+    analyzer = _analyzer()
+    if analyzer is None or not analyzer.word_is_known(word):
+        return word
+    parse = analyzer.parse(word)[0]
+    base = parse.normal_form.replace("ё", "е")
+    person = parse.tag.person
+    return f"{base}·{person[0]}" if parse.tag.POS == "VERB" and person else base
+
+
+@lru_cache(maxsize=8192)
+def lemmatize_verbs_with_person(norm_text: str) -> str:
+    """Dictionary forms for matching complaints: «меня не видят» must not match «не вижу»."""
+    return _WORD_RE.sub(lambda match: _lemma_with_person(match.group(0)), norm_text)
+
+
 def _forms(word: str) -> set[str]:
     analyzer = _analyzer()
     if analyzer is None or not analyzer.word_is_known(word):
