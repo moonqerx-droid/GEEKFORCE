@@ -1,3 +1,4 @@
+import { Link } from "react-router-dom";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { PanelRight, UserRoundCheck } from "lucide-react";
 import type { Conversation, Message } from "../../api/types";
@@ -114,6 +115,16 @@ export function ConversationPage({ onActivity }: { onActivity?: (conversation: C
                 {conv.notice}
                 <button type="button" onClick={conv.dismissNotice} aria-label="Скрыть уведомление">×</button>
               </div>
+            ) : null}
+
+            {c?.similar_open ? (
+              <aside className="similar-open" role="note" aria-label="Похожее открытое обращение">
+                <p>
+                  У вас уже есть открытое обращение «{c.similar_open.summary ?? "без названия"}». Если это то же
+                  самое, продолжите там — не придётся объяснять заново.
+                </p>
+                <Link to={`/employee?conversation=${c.similar_open.id}`}>Открыть его</Link>
+              </aside>
             ) : null}
 
             {!c && conv.pendingMessage == null ? (

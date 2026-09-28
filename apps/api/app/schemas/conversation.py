@@ -142,6 +142,8 @@ class ConversationRead(BaseModel):
     citations: list[CitationRead] = Field(default_factory=list)
     # One-tap answers to the question the assistant just asked (empty for free text).
     quick_replies: list[str] = Field(default_factory=list)
+    # The employee's other open request about the same problem, if this one is a repeat.
+    similar_open: "SimilarOpen | None" = None
     assignee_id: str | None = None
     assignee_name: str | None = None
     escalated_at: datetime | None = None
@@ -153,9 +155,11 @@ class ConversationRead(BaseModel):
     rating_comment: str | None = None
 
     @classmethod
-    def from_model(cls, model, quick_replies: list[str] | None = None) -> "ConversationRead":
+    def from_model(cls, model, quick_replies: list[str] | None = None, similar=None) -> "ConversationRead":
         data = cls.model_validate(model, from_attributes=True)
         data.quick_replies = list(quick_replies or [])
+        if similar is not None:
+            data.similar_open = SimilarOpen(id=similar.id, summary=similar.summary)
         if model.current_step_code and model.current_step_instruction:
             data.current_step = CurrentStep(
                 code=model.current_step_code,
@@ -164,6 +168,14 @@ class ConversationRead(BaseModel):
         if data.answer_kind is None:
             data.answer_kind = _infer_answer_kind(model)
         return data
+
+
+class SimilarOpen(BaseModel):
+    id: str
+    summary: str | None = None
+
+
+ConversationRead.model_rebuild()
 
 
 class OperatorTicket(ConversationRead):

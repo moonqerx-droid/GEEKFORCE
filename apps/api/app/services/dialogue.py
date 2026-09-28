@@ -23,6 +23,9 @@ class DialogueService:
     def quick_replies(self, conversation: Conversation) -> list[str]:
         return []
 
+    def similar_open(self, conversation: Conversation) -> Conversation | None:
+        return None
+
     def get_conversation(self, conversation_id: str) -> Conversation:
         conversation = self.repository.get(conversation_id)
         if conversation is None:

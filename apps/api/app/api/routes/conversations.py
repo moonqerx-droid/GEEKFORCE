@@ -38,7 +38,8 @@ DialogueDependency = Annotated[DialogueService, Depends(get_dialogue_service)]
 
 def serialize(conversation, service: DialogueService | None = None) -> ConversationRead:
     replies = service.quick_replies(conversation) if service is not None else None
-    return ConversationRead.from_model(conversation, quick_replies=replies)
+    similar = service.similar_open(conversation) if service is not None else None
+    return ConversationRead.from_model(conversation, quick_replies=replies, similar=similar)
 
 
 def not_found() -> HTTPException:

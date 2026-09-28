@@ -1,11 +1,13 @@
 """Transactional adapter between the stable HTTP contract and helpflow_ai."""
 
 import logging
+from datetime import timedelta
 
 from app.services import ocr
 from helpflow_ai import voice
 from helpflow_ai.engine import ALSO_REPORTED
 from helpflow_ai import AnswerKind, ConversationContext, DecisionAction, StepRecord, TriageEngine
+from sqlalchemy import select
 from sqlalchemy.orm.exc import StaleDataError
 
 from app.models.conversation import Conversation, Message, TroubleshootingStep, utc_now
@@ -303,6 +305,30 @@ class TriageDialogueService(DialogueService):
         except Exception:
             self.repository.session.rollback()
             raise
+
+    OPEN_STATUSES = ("CLARIFYING", "TROUBLESHOOTING", "VERIFYING", "ESCALATED", "IN_PROGRESS")
+    SIMILAR_WINDOW = timedelta(days=3)
+
+    def similar_open(self, conversation):
+        """The employee's other open request about the same problem, while this one is fresh:
+        continuing there beats explaining everything again."""
+        if (not conversation.owner_id or conversation.playbook_id in (None, "unknown")
+                or conversation.status not in self.OPEN_STATUSES
+                or sum(m.role == "user" for m in conversation.messages) > 2):
+            return None
+        return self.repository.session.scalar(
+            select(Conversation)
+            .where(
+                Conversation.owner_id == conversation.owner_id,
+                Conversation.id != conversation.id,
+                Conversation.playbook_id == conversation.playbook_id,
+                Conversation.status.in_(self.OPEN_STATUSES),
+                Conversation.created_at >= utc_now() - self.SIMILAR_WINDOW,
+                Conversation.created_at < conversation.created_at,
+            )
+            .order_by(Conversation.created_at.desc())
+            .limit(1)
+        )
 
     def quick_replies(self, conversation) -> list[str]:
         """One-tap answers while the assistant waits for a reply to a closed question."""
