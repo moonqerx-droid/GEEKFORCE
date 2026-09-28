@@ -142,3 +142,23 @@ def test_runtime_company_fragments_follow_adapter_contract(kb) -> None:
         playbook_id="unknown",
     ))
     assert without_document.answer_kind == AnswerKind.HANDOFF
+
+
+def test_document_answer_reads_as_text_not_markdown(kb) -> None:
+    engine = TriageEngine(kb)
+    engine.set_company_fragments([{
+        "source_id": "document:travel-policy:0",
+        "title": "Регламент командировок",
+        "text": "# Командировки\n\nСуточные в командировке по России — 700 рублей в день.",
+    }])
+
+    decision = engine.decide(ConversationContext(
+        original_request="Какие суточные положены в командировке?",
+        playbook_id="unknown",
+    ))
+
+    assert decision.answer_kind == AnswerKind.DOCUMENT
+    assert "#" not in decision.message
+    assert "Суточные в командировке по России — 700 рублей в день." in decision.message
+    # The citation stays verbatim: it is the evidence, not the presentation.
+    assert decision.citations[0].quote.startswith("# Командировки")

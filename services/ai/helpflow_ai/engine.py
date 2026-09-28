@@ -725,7 +725,9 @@ def _general_guidance_decision(query: str) -> Decision:
 
 
 def _company_knowledge_decision(chunk: KnowledgeChunk) -> Decision:
-    instruction = chunk.text.strip()[:900]
+    quote = chunk.text.strip()[:900]
+    # Shown to the employee as text: Markdown heading marks and blank lines go, the words stay.
+    instruction = re.sub(r"\n{2,}", "\n", re.sub(r"(?m)^#{1,6}\s+", "", quote)).strip()
     step = Step(
         id=f"knowledge.{chunk.id}",
         title=f"По документу «{chunk.title}»",
@@ -738,7 +740,8 @@ def _company_knowledge_decision(chunk: KnowledgeChunk) -> Decision:
         reason="найден подтверждённый документ компании",
         source_ids=[chunk.id],
         answer_kind=AnswerKind.DOCUMENT,
-        citations=[Citation(source_id=chunk.id, title=chunk.title, quote=instruction)],
+        # The citation stays verbatim: it is the evidence.
+        citations=[Citation(source_id=chunk.id, title=chunk.title, quote=quote)],
     )
 
 
