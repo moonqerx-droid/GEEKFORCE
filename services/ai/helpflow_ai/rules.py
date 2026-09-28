@@ -188,7 +188,53 @@ def score_playbook(norm_text: str, playbook: Playbook) -> int:
         score += 3
     if playbook.id == "software_install" and _software_request(norm_text):
         score += 2
+    if playbook.id == "security_incident" and _COMPROMISE_SIGN_RE.search(norm_text):
+        score += 3
+    if playbook.id == "network_wifi" and _SLOW_NETWORK_RE.search(norm_text):
+        score += 3
+    if (playbook.id == "app_not_starting" and _FAILS_TO_START_RE.search(norm_text)
+            and not _NOT_A_LOCAL_PROGRAM_RE.search(norm_text)):
+        score += 2
+    if playbook.id == "software_install" and _INSTALL_NEEDS_ADMIN_RE.search(norm_text):
+        score += 3
+    if (playbook.id == "credentials_request" and _INSTALL_NEEDS_ADMIN_RE.search(norm_text)
+            and not _ASKS_FOR_IT_RE.search(norm_text)):
+        return 0  # «установка требует пароль администратора» describes the installer, asks nothing
+    if playbook.id == "vpn_connection" and _VPN_FAILS_RE.search(norm_text):
+        score += 2  # «впн не цепляется, а мне в црм»: the VPN fails, the CRM is only the goal
     return score
+
+
+# Signs of a compromise without the word «вирус»: a program in an attachment, mail sent in
+# the person's name, a cursor that moves by itself, a code nobody asked for, a «security» call.
+_COMPROMISE_SIGN_RE = re.compile(
+    r"(?<!\w)exe(?!\w)|\.(?:exe|scr|bat|js|vbs)(?!\w)|"
+    r"(?:от моего имени|с моего (?:ящика|адреса|почты|аккаунта))(?: \S+){0,4} (?:разосл|ушл|рассыл|отправ)|"
+    r"(?:мыш\w*|курсор)(?: \S+){0,1} сам\w*(?: по себе)? (?:бега|двига|кликает|открывает|нажима)|"
+    r"(?:код\w*|смс)[^.!?]{0,40}(?:(?:хотя|а) я? ?(?:ничего |никуда )?не (?:запрашивал|входил|заходил|просил))|"
+    r"(?:звон|позвонил)\w*[^.!?]{0,20} (?:из |от )?[«\"]?служб\w* безопасност"
+)
+# «вайфай медленный», «интернет еле работает»: the network is slow, not the computer.
+_SLOW_NETWORK_RE = re.compile(
+    r"(?<!\w)(?:wi-fi|wifi|вай-фай|вайфай|вай фай|интернет|сеть)\w*(?: \S+){0,1} "
+    r"(?:тормоз|медлен|лага|еле|очень медлен|плохо работает)"
+)
+# «не запускается клиент-банк», «телеграм не запускается»: any program but the computer itself.
+_FAILS_TO_START_RE = re.compile(
+    r"(?<!\w)(?!комп|ноут|пк(?!\w)|windows|винд|систем|сервер|сайт|портал)[\w-]+ не запуска|"
+    r"не запуска\w* (?!комп|ноут|windows|винд)[\w-]+|"
+    r"после обновлени\w*[^.!?]{0,40}не (?:запуска|открыва|работа)|не (?:запуска|открыва)\w*[^.!?]{0,40}после обновлени"
+)
+_ASKS_FOR_IT_RE = re.compile(r"(?<!\w)(?:дай|дайте|скаж|подскаж|пришл|скинь|скиньте|сообщ|какой)\w*(?: \S+){0,2} парол")
+_VPN_FAILS_RE = re.compile(
+    r"(?<!\w)(?:vpn|впн|впэн|forticlient|anyconnect)\w*(?: \S+){0,2} (?:не |отвал|пада|слетает|рвется)")
+# A call app has its own scenario; «сервер недоступен» points at the service, not the program.
+_NOT_A_LOCAL_PROGRAM_RE = re.compile(
+    r"(?<!\w)(?:teams|тимс|zoom|зум|телемост|демонстрац|созвон|встреч|сервер|сервис)")
+# «установить слак, а он просит права админа»: an install, not an access request.
+_INSTALL_NEEDS_ADMIN_RE = re.compile(
+    r"(?:установ|постав|скача)\w*[^.!?]{0,50}(?:прав\w* (?:админ|администратор)|парол\w* (?:админ|администратор))"
+)
 
 
 # «антивирус нашёл/заблокировал/удалил…»: an event, not a question about the antivirus.

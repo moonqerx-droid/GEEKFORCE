@@ -3,7 +3,7 @@ title: Проблема с корпоративной почтой
 service: Почта
 default_urgency: medium
 escalation_team: Администраторы почты
-keywords: [почт, outlook, аутлук, письм, email, e-mail, mail, ящик, входящ, вложени, exchange]
+keywords: [почт, outlook, аутлук, письм, email, e-mail, mail, ящик, входящ, вложени, exchange, исходящ, не уходят письма, письма не уходят]
 examples:
   - outlook не отправляет письма
   - письма не приходят
