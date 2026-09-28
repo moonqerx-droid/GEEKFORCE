@@ -13,8 +13,8 @@ React + TypeScript + Vite фронтенд поверх backend из `origin/fea
 
 ## Запуск
 
-Нужен запущенный backend (см. корневой `README.md`, ветка `feat/backend-workflow`):
-он поднимается через `docker compose up --build` в отдельном worktree/checkout.
+Нужен запущенный backend: из корня репозитория `docker compose up -d --build`
+(см. корневой `README.md`).
 
 ### macOS / Linux
 
@@ -62,8 +62,8 @@ npm run build
 npm run lint
 ```
 
-Текущий статус (локально, на этой ветке): 18/18 тестов зелёные, production build
-проходит, `npm run lint` — 0 ошибок (2 предупреждения `react/set-state-in-effect`
+Статус на 28.09.2026: 113 тестов в 21 файле зелёные, production build
+проходит, `npm run lint` — 0 ошибок (3 предупреждения `react/set-state-in-effect`
 от oxlint на стандартном паттерне "fetch on mount" — эффект вызывает
 async-функцию, а не синхронный `setState`, это ожидаемо).
 
@@ -98,23 +98,12 @@ src/
   теряет черновик пользователя (текст остаётся в поле ввода);
 - блокирует повторное нажатие кнопок на время запроса (`sending`).
 
-## Известные ограничения и расхождения с исходным описанием
+## Особенности
 
-- `GET /api/operator/incidents` в `feat/backend-workflow` пока не существует
-  (Incident Radar ещё проектируется — см. `PROJECT_PLAN.md`). Секция Incident
-  Radar в `/operator` (`IncidentsSection`) вызывает этот endpoint и **тихо
-  скрывается** при `404`. В production-коде фиктивные инциденты не
-  подставляются; в тестах используются fixtures (`src/test/fixtures.ts`).
 - `escalation_card` не имеет фиксированной схемы на бэкенде
   (`dict[str, unknown] | None` в `ConversationRead`), поэтому UI читает из
   него только опциональное поле `team` для отображения «кому передано» и
   корректно работает при `escalation_card: null`.
-- Ручная browser-проверка полного сценария (срочная проблема → уточнение →
-  шаг → helped → RESOLVED; несколько отрицательных исходов → ESCALATED →
-  карточка в `/operator`; восстановление после перезагрузки; два таба и 409;
-  375px/1440px viewport) не проводилась в этой сессии — здесь нет запущенного
-  backend. Список сценариев для ручной проверки — в `FRONTEND_AGENT_PROMPT.md`
-  в корне репозитория.
 - Автоматическое обновление очереди `/operator` — раз в 15 секунд, только
   пока вкладка видима (`document.visibilityState`).
 

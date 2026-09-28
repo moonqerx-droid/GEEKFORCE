@@ -1,6 +1,6 @@
 """Typed contracts of the AI triage service.
 
-Field names follow section 7 of PROJECT_PLAN.md so the backend can map them
+Field names follow the team's original API contract so the backend can map them
 onto the Conversation model without renaming.
 """
 

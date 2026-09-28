@@ -26,12 +26,15 @@ logger = logging.getLogger(__name__)
 DEFAULT_EMBED_MODEL = "bge-m3"
 # After a failed call, stay on rules for a while instead of slowing every request.
 RETRY_AFTER_SECONDS = 60.0
+# The first call after Ollama starts loads the model into memory (~35 s on a laptop).
+# Only building the index waits that long; a request never does.
+LOAD_TIMEOUT_SECONDS = 120.0
 
 
 class Embedder(Protocol):
     name: str
 
-    def embed(self, texts: list[str]) -> list[list[float]]: ...
+    def embed(self, texts: list[str], timeout: float | None = None) -> list[list[float]]: ...
 
 
 class OllamaEmbedder:
@@ -43,11 +46,12 @@ class OllamaEmbedder:
         self.timeout = timeout
         self.keep_alive = keep_alive
 
-    def embed(self, texts: list[str]) -> list[list[float]]:
+    def embed(self, texts: list[str], timeout: float | None = None) -> list[list[float]]:
+        limit = timeout or max(self.timeout, 10.0 * math.ceil(len(texts) / 20))
         response = httpx.post(
             f"{self.base_url}/api/embed",
             json={"model": self.model, "input": texts, "keep_alive": self.keep_alive},
-            timeout=httpx.Timeout(max(self.timeout, 10.0 * math.ceil(len(texts) / 20)), connect=2.0),
+            timeout=httpx.Timeout(limit, connect=2.0),
         )
         response.raise_for_status()
         vectors = response.json()["embeddings"]
@@ -78,12 +82,12 @@ class SemanticIndex:
         ]
         self._vectors: list[list[float]] | None = None
         self._failed_at: float | None = None
+        self._cold = True  # the model may not be in Ollama's memory yet
+        self._building = False
+        self._background = background
         self._lock = threading.Lock()
         self._cache_file = (cache_dir or _default_cache_dir()) / f"embeddings-{_slug(embedder.name)}.json"
-        if background:
-            threading.Thread(target=self._build, name="semantic-index", daemon=True).start()
-        else:
-            self._build()
+        self._start_build()
 
     @property
     def ready(self) -> bool:
@@ -91,12 +95,15 @@ class SemanticIndex:
 
     def rank(self, text: str) -> list[tuple[str, float]] | None:
         """Playbooks with the similarity of their closest example, best first; None if unavailable."""
-        if self._vectors is None or not self._healthy():
+        if self._vectors is None or self._cold:
+            # Not built yet, or Ollama dropped the model: rebuild off the request path.
+            self._start_build()
             return None
         try:
             query = _unit(self.embedder.embed([text])[0])
         except Exception as error:  # noqa: BLE001 - any failure means «use the rules»
             self._fail(error)
+            self._cold = True
             return None
         best: dict[str, float] = {}
         for (playbook_id, _), vector in zip(self._entries, self._vectors):
@@ -114,15 +121,26 @@ class SemanticIndex:
         self._failed_at = time.monotonic()
         logger.warning("semantic.unavailable model=%s error=%s", self.embedder.name, type(error).__name__)
 
-    def _build(self) -> None:
+    def _start_build(self) -> None:
         with self._lock:
+            if self._building or not self._healthy():
+                return
+            self._building = True
+        if self._background:
+            threading.Thread(target=self._build, name="semantic-index", daemon=True).start()
+        else:
+            self._build()
+
+    def _build(self) -> None:
+        try:
             texts = [text for _, text in self._entries]
             cache = self._read_cache()
             missing = [text for text in dict.fromkeys(texts) if _key(text) not in cache]
             try:
-                for start in range(0, len(missing), 32):
-                    chunk = missing[start:start + 32]
-                    for text, vector in zip(chunk, self.embedder.embed(chunk)):
+                # With every example cached, one call still loads the model before requests use it.
+                for start in range(0, max(len(missing), 1), 32):
+                    chunk = missing[start:start + 32] or texts[:1]
+                    for text, vector in zip(chunk, self.embedder.embed(chunk, timeout=LOAD_TIMEOUT_SECONDS)):
                         cache[_key(text)] = _unit(vector)
             except Exception as error:  # noqa: BLE001
                 self._fail(error)
@@ -131,7 +149,10 @@ class SemanticIndex:
                 self._write_cache(cache)
             self._vectors = [cache[_key(text)] for text in texts]
             self._failed_at = None
+            self._cold = False
             logger.info("semantic.ready examples=%s embedded=%s", len(texts), len(missing))
+        finally:
+            self._building = False
 
     def _read_cache(self) -> dict[str, list[float]]:
         try:

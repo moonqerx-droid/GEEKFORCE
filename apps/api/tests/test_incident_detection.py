@@ -38,7 +38,10 @@ def test_fingerprint_normalizes_russian_and_preserves_codes():
 
 @pytest.mark.parametrize(
     ("service", "playbook"),
-    [("Не определён", "unknown"), ("ИБ", "security_incident")],
+    [("Не определён", "unknown"), ("ИБ", "security_incident"),
+     # Requests, not outages: five people asking for folder access are not a broken service.
+     ("Права доступа", "access_rights"), ("Установка ПО", "software_install"),
+     ("Учётные данные", "credentials_request")],
 )
 def test_unknown_and_security_are_not_clusterable(service, playbook):
     assert build_fingerprint(conversation(service=service, playbook_id=playbook)) is None

@@ -1,4 +1,4 @@
-"""The six mandatory scenarios from PROJECT_PLAN.md (stage 3), driven end to end."""
+"""The six mandatory scenarios of the case, driven end to end."""
 
 from __future__ import annotations
 

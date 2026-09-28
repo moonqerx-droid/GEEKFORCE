@@ -54,7 +54,7 @@ from helpflow_ai import TriageEngine, ConversationContext, StepRecord, DecisionA
 engine = TriageEngine.from_env()          # один экземпляр на приложение
 
 # 1. Первое сообщение: ANALYZING
-analysis = engine.analyze(text)           # -> Analysis (JSON из раздела 7 PROJECT_PLAN)
+analysis = engine.analyze(text)           # -> Analysis (см. helpflow_ai/schemas.py)
 # сохранить в Conversation: summary, service, symptoms, urgency, urgency_reason,
 # known_facts, missing_facts, confidence, playbook_id = analysis.recommended_playbook
 

@@ -19,6 +19,9 @@ STOP_WORDS = frozenset({
     "пишет", "выдает", "показывает", "опять", "снова", "делать", "помогите", "пожалуйста",
 })
 EXCLUDED_SERVICES = frozenset({"", "не определен", "не определено", "unknown"})
+# Security goes to its own team at once; requests (access, installs, credentials) are not outages.
+EXCLUDED_PLAYBOOKS = frozenset({"unknown", "security_incident", "access_rights", "software_install",
+                                "credentials_request"})
 
 
 @dataclass(frozen=True)
@@ -52,7 +55,7 @@ def build_fingerprint(conversation) -> IncidentFingerprint | None:
     playbook_id = str(getattr(conversation, "playbook_id", "") or "").casefold()
     service_tokens = _tokens(getattr(conversation, "service", None))
     service = " ".join(service_tokens)
-    if playbook_id in {"unknown", "security_incident"} or service in EXCLUDED_SERVICES:
+    if playbook_id in EXCLUDED_PLAYBOOKS or service in EXCLUDED_SERVICES:
         return None
 
     weighted: dict[str, int] = {}
