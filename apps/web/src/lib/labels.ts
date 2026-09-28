@@ -86,6 +86,8 @@ export const FACT_LABEL: Record<string, string> = {
   device: "Устройство",
   recurring: "Повторяется",
   critical_update: "Важное уточнение",
+  problem_area: "Похоже на",
+  details: "Подробности",
 };
 
 const FACT_VALUE: Record<string, string> = {
@@ -114,6 +116,14 @@ const FACT_VALUE: Record<string, string> = {
   amocrm: "amoCRM",
   salesforce: "Salesforce",
   crm: "CRM",
+  // Areas offered when the request is unclear (fact problem_area).
+  password_login: "вход или пароль",
+  email_outlook: "почта",
+  vpn_connection: "VPN",
+  network_wifi: "интернет или Wi-Fi",
+  slow_performance: "медленная работа",
+  access_rights: "доступ к папке или программе",
+  other: "другое",
 };
 
 export const ROLE_LABEL: Record<UserRole, string> = {

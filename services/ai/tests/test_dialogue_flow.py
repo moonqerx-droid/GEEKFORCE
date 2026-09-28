@@ -70,14 +70,14 @@ def test_ambiguous_request_asks_at_most_three_questions(simulate):
     assert sim.decision.action == DecisionAction.ESCALATE
 
 
-def test_unknown_issue_escalates_after_unique_clarifications(simulate):
+def test_unknown_issue_asks_one_question_with_areas_then_escalates(simulate):
     sim = simulate("У меня странная проблема, ничего не понятно")
     asked = []
     while sim.decision.action == DecisionAction.ASK:
         asked.append(sim.decision.question.fact)
         sim.answer("не знаю")
 
-    assert asked == ["service_name", "error_text", "since_when"]
+    assert asked == ["problem_area"]
     assert sim.decision.action == DecisionAction.ESCALATE
     assert sim.decision.escalation_team == "Service Desk L1"
 
@@ -160,3 +160,12 @@ def test_failed_verification_continues_troubleshooting(simulate):
 def test_decide_is_pure_for_same_context(engine):
     ctx = ConversationContext(original_request=DEMO, playbook_id="crm_login_device_specific")
     assert engine.decide(ctx) == engine.decide(ctx)
+
+
+def test_unknown_issue_switches_to_the_area_the_employee_picks(simulate):
+    sim = simulate("У меня странная проблема, ничего не понятно")
+    assert sim.engine.quick_replies("unknown", "problem_area")[0] == "Вход или пароль"
+    sim.answer("Другое")
+    assert sim.decision.question.fact == "details"
+    sim.answer("при включении пищит и чёрный экран")
+    assert sim.decision.action == DecisionAction.ESCALATE

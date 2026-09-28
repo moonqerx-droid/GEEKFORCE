@@ -6,13 +6,31 @@ escalation_team: Service Desk L1
 escalate_immediately: false
 keywords: []
 questions:
-  - fact: service_name
-    text: Уточните, пожалуйста, какая программа или сервис не работает?
+  # One question with the likely areas instead of a questionnaire: a tap switches to the
+  # right scenario; a free-text answer is re-read like a new description.
+  - fact: problem_area
+    text: Пока не ясно, что случилось. На что это похоже?
+    kind: choice
+    offer_dont_know: false
+    options:
+      password_login: [вход, войти, зайти, пароль, логин, учетн]
+      email_outlook: [почт, outlook, аутлук, письм]
+      vpn_connection: [vpn, впн]
+      network_wifi: [интернет, wi-fi, wifi, вайфай, сеть]
+      slow_performance: [медленн, тормоз, виснет, зависа, долго]
+      access_rights: [доступ, прав]
+      other: [друго, ничего из, не то]
+    option_labels:
+      password_login: Вход или пароль
+      email_outlook: Почта
+      vpn_connection: VPN
+      network_wifi: Интернет или Wi-Fi
+      slow_performance: Всё медленно работает
+      access_rights: Нет доступа к папке или программе
+      other: Другое
+  # Only after «Другое»: one open question, then a specialist gets the whole story.
+  - fact: details
+    text: Опишите, пожалуйста, что вы делаете и что видите на экране. Дальше подключу специалиста — он получит всю историю.
     kind: text
-  - fact: error_text
-    text: Что именно происходит — есть ли сообщение об ошибке?
-    kind: text
-  - fact: since_when
-    text: Когда это началось и работало ли раньше?
-    kind: text
+    when_facts: {problem_area: [other]}
 verify_question: После этого всё работает как нужно?

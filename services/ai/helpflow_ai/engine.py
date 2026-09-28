@@ -542,7 +542,7 @@ class TriageEngine:
             service = subject
             stated.setdefault("service_name", subject)
         additional = [issue for issue in plan if issue.playbook_id != playbook.id]
-        summary = _summary(playbook, service, symptoms)
+        summary = _summary(playbook, service, symptoms, text)
         if additional:
             summary += ". Ещё: " + "; ".join(i.evidence or i.title for i in additional)
         return Analysis(
@@ -712,6 +712,7 @@ def _applicable_questions(playbook: Playbook, ctx: ConversationContext) -> list[
     return [
         q for q in playbook.questions
         if _symptoms_allow(q, described) and not (q.only_without_symptoms and described)
+        and all(ctx.known_facts.get(key) in values for key, values in q.when_facts.items())
     ]
 
 
@@ -900,17 +901,28 @@ def _general_how_to_decision(topic: str) -> Decision:
     )
 
 
-def _summary(playbook: Playbook, service: str, symptoms: list[str]) -> str:
+def _summary(playbook: Playbook, service: str, symptoms: list[str], text: str = "") -> str:
     if playbook.id == "service_unavailable":
         title = f"Недоступен сервис {service}"
     elif playbook.id == "unknown" and service != playbook.service:
         title = f"Проблема: {service} (готового сценария нет)"
+    elif playbook.id == "unknown" and _excerpt(text):
+        # The employee's own words say more than «Проблема требует уточнения».
+        return _excerpt(text)
     else:
         title = playbook.title
     title_words = _words(title)
     # "VPN не подключается" adds nothing to "Не подключается VPN": same words, other order.
     extra = [s for s in symptoms if not _words(s) <= title_words]
     return f"{title}: {', '.join(extra)}" if extra else title
+
+
+def _excerpt(text: str, limit: int = 70) -> str:
+    """First sentence of the request as a title: «Странная штука с компьютером»."""
+    first = re.split(r"(?<=[.!?\n])\s+", text.strip(), maxsplit=1)[0].strip(" .!?,;:")
+    if len(first) > limit:
+        first = first[:limit].rsplit(" ", 1)[0].rstrip(" ,;:") + "…"
+    return first[:1].upper() + first[1:]
 
 
 def _words(text: str) -> set[str]:

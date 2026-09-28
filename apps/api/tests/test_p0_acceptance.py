@@ -52,7 +52,8 @@ def test_unknown_issue_escalates_without_hallucinated_step(client):
         assistant_questions.append(state["messages"][-1]["content"])
         state = send(client, cid, "не знаю")
     assert state["status"] == "ESCALATED"
-    assert len(assistant_questions) == len(set(assistant_questions)) == 3
+    # One question with the likely areas; «не знаю» there hands over to a person.
+    assert len(assistant_questions) == len(set(assistant_questions)) == 1
     assert state["completed_steps"] == []
     assert state["escalation_card"]["recommended_team"] == "Service Desk L1"
 

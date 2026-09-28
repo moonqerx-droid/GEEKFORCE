@@ -224,7 +224,8 @@ def test_named_device_without_playbook_is_handed_off_at_once(simulate, engine, m
 def test_ambiguous_request_asks_what_is_broken_first(simulate, message):
     sim = simulate(message)
     assert sim.decision.action == DecisionAction.ASK
-    assert sim.decision.question.fact in ("service_name", "error_text")
+    # One question with the likely areas as buttons, not a questionnaire.
+    assert sim.decision.question.fact == "problem_area"
     asked = first_question_facts(sim)
     assert len(asked) <= 3 and len(asked) == len(set(asked))
 

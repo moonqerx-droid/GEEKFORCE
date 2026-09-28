@@ -377,9 +377,21 @@ def parse_answer(question: Question, text: str) -> str:
             if any(contains(norm, kw) for kw in keywords):
                 return value
         return "unknown" if _UNKNOWN_RE.search(norm) else text.strip()[:MAX_FREE_TEXT_FACT]
+    if _UNKNOWN_RE.search(norm):
+        return "unknown"
     if question.fact == "error_text":
+        if _NO_MESSAGE_RE.fullmatch(norm.strip(" .!")):
+            return NO_ERROR_MESSAGE
         return extract_error_text(text) or text.strip()[:MAX_FREE_TEXT_FACT]
     return text.strip()[:MAX_FREE_TEXT_FACT]
+
+
+# «нет», «ничего не пишет»: the answer to «есть ли сообщение об ошибке?», not its text.
+NO_ERROR_MESSAGE = "сообщения об ошибке нет"
+_NO_MESSAGE_RE = re.compile(
+    r"(?:нет|неа|нету|ничего|никакого|никаких)(?:\s+(?:ошибки|ошибок|сообщения|сообщений|не пишет|не показывает|не выдает))?"
+    r"|(?:ошибки|сообщения) нет|ничего не (?:пишет|показывает|выдает|появляется)|просто не работает"
+)
 
 
 def quick_replies(question: Question) -> list[str]:
@@ -391,7 +403,7 @@ def quick_replies(question: Question) -> list[str]:
             question.option_labels.get(value) or keywords[0].capitalize()
             for value, keywords in question.options.items()
         ]
-        return [*labels, "Не знаю"]
+        return [*labels, "Не знаю"] if question.offer_dont_know else labels
     return []
 
 

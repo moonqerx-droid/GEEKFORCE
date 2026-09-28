@@ -32,7 +32,7 @@ def test_every_reply_parses_back_to_its_own_answer(engine, kb):
             yes, no = ("no", "yes") if question.invert else ("yes", "no")
             expected = [yes, no, "unknown"]
         else:
-            expected = [*question.options.keys(), "unknown"]
+            expected = [*question.options.keys(), *(["unknown"] if question.offer_dont_know else [])]
         assert [parse_answer(question, reply) for reply in replies] == expected, (playbook_id, question.fact, replies)
         checked += 1
     assert checked >= 5

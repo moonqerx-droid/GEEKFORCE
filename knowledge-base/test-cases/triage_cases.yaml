@@ -37,7 +37,8 @@ cases:
     expect:
       playbook: unknown
       urgency: medium
-      questions_before_step: 3
+      # One question with likely areas; «не знаю» there means a specialist should look.
+      questions_before_step: 1
       action_after_questions: escalate
 
   - name: несколько симптомов — почта

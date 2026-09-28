@@ -243,7 +243,7 @@ def test_unknown_issue_escalates_to_l1_without_invented_steps(client):
     cid = client.post("/api/conversations").json()["id"]
 
     state = send(client, cid, original)
-    for answer in ("не знаю", "нет текста ошибки", "сегодня"):
+    for answer in ("Другое", "при включении компьютер пищит и показывает чёрный экран"):
         assert state["status"] == "CLARIFYING"
         state = send(client, cid, answer)
 

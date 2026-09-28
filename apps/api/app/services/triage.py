@@ -217,6 +217,15 @@ class TriageDialogueService(DialogueService):
             elif previous_status == "CLARIFYING":
                 facts = self.engine.absorb_answer(content, self._context(conversation))
                 conversation.known_facts = {**conversation.known_facts, **facts}
+                picked = facts.get("problem_area")
+                if (conversation.playbook_id == "unknown" and update.recommended_playbook == "unknown"
+                        and picked not in (None, "other", "unknown") and self.engine.kb.has(picked)):
+                    # A tap on «Почта» is an explicit choice, not something to guess from keywords.
+                    update = update.model_copy(update={
+                        "recommended_playbook": picked,
+                        "service": self.engine.kb.get(picked).service,
+                        "summary": self.engine.kb.get(picked).title,
+                    })
                 if conversation.playbook_id == "unknown" and update.recommended_playbook != "unknown":
                     conversation.playbook_id = update.recommended_playbook
                     conversation.summary = update.summary

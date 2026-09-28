@@ -57,8 +57,12 @@ class Question(BaseModel):
     options: dict[str, list[str]] = Field(default_factory=dict)
     # For CHOICE: how each option reads as a one-tap answer ("В браузере").
     option_labels: dict[str, str] = Field(default_factory=dict)
+    # For CHOICE: append «Не знаю» to the one-tap answers.
+    offer_dont_know: bool = True
     # For YES_NO: store the opposite answer (question is phrased positively).
     invert: bool = False
+    # Asked only when every listed fact has one of the given values.
+    when_facts: dict[str, list[str]] = Field(default_factory=dict)
     # Asked only when one of these symptoms was described (empty = always).
     when_symptoms: list[str] = Field(default_factory=list)
     # Skipped when one of these symptoms was described.

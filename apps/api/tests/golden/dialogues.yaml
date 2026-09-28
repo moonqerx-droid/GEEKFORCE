@@ -1,0 +1,320 @@
+# Эталонные диалоги: как пишут живые сотрудники, и чего мы ждём от помощника.
+#
+# say: реплики сотрудника по порядку. "@helped" / "@not_helped" / "@cannot" — кнопки у шага.
+# playbook: какой сценарий должен вести диалог в конце (один или список допустимых).
+# max_questions: сколько уточняющих вопросов допустимо до первого полезного действия
+#   (шаг, ответ по документу, передача специалисту). По умолчанию 2.
+# end: чем должен закончиться сценарий: step | escalated | answer | resolved (необязательно).
+# tags: "понимание" — проверка распознавания (опечатки, сленг; зона классификатора),
+#       "диалог" — поведение по ходу разговора.
+
+- id: device-login-clean
+  say: ["Вчера всё работало, сегодня не могу зайти в систему с ноутбука, а с телефона открывается"]
+  playbook: crm_login_device_specific
+  tags: [понимание]
+
+- id: device-login-typos
+  say: ["Вчера всё ранботало, сигодня не могу зайти в систему с ноутбука, а с телефона открыватся"]
+  playbook: crm_login_device_specific
+  tags: [понимание]
+
+- id: outlook-slang
+  say: ["не работаит аутлук"]
+  playbook: email_outlook
+  tags: [понимание]
+
+- id: vpn-slang
+  say: ["впн не конектится"]
+  playbook: vpn_connection
+  tags: [понимание]
+
+- id: vpn-typo
+  say: ["не подключаеться впн из дома, пишет ошибка 809"]
+  playbook: vpn_connection
+  tags: [понимание]
+
+- id: password-forgot-fem
+  say: ["пароль забыла"]
+  playbook: password_login
+  end: step
+  tags: [понимание]
+
+- id: password-typo
+  say: ["забыл пароьл от компа"]
+  playbook: password_login
+  tags: [понимание]
+
+- id: password-expired
+  say: ["Windows пишет что срок действия пароля истёк"]
+  playbook: password_login
+  tags: [понимание]
+
+- id: printer-plain
+  say: ["принтер не печатает"]
+  playbook: printer
+  end: step
+  tags: [понимание]
+
+- id: printer-typo
+  say: ["принтр не пичатает, бумага зажевалась"]
+  playbook: printer
+  tags: [понимание]
+
+- id: wifi-drops
+  say: ["вайфай постоянно отваливается"]
+  playbook: network_wifi
+  tags: [понимание]
+
+- id: internet-slow-typo
+  say: ["инет очень медлено работает"]
+  playbook: [network_wifi, slow_performance]
+  tags: [понимание]
+
+- id: zoom-mic
+  say: ["в зуме меня не слышат"]
+  playbook: video_calls
+  tags: [понимание]
+
+- id: teams-typo
+  say: ["в тимсе камира не работает"]
+  playbook: video_calls
+  tags: [понимание]
+
+- id: access-folder
+  say: ["нужен доступ к папке отдела на общем диске"]
+  playbook: access_rights
+  tags: [понимание]
+
+- id: access-denied-typo
+  say: ["пишет доступ запрешен когда открываю папку"]
+  playbook: access_rights
+  tags: [понимание]
+
+- id: phishing
+  say: ["перешёл по ссылке из странного письма и ввёл пароль"]
+  playbook: security_incident
+  end: escalated
+  tags: [понимание]
+
+- id: mass-outage
+  say: ["у всего отдела не открывается CRM"]
+  playbook: mass_incident
+  tags: [понимание]
+
+- id: portal-502
+  say: ["портал выдаёт 502 bad gateway"]
+  playbook: service_unavailable
+  tags: [понимание]
+
+- id: mail-not-arriving
+  say: ["письма не приходят уже второй час"]
+  playbook: email_outlook
+  tags: [понимание]
+
+- id: mail-mailbox-full
+  say: ["ящик переполнен, не могу отправить письмо"]
+  playbook: email_outlook
+  tags: [понимание]
+
+- id: bitrix-login
+  say: ["не пускает в битрикс, а у коллеги рядом работает"]
+  playbook: crm_login_device_specific
+  tags: [понимание]
+
+# --- медленная работа: не то же самое, что «не открывается» -------------------
+
+- id: 1c-slow
+  say: ["1с тормозит"]
+  playbook: slow_performance
+  tags: [диалог]
+
+- id: pc-slow
+  say: ["компьютер очень медленно работает, всё виснет"]
+  playbook: slow_performance
+  tags: [диалог]
+
+- id: excel-slow
+  say: ["эксель долго открывает файлы, по минуте грузит"]
+  playbook: slow_performance
+  tags: [диалог]
+
+# --- непонятный запрос: один вопрос с вариантами, а не анкета ------------------
+
+- id: vague-help
+  say: ["у меня ничего не работает", "Вход или пароль"]
+  playbook: password_login
+  max_questions: 2
+  tags: [диалог]
+
+- id: vague-then-vpn
+  say: ["не получается работать из дома", "VPN"]
+  playbook: vpn_connection
+  tags: [диалог]
+
+- id: vague-then-mail
+  say: ["что-то сломалось", "Почта"]
+  playbook: email_outlook
+  tags: [диалог]
+
+- id: vague-then-free-text
+  say: ["помогите пожалуйста срочно", "не открывается outlook"]
+  playbook: email_outlook
+  tags: [диалог]
+
+- id: vague-then-other
+  say: ["странная штука с компьютером", "Другое", "при включении пищит и чёрный экран"]
+  playbook: unknown
+  end: escalated
+  max_questions: 2
+  tags: [диалог]
+
+- id: vague-then-slow
+  say: ["всё очень плохо", "Всё медленно работает"]
+  playbook: slow_performance
+  tags: [диалог]
+
+# --- ответы на вопросы: не записывать мусор -----------------------------------
+
+- id: mail-no-error
+  say: ["не приходят письма в outlook", "нет"]
+  playbook: email_outlook
+  tags: [диалог]
+
+- id: vpn-dont-know-error
+  say: ["не подключается vpn", "не знаю"]
+  playbook: vpn_connection
+  tags: [диалог]
+
+- id: mail-answer-is-browser
+  say: ["почта не работает", "в браузере"]
+  playbook: email_outlook
+  tags: [диалог]
+
+- id: wifi-from-home
+  say: ["интернет пропадает", "из дома"]
+  playbook: network_wifi
+  tags: [диалог]
+
+# --- шаги ---------------------------------------------------------------------
+
+- id: printer-all-steps-fail
+  say: ["принтер не печатает", "@not_helped", "@not_helped"]
+  playbook: printer
+  end: escalated
+  tags: [диалог]
+
+- id: password-reset-helps
+  say: ["забыл пароль", "@helped", "да, всё работает"]
+  playbook: password_login
+  end: resolved
+  tags: [диалог]
+
+- id: vpn-cannot-do-step
+  say: ["не подключается vpn, пишет ошибка 809", "да", "@cannot"]
+  playbook: vpn_connection
+  tags: [диалог]
+
+# --- контрольная группа: добавлена без подстройки движка ------------------------
+
+- id: holdout-teams-no-sound
+  say: ["не слышу собеседников в тимс, звук есть в ютубе"]
+  playbook: video_calls
+  tags: [понимание, контроль]
+
+- id: holdout-account-locked
+  say: ["учетку заблокировало после трех попыток"]
+  playbook: password_login
+  tags: [понимание, контроль]
+
+- id: holdout-2fa
+  say: ["не приходит код подтверждения при входе"]
+  playbook: password_login
+  tags: [понимание, контроль]
+
+- id: holdout-mail-attachment
+  say: ["не могу отправить письмо с вложением, большое"]
+  playbook: email_outlook
+  tags: [понимание, контроль]
+
+- id: holdout-outlook-password-loop
+  say: ["аутлук постоянно спрашивает пароль"]
+  playbook: email_outlook
+  tags: [понимание, контроль]
+
+- id: holdout-vpn-anyconnect
+  say: ["anyconnect пишет login failed"]
+  playbook: vpn_connection
+  tags: [понимание, контроль]
+
+- id: holdout-no-internet-office
+  say: ["в офисе нет интернета на моём компе, у соседа есть"]
+  playbook: network_wifi
+  tags: [понимание, контроль]
+
+- id: holdout-printer-queue
+  say: ["документ висит в очереди печати и не печатается"]
+  playbook: printer
+  tags: [понимание, контроль]
+
+- id: holdout-jira-down
+  say: ["джира не открывается, 503"]
+  playbook: service_unavailable
+  tags: [понимание, контроль]
+
+- id: holdout-sharepoint-access
+  say: ["нет прав на sharepoint сайт проекта"]
+  playbook: access_rights
+  tags: [понимание, контроль]
+
+- id: holdout-virus
+  say: ["антивирус ругается на файл из почты, я его открыл"]
+  playbook: security_incident
+  end: escalated
+  tags: [понимание, контроль]
+
+- id: holdout-slow-browser
+  say: ["браузер жутко тормозит"]
+  playbook: slow_performance
+  tags: [понимание, контроль]
+
+- id: holdout-laptop-hangs
+  say: ["ноут подвисает каждые пять минут"]
+  playbook: slow_performance
+  tags: [понимание, контроль]
+
+- id: holdout-camera-zoom
+  say: ["на созвоне не видят мою камеру"]
+  playbook: video_calls
+  tags: [понимание, контроль]
+
+- id: holdout-vague-tap-access
+  say: ["ничего не получается", "Нет доступа к папке или программе"]
+  playbook: access_rights
+  tags: [диалог, контроль]
+
+- id: holdout-vague-typed-answer
+  say: ["беда какая-то", "интернет не работает"]
+  playbook: network_wifi
+  tags: [диалог, контроль]
+
+- id: holdout-vague-dont-know
+  say: ["что-то не так", "не знаю"]
+  playbook: unknown
+  end: escalated
+  tags: [диалог, контроль]
+
+- id: holdout-vpn-no-error
+  say: ["не подключается впн", "ничего не пишет"]
+  playbook: vpn_connection
+  tags: [диалог, контроль]
+
+- id: holdout-mail-dont-know-client
+  say: ["почта глючит", "не знаю"]
+  playbook: email_outlook
+  tags: [диалог, контроль]
+
+- id: holdout-slow-colleagues-too
+  say: ["1с очень медленно работает", "да"]
+  playbook: slow_performance
+  end: escalated
+  tags: [диалог, контроль]
