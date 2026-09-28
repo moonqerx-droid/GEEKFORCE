@@ -841,6 +841,10 @@ def _company_knowledge_decision(chunk: KnowledgeChunk) -> Decision:
         )
     # Render Markdown as readable chat text while keeping the evidence quote verbatim.
     instruction = re.sub(r"\n{2,}", "\n", re.sub(r"(?m)^#{1,6}\s+", "", quote)).strip()
+    # A leading section heading («Пароли») repeats the source title shown with the answer.
+    first, _, rest = instruction.partition("\n")
+    if rest.strip() and len(first.split()) <= 5 and not re.search(r"[.!?:;]$", first.strip()):
+        instruction = rest.strip()
     step = Step(
         id=f"knowledge.{chunk.id}",
         title=f"По документу «{chunk.title}»",

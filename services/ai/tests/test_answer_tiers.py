@@ -282,3 +282,13 @@ def test_password_complaints_still_follow_the_scenario(kb, complaint) -> None:
     engine.set_company_fragments([PASSWORD_POLICY])
 
     assert _ask(engine, complaint).answer_kind != AnswerKind.DOCUMENT
+
+
+def test_document_answer_does_not_repeat_the_section_heading(kb) -> None:
+    engine = TriageEngine(kb)
+    engine.set_company_fragments([{**PASSWORD_POLICY, "text": "## Пароли\n\n" + PASSWORD_POLICY["text"]}])
+
+    decision = _ask(engine, "Какие требования к паролю?")
+
+    assert decision.step.instruction.startswith("Пароль от рабочей учётной записи")
+    assert decision.citations[0].quote.startswith("## Пароли")  # evidence stays verbatim
