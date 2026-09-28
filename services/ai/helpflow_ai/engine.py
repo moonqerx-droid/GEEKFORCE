@@ -377,6 +377,22 @@ class TriageEngine:
             return self._escalate(playbook, "решить может только специалист: " + ", ".join(sorted(
                 described & set(playbook.escalate_on_symptoms))), context.known_facts)
         step = self.next_step(playbook, context)
+        if step is not None and step.requires_admin:
+            # Admin rights or a risky change: the specialist does it, the employee is not asked to.
+            decision = self._escalate(playbook, f"нужны права администратора: {step.id}")
+            note = (f"Следующий шаг — «{step.title}» — делает специалист: для него нужны права "
+                    "администратора, самому это делать не нужно.")
+            return decision.model_copy(update={"message": f"{note} {decision.message}"})
+        own_ids = {s.id for s in playbook.steps}
+        tried_here = any(r.step_id in own_ids for r in context.completed_steps)
+        if (step is not None and tried_here and context.urgency not in URGENT_LEVELS
+                and all(s.workaround for s in _open_steps(playbook, context))):
+            # Diagnosis is exhausted: hand off now and leave the workaround as a tip, rather
+            # than one more step for someone who already pressed «не помогло».
+            decision = self._escalate(playbook, f"выполнено шагов: {len(context.completed_steps)}, "
+                                                "проблема не решена")
+            tip = f"А пока специалист разбирается, можно обойтись так. {step.instruction}"
+            return decision.model_copy(update={"message": f"{decision.message} {tip}"})
         if step is not None:
             helped = after_workaround and last.outcome == StepOutcome.HELPED
             return _step_decision(step, AFTER_WORKAROUND_INTRO if helped else "",

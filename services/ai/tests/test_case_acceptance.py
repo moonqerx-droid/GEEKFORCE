@@ -276,6 +276,12 @@ def test_problems_are_worked_through_one_by_one(simulate):
         sim.answer("никакой ошибки нет")
     assert sim.decision.action == DecisionAction.STEP
     assert sim.decision.playbook_id == "email_outlook"
+    assert sim.decision.step.id == "check_web_mail"
+
+    # Mail in the browser is a way around, not a fix: Outlook itself is repaired next.
+    sim.step_result(StepOutcome.HELPED)
+    assert sim.decision.action == DecisionAction.STEP
+    assert sim.decision.step.id == "restart_outlook"
 
     sim.step_result(StepOutcome.HELPED)
     assert sim.decision.action == DecisionAction.ASK
