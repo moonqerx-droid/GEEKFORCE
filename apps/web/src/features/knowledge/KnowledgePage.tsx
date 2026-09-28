@@ -29,6 +29,14 @@ function formatLabel(document: KnowledgeDocument): string {
   return extensionOf(document.original_filename).toUpperCase() || document.media_type;
 }
 
+/** A fragment as reading text: its heading is already shown as a label, Markdown marks are not words. */
+function readableFragment(text: string, heading: string | null | undefined): string {
+  const lines = text.split("\n");
+  const first = lines[0]?.replace(/^#{1,6}\s+/, "").trim();
+  const body = heading && first === heading.trim() ? lines.slice(1) : lines;
+  return body.join("\n").replace(/^#{1,6}\s+/gm, "").replace(/\n{3,}/g, "\n\n").trim();
+}
+
 function localProblem(file: File): string | null {
   if (!EXTENSIONS.has(extensionOf(file.name))) return "Подходят PDF, DOCX, TXT и Markdown.";
   if (file.size > MAX_BYTES) return "Файл больше 10 МБ.";
@@ -203,8 +211,10 @@ export function KnowledgePage() {
                     {item.status === "failed" && item.error_message ? <span className="kb-reason">{item.error_message}</span> : null}
                   </td>
                   <td data-label="Загружен" className="kb-when">
-                    {formatDateTime(item.created_at)}
-                    {item.uploaded_by_name ? <span className="kb-author">{item.uploaded_by_name}</span> : null}
+                    <span>
+                      {formatDateTime(item.created_at)}
+                      {item.uploaded_by_name ? <span className="kb-author">{item.uploaded_by_name}</span> : null}
+                    </span>
                   </td>
                 </tr>
               ))}
@@ -288,7 +298,7 @@ function DocumentPanel({ document, onClose, onDeleted }: {
           {chunks.map((chunk) => (
             <li key={chunk.id}>
               {chunk.metadata.heading ? <span className="kb-chunk-heading">{chunk.metadata.heading}</span> : null}
-              <p className="kb-chunk-text">{chunk.text}</p>
+              <p className="kb-chunk-text">{readableFragment(chunk.text, chunk.metadata.heading)}</p>
             </li>
           ))}
         </ol>

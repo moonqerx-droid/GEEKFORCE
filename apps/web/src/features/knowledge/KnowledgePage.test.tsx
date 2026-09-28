@@ -143,6 +143,10 @@ describe("KnowledgePage", () => {
     await user.click(await screen.findByRole("button", { name: /Командировки/ }));
     const panel = await screen.findByRole("region", { name: "Документ «Командировки»" });
     expect(await within(panel).findByText(/Суточные — 700 рублей в день/)).toBeInTheDocument();
+    // The heading is shown once, as a label, and Markdown marks are not shown as text.
+    const fragments = within(panel).getByRole("list");
+    expect(within(fragments).getAllByText("Командировки")).toHaveLength(1);
+    expect(within(fragments).queryByText(/#/)).not.toBeInTheDocument();
 
     await user.click(within(panel).getByRole("button", { name: "Удалить документ" }));
     await user.click(within(panel).getByRole("button", { name: "Да, удалить" }));

@@ -132,3 +132,11 @@
     display: none;
   }
 }
+
+/* Narrow phones: the support lead has four sections; keep them all visible without scrolling. */
+@media (max-width: 420px) {
+  .app-header-nav a {
+    padding: 6px 8px;
+    font-size: 13px;
+  }
+}
