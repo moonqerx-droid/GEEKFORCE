@@ -111,7 +111,8 @@ export function ConversationPage({ onActivity }: { onActivity?: (conversation: C
             ) : null}
 
             {!c && conv.pendingMessage == null ? (
-              <WelcomeScreen firstName={user?.first_name} onExample={setDraft} />
+              <WelcomeScreen firstName={user?.first_name} onExample={setDraft}
+                onReport={(text) => void conv.startWithMessage(text, []).catch(() => undefined)} />
             ) : null}
 
             {c || conv.pendingMessage != null ? (

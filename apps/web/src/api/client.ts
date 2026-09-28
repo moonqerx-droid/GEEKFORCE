@@ -1,5 +1,6 @@
 import { ApiError, ConflictError, NetworkError, NotFoundError, ValidationError } from "./errors";
 import type {
+  KnownIssue,
   KnowledgeDocument,
   KnowledgeDocumentDetail,
   Attachment,
@@ -117,6 +118,10 @@ export const api = {
 
   createConversation(signal?: AbortSignal): Promise<Conversation> {
     return request("/api/conversations", { method: "POST" }, signal);
+  },
+
+  knownIssues(signal?: AbortSignal): Promise<KnownIssue[]> {
+    return request("/api/known-issues", {}, signal);
   },
 
   listConversations(signal?: AbortSignal): Promise<Conversation[]> {

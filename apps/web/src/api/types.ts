@@ -375,3 +375,12 @@ export interface Citation {
   title: string;
   quote: string;
 }
+
+/** A confirmed outage, as shown to employees before they write. */
+export interface KnownIssue {
+  id: string;
+  service: string;
+  since: string;
+  affected: number;
+  update: string | null;
+}

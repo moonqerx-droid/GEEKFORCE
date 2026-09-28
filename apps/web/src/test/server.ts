@@ -8,6 +8,7 @@ export const handlers = [
   http.post("*/api/conversations", () => HttpResponse.json(makeConversation(), { status: 201 })),
 
   http.get("*/api/conversations", () => HttpResponse.json([])),
+  http.get("*/api/known-issues", () => HttpResponse.json([])),
 
   http.get("*/api/conversations/:id", ({ params }) =>
     HttpResponse.json(makeConversation({ id: params.id as string })),

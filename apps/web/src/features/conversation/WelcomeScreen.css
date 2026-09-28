@@ -92,3 +92,81 @@
     border-left: 0;
   }
 }
+
+/* A status page in one line: what is already known to be down, so nobody reports it twice. */
+.known-issues {
+  display: grid;
+  gap: var(--space-2);
+  margin-bottom: var(--space-5);
+}
+
+.known-issue {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid color-mix(in srgb, var(--color-warning) 35%, transparent);
+  border-radius: var(--radius-md);
+  background: var(--color-warning-bg);
+}
+
+.known-issue-dot {
+  flex: none;
+  width: 10px;
+  height: 10px;
+  margin-top: 6px;
+  border-radius: 50%;
+  background: var(--color-warning);
+}
+
+.known-issue-body {
+  flex: 1;
+  min-width: 0;
+}
+
+.welcome .known-issue-title {
+  margin: 0;
+  font-size: var(--font-size-sm);
+  font-weight: 700;
+  letter-spacing: 0;
+}
+
+.known-issue-text {
+  color: var(--ink-soft);
+  font-size: var(--font-size-sm);
+  line-height: 1.45;
+}
+
+.known-issue-join {
+  flex: none;
+  align-self: center;
+  padding: 7px 14px;
+  border: 1.5px solid var(--color-warning);
+  border-radius: var(--radius-pill);
+  background: var(--color-surface);
+  color: var(--ink);
+  font: inherit;
+  font-size: var(--font-size-sm);
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.known-issue-join:hover {
+  background: var(--color-warning);
+  color: #fff;
+}
+
+.known-issue-join:focus-visible {
+  outline: 3px solid var(--color-warning);
+  outline-offset: 2px;
+}
+
+@media (max-width: 560px) {
+  .known-issue {
+    flex-wrap: wrap;
+  }
+
+  .known-issue-join {
+    width: 100%;
+  }
+}

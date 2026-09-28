@@ -1,3 +1,7 @@
+import { useEffect, useState } from "react";
+import { api } from "../../api/client";
+import type { KnownIssue } from "../../api/types";
+import { formatTime } from "../../lib/labels";
 import "./WelcomeScreen.css";
 
 const EXAMPLES = [
@@ -14,9 +18,48 @@ const PROMISES = [
 ] as const;
 
 /** The empty chat: what to write and why it is safe to write it plainly. The composer sits below. */
-export function WelcomeScreen({ firstName, onExample }: { firstName?: string; onExample: (text: string) => void }) {
+export function WelcomeScreen({
+  firstName,
+  onExample,
+  onReport,
+}: {
+  firstName?: string;
+  onExample: (text: string) => void;
+  /** Starts a request right away; the radar adds it to the outage, so the employee hears when it is fixed. */
+  onReport?: (text: string) => void;
+}) {
+  const [issues, setIssues] = useState<KnownIssue[]>([]);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    // A status line is a bonus: if it cannot load, the page simply goes without it.
+    api.knownIssues(controller.signal).then(setIssues).catch(() => undefined);
+    return () => controller.abort();
+  }, []);
+
   return (
     <section className="welcome" aria-labelledby="welcome-title">
+      {issues.length ? (
+        <section className="known-issues" aria-label="Известные сбои">
+          {issues.map((issue) => (
+            <article key={issue.id} className="known-issue">
+              <span className="known-issue-dot" aria-hidden="true" />
+              <div className="known-issue-body">
+                <h2 className="known-issue-title">{issue.service}: известный сбой, уже чиним</h2>
+                <p className="known-issue-text">
+                  С {formatTime(issue.since)}, затронуто сотрудников: {issue.affected}.
+                  {issue.update ? ` Последнее от поддержки: «${issue.update}»` : " Писать отдельно не нужно — сообщим, когда починят."}
+                </p>
+              </div>
+              {onReport ? (
+                <button type="button" className="known-issue-join" onClick={() => onReport(`У меня тоже не работает ${issue.service}`)}>
+                  У меня то же самое
+                </button>
+              ) : null}
+            </article>
+          ))}
+        </section>
+      ) : null}
       <p className="welcome-greeting">{firstName ? `${firstName}, привет!` : "Привет!"}</p>
       <h1 id="welcome-title" className="welcome-title">Что случилось?</h1>
       <p className="welcome-lead">
