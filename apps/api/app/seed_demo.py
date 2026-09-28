@@ -9,8 +9,10 @@ questions and steps look exactly like production ones.
 
 from __future__ import annotations
 
+import os
 import random
 from datetime import timedelta
+from pathlib import Path
 
 from helpflow_ai import TriageEngine
 from helpflow_ai.knowledge import KnowledgeBase
@@ -23,6 +25,7 @@ from app.models.conversation import Conversation
 from app.models.incident import Incident
 from app.repositories.conversations import ConversationRepository
 from app.services.admin import _aware
+from app.services.knowledge import KnowledgeService, KnowledgeUploadRefused
 from app.services.operator import OperatorService
 from app.services.triage import TriageDialogueService
 
@@ -206,9 +209,50 @@ def seed_incident(seed_value: int = 7, session_factory=SessionLocal) -> bool:
         return True
 
 
+# Company documents the demo stand answers from; the admin could upload the same files by hand.
+DOCUMENT_TITLES = {
+    "travel-regulations.md": "Регламент командировок",
+    "vpn-guide.md": "Инструкция по VPN",
+    "password-rules.md": "Правила паролей",
+}
+
+
+def seed_documents(session_factory=SessionLocal, directory: Path | None = None) -> int:
+    """Upload the demo company documents as the demo admin; already uploaded ones are skipped."""
+    directory = directory or _documents_dir()
+    files = sorted(path for path in directory.glob("*.md") if path.name in DOCUMENT_TITLES) if directory else []
+    added = 0
+    with session_factory() as session:
+        admin = session.scalar(select(User).where(User.email == f"admin@{DOMAIN}"))
+        if admin is None or not files:
+            return 0
+        knowledge = KnowledgeService(session)
+        for path in files:
+            try:
+                knowledge.upload(path.name, path.read_bytes(), "text/markdown", admin,
+                                 title=DOCUMENT_TITLES[path.name])
+                added += 1
+            except KnowledgeUploadRefused as refused:
+                if refused.status_code != 409:  # 409: this very file is already in the knowledge base
+                    raise
+                session.rollback()
+    return added
+
+
+def _documents_dir() -> Path | None:
+    # Docker image: /app/knowledge-base (HELPFLOW_KB_DIR); a checkout: the repository root.
+    kb_dir = os.getenv("HELPFLOW_KB_DIR")
+    candidates = [Path(kb_dir) / "company-documents"] if kb_dir else []
+    candidates += [parent / "knowledge-base" / "company-documents" for parent in Path(__file__).resolve().parents]
+    return next((candidate for candidate in candidates if candidate.is_dir()), None)
+
+
 def main() -> None:
     created = seed()
     outage = seed_incident()
+    documents = seed_documents()
+    if documents:
+        print(f"Загружено документов компании: {documents} (раздел «База знаний»).")
     if not created:
         print(f"Демо-данные уже есть. Вход: admin@{DOMAIN} / {PASSWORD}")
         if outage:

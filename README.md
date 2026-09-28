@@ -115,7 +115,7 @@ cd apps/api && PYTHONPATH=../../services/ai python -m app.eval_dialogues --seman
 
 ```bash
 docker compose up -d --build                       # PostgreSQL + API на :8000, миграции применяются сами
-docker compose exec api python -m app.seed_demo    # демо-пользователи, история обращений, сбой VPN для радара
+docker compose exec api python -m app.seed_demo    # демо-пользователи, история, сбой VPN, документы компании
 cd apps/web && npm ci && npm run dev               # интерфейс на http://localhost:5173
 ```
 
@@ -127,7 +127,7 @@ cd apps/web && npm ci && npm run dev               # интерфейс на htt
 | Специалисты | `anna@helpflow.demo`, `oleg@helpflow.demo` |
 | Сотрудники | `ivan@helpflow.demo`, `elena@helpflow.demo`, `dmitry@helpflow.demo`, `olga@helpflow.demo`, `sergey@helpflow.demo` |
 
-Демо-данные — две недели истории, проигранной через настоящий движок, и свежий сбой VPN у пяти сотрудников для радара.
+Демо-данные — две недели истории, проигранной через настоящий движок, и свежий сбой VPN у пяти сотрудников для радара. В «Базу знаний» загружаются три документа компании из `knowledge-base/company-documents/` (регламент командировок, инструкция по VPN, правила паролей): помощник сразу отвечает по ним с цитатой, например на «Какие суточные в командировке?».
 
 **Режимы AI.** Без `.env` помощник работает только на правилах (`AI_PROVIDER=mock`): без сети, ключей и Ollama — все сценарии кейса работают. Чтобы включить смысловое понимание сленга и формулировку ответов по документам локальной моделью:
 
@@ -196,7 +196,7 @@ apps/api/               FastAPI: диалог, очередь специалис
 apps/web/               React 19 + Vite + TypeScript: интерфейсы сотрудника, специалиста, руководителя
 services/ai/            AI-движок helpflow_ai: понимание, сценарии, уровни ответов, проверка цитат
   helpflow_ai/understanding/  опечатки и словоформы (pymorphy3, rapidfuzz), смысловой слой (bge-m3)
-knowledge-base/         17 YAML-сценариев, статьи FAQ, тестовые кейсы
+knowledge-base/         17 YAML-сценариев, статьи FAQ, демо-документы компании, тестовые кейсы
 scripts/                check-case.py и smoke-тесты живого стенда
 docs/                   модели и замеры, уровни ответов, демо-сценарий, скриншоты
 ```

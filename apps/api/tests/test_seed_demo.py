@@ -77,3 +77,32 @@ def test_seeded_metrics_still_load(factory):
         metrics = AdminService(session, "http://localhost").metrics(7)
         assert metrics["total"] >= 5
         assert metrics["open"] >= 4
+
+
+def test_seed_loads_the_demo_company_documents(factory):
+    from app.models.knowledge import KnowledgeDocument
+    from app.seed_demo import seed_documents
+
+    seed(total=12, session_factory=factory)
+
+    assert seed_documents(session_factory=factory) == 3
+    assert seed_documents(session_factory=factory) == 0, "a second run adds nothing"
+    with factory() as session:
+        documents = session.query(KnowledgeDocument).all()
+        assert sorted(d.title for d in documents) == ["Инструкция по VPN", "Правила паролей", "Регламент командировок"]
+        assert all(d.status == "ready" and d.chunks for d in documents)
+
+
+def test_employee_gets_an_answer_from_a_seeded_document(factory):
+    from app.seed_demo import seed_documents
+
+    seed(total=12, session_factory=factory)
+    seed_documents(session_factory=factory)
+    with factory() as session:
+        service = TriageDialogueService(ConversationRepository(session), TriageEngine(KnowledgeBase.load(), None))
+        conversation = service.create_conversation()
+        session.commit()
+        answered = service.handle_message(conversation.id, "Какие суточные положены в командировке по России?")
+
+    assert answered.answer_kind == "document"
+    assert "700 рублей" in answered.messages[-1].content
