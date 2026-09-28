@@ -1716,3 +1716,231 @@
   expect_text: ["администратор"]
   expect_fact: {software: "visio"}
   tags: [диалог, новые]
+
+# --- Контроль-5: слепая группа, написана после всех правок answers-v2 и один раз
+# замерена. Не подгонять: это честная мера на новых формулировках.
+
+- id: h5-01
+  say: ["не могу залогиниться в рабочий ноут после отпуска"]
+  playbook: password_login
+  tags: [контроль-5]
+
+- id: h5-02
+  say: ["учётка заблочилась, пока я был на обеде"]
+  playbook: password_login
+  tags: [контроль-5]
+
+- id: h5-03
+  say: ["пароль истёк и не даёт поставить новый"]
+  playbook: password_login
+  tags: [контроль-5]
+
+- id: h5-04
+  say: ["впн висит на подключении и ничего"]
+  playbook: vpn_connection
+  tags: [контроль-5]
+
+- id: h5-05
+  say: ["из командировки не открываются внутренние сайты, впн пишет ошибка"]
+  playbook: vpn_connection
+  tags: [контроль-5]
+
+- id: h5-06
+  say: ["forticlient просит сертификат"]
+  playbook: vpn_connection
+  tags: [контроль-5]
+
+- id: h5-07
+  say: ["аутлук не видит новые письма уже час"]
+  playbook: email_outlook
+  tags: [контроль-5]
+
+- id: h5-08
+  say: ["письмо с презентацией не уходит, слишком большое"]
+  playbook: email_outlook
+  tags: [контроль-5]
+
+- id: h5-09
+  say: ["в браузерной почте ошибка при входе в ящик"]
+  playbook: email_outlook
+  tags: [контроль-5]
+
+- id: h5-10
+  say: ["вай фай подключается и тут же отваливается"]
+  playbook: network_wifi
+  tags: [контроль-5]
+
+- id: h5-11
+  say: ["на новом месте в офисе нет сети из розетки"]
+  playbook: network_wifi
+  tags: [контроль-5]
+
+- id: h5-12
+  say: ["дома интернет есть, а на ноуте нет"]
+  playbook: network_wifi
+  tags: [контроль-5]
+
+- id: h5-13
+  say: ["в зуме собеседники говорят что я пропадаю"]
+  playbook: video_calls
+  tags: [контроль-5]
+
+- id: h5-14
+  say: ["камера ноутбука показывает серый экран в тимсе"]
+  playbook: video_calls
+  tags: [контроль-5]
+
+- id: h5-15
+  say: ["не могу демонстрировать экран на созвоне"]
+  playbook: video_calls
+  tags: [контроль-5]
+
+- id: h5-16
+  say: ["нужно открыть папку проекта для нового коллеги"]
+  playbook: access_rights
+  tags: [контроль-5]
+
+- id: h5-17
+  say: ["при открытии сетевой папки пишет что нет разрешения"]
+  playbook: access_rights
+  tags: [контроль-5]
+
+- id: h5-18
+  say: ["принтер на втором этаже пишет замените тонер"]
+  playbook: printer
+  tags: [контроль-5]
+
+- id: h5-19
+  say: ["распечатываю, а выходят пустые листы"]
+  playbook: printer
+  tags: [контроль-5]
+
+- id: h5-20
+  say: ["портал для заявок показывает 504"]
+  playbook: service_unavailable
+  tags: [контроль-5]
+
+- id: h5-21
+  say: ["вики компании не открывается ни у меня, ни на телефоне"]
+  playbook: service_unavailable
+  tags: [контроль-5]
+
+- id: h5-22
+  say: ["эксель тормозит на сводных таблицах"]
+  playbook: slow_performance
+  tags: [контроль-5]
+
+- id: h5-23
+  say: ["ноутбук очень шумит и всё медленно"]
+  playbook: slow_performance
+  tags: [контроль-5]
+
+- id: h5-24
+  say: ["после установки обновлений компьютер загружается вечность"]
+  playbook: slow_performance
+  tags: [контроль-5]
+
+- id: h5-25
+  say: ["мне пришло письмо что мой ящик переполнен, по ссылке просят ввести пароль"]
+  playbook: security_incident
+  tags: [контроль-5]
+
+- id: h5-26
+  say: ["антивирус заблокировал файл из флешки"]
+  playbook: security_incident
+  tags: [контроль-5]
+
+- id: h5-27
+  say: ["на рабочем столе появилась записка с требованием выкупа"]
+  playbook: security_incident
+  tags: [контроль-5]
+
+- id: h5-28
+  say: ["пришлите доступы от админки сайта"]
+  playbook: credentials_request
+  tags: [контроль-5]
+
+- id: h5-29
+  say: ["какой логин у общей учётки бухгалтерии и пароль"]
+  playbook: credentials_request
+  tags: [контроль-5]
+
+- id: h5-30
+  say: ["у всей бухгалтерии не открывается 1с"]
+  playbook: mass_incident
+  tags: [контроль-5]
+
+- id: h5-31
+  say: ["ни у кого на этаже нет вайфая"]
+  playbook: mass_incident
+  tags: [контроль-5]
+
+- id: h5-32
+  say: ["битрикс не грузится только на моём ноуте, у коллеги работает"]
+  playbook: crm_login_device_specific
+  tags: [контроль-5]
+
+- id: h5-33
+  say: ["в amocrm бесконечная загрузка после входа"]
+  playbook: crm_login_device_specific
+  tags: [контроль-5]
+
+- id: h5-34
+  say: ["1с говорит что лицензия не получена"]
+  playbook: onec_login
+  tags: [контроль-5]
+
+- id: h5-35
+  say: ["в окне 1с не вижу базы зарплаты"]
+  playbook: onec_login
+  tags: [контроль-5]
+
+- id: h5-36
+  say: ["1с просит пароль, а я его не знаю"]
+  playbook: onec_login
+  tags: [контроль-5]
+
+- id: h5-37
+  say: ["мышь двигается рывками"]
+  playbook: peripherals
+  tags: [контроль-5]
+
+- id: h5-38
+  say: ["клавиатура на ноутбуке печатает не те буквы"]
+  playbook: peripherals
+  tags: [контроль-5]
+
+- id: h5-39
+  say: ["монитор показывает нет сигнала"]
+  playbook: peripherals
+  tags: [контроль-5]
+
+- id: h5-40
+  say: ["acrobat закрывается как только открываю файл"]
+  playbook: app_not_starting
+  tags: [контроль-5]
+
+- id: h5-41
+  say: ["программа банк-клиент не стартует, пишет ошибку"]
+  playbook: app_not_starting
+  tags: [контроль-5]
+
+- id: h5-42
+  say: ["не получается установить обновление программы, пишет ошибка"]
+  playbook: app_not_starting
+  tags: [контроль-5]
+
+- id: h5-43
+  say: ["нужен figma для дизайнера"]
+  playbook: software_install
+  tags: [контроль-5]
+
+- id: h5-44
+  say: ["прошу поставить на мой компьютер skype"]
+  playbook: software_install
+  tags: [контроль-5]
+
+- id: h5-45
+  say: ["помогите, беда"]
+  playbook: unknown
+  tags: [контроль-5]

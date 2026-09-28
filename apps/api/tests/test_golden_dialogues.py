@@ -11,7 +11,7 @@ def test_golden_dialogues_meet_the_quality_bar():
     table = summary(results)
     # «контроль-4» is a deliberately hard holdout written before the answers-v2 changes;
     # it has its own floor below and does not dilute the overall bar.
-    core = summary([r for r in results if "контроль-4" not in r.tags])
+    core = summary([r for r in results if not {"контроль-4", "контроль-5"} & set(r.tags)])
     failures = "\n".join(f"{r.id}: {'; '.join(r.problems)}" for r in results if not r.ok)
 
     # Dialogue behaviour is fully under our control: every golden dialogue must be clean.
@@ -22,3 +22,5 @@ def test_golden_dialogues_meet_the_quality_bar():
     assert core["всего"]["clean"] >= 0.87, failures
     assert core["всего"]["questions"] <= 1.5, failures
     assert table["контроль-4"]["playbook"] >= 0.95, failures
+    # «контроль-5» is blind: measured, never tuned; the floor only guards against regressions.
+    assert table["контроль-5"]["playbook"] >= 0.66, failures
