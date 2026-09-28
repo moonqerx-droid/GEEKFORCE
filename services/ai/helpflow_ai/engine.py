@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import logging
 import re
+from threading import RLock
 import time
 from typing import Any
 
@@ -22,6 +23,8 @@ from .llm import LLMClient, LLMError, LLMSettings
 from .retrieval import KnowledgeRetriever
 from .schemas import (
     Analysis,
+    AnswerKind,
+    Citation,
     DetectedIssue,
     ConversationContext,
     Decision,
@@ -29,9 +32,11 @@ from .schemas import (
     EscalationCard,
     GroundedAnswer,
     KnowledgeChunk,
+    KnowledgeMatch,
     Playbook,
     Question,
     QuestionKind,
+    RetrievedFragment,
     Step,
     StepOutcome,
     Urgency,
@@ -57,7 +62,10 @@ class TriageEngine:
     def __init__(self, knowledge: KnowledgeBase, llm: LLMClient | None = None):
         self.kb = knowledge
         self.llm = llm
-        self.retriever = KnowledgeRetriever(knowledge.chunks)
+        self._base_chunks = tuple(knowledge.chunks)
+        self._company_chunks: tuple[KnowledgeChunk, ...] = ()
+        self._knowledge_lock = RLock()
+        self.retriever = KnowledgeRetriever(list(self._base_chunks))
         self.answer_policy = AnswerPolicy()
 
     @classmethod
@@ -89,6 +97,39 @@ class TriageEngine:
             new_facts[pending.fact] = rules.parse_answer(pending, message)
         return new_facts
 
+    def citations_for(self, source_ids: list[str]) -> list[Citation]:
+        """Resolve persisted source ids into current presentation metadata."""
+        with self._knowledge_lock:
+            chunks = {chunk.id: chunk for chunk in (*self._base_chunks, *self._company_chunks)}
+        return [
+            Citation(source_id=source_id, title=chunks[source_id].title, quote=chunks[source_id].text[:1200])
+            for source_id in dict.fromkeys(source_ids)
+            if source_id.startswith("document:") and source_id in chunks
+        ]
+
+    def set_company_fragments(self, fragments: list[RetrievedFragment | dict]) -> None:
+        """Atomically replace active READY document fragments supplied by the API.
+
+        The adapter owns lifecycle filtering. Passing an empty list immediately
+        removes archived or unavailable company knowledge from retrieval.
+        """
+        parsed = [RetrievedFragment.model_validate(fragment) for fragment in fragments]
+        ids = [fragment.source_id for fragment in parsed]
+        duplicates = {source_id for source_id in ids if ids.count(source_id) > 1}
+        if duplicates:
+            raise ValueError(f"duplicate company fragment ids: {sorted(duplicates)}")
+        chunks = tuple(KnowledgeChunk(
+            id=fragment.source_id,
+            service="Company knowledge",
+            title=fragment.title,
+            text=fragment.text,
+            keywords=[],
+            escalation_team="Service Desk L1",
+        ) for fragment in parsed)
+        with self._knowledge_lock:
+            self._company_chunks = chunks
+            self.retriever = KnowledgeRetriever([*self._base_chunks, *chunks])
+
     @staticmethod
     def interpret_confirmation(message: str) -> bool | None:
         """For VERIFYING: True = solved, False = not solved, None = unclear."""
@@ -106,6 +147,18 @@ class TriageEngine:
 
     def decide(self, context: ConversationContext) -> Decision:
         """Choose the flow with rules, then optionally improve only its wording."""
+        query = context.original_request or _first_user_message(context)
+        procedural_route = self.answer_policy.procedural_route(query, context.playbook_id)
+        if procedural_route == AnswerRoute.GENERAL:
+            return _general_how_to_decision(
+                self.answer_policy.general_how_to_topic(query) or "basic"
+            )
+        if procedural_route == AnswerRoute.OPERATOR:
+            playbook = self.kb.get(context.playbook_id)
+            return self._escalate(
+                playbook,
+                "общая рекомендация запрещена без подтверждённого источника",
+            ).model_copy(update={"playbook_id": playbook.id})
         decision = self._decide_rules(context)
         if decision.step is not None and decision.step.id.startswith("general."):
             # These tiny, deterministic hints exist specifically to avoid a
@@ -146,6 +199,7 @@ class TriageEngine:
                 message="Проверьте, пожалуйста: проблема решена и всё работает как нужно?",
                 reason="общая безопасная рекомендация помогла",
                 playbook_id="unknown",
+                answer_kind=AnswerKind.GENERAL,
             )
         solved = bool(last and last.outcome == StepOutcome.HELPED and not context.verification_failed
                       and not after_workaround)
@@ -156,6 +210,7 @@ class TriageEngine:
                 message=playbook.verify_question,
                 reason="пользователь сообщил, что шаг помог",
                 playbook_id=playbook.id,
+                answer_kind=AnswerKind.PLAYBOOK,
             )
         if index is None:
             # "Not solved" at verification: keep working on the problem of the last step.
@@ -165,7 +220,7 @@ class TriageEngine:
             question = _check_question(issue)
             return Decision(action=DecisionAction.ASK, message=question.text, question=question,
                             reason=f"проверяем, осталась ли проблема: {issue.title}",
-                            playbook_id=issue.playbook_id)
+                            playbook_id=issue.playbook_id, answer_kind=AnswerKind.PLAYBOOK)
         playbook = self.kb.get(issue.playbook_id)
         decision = self._work_on(playbook, context, last, after_workaround)
         if len(plan) > 1 and not context.asked_facts and not context.completed_steps:
@@ -183,7 +238,10 @@ class TriageEngine:
             if route == AnswerRoute.GENERAL:
                 return _general_guidance_decision(query)
             if route == AnswerRoute.COMPANY:
-                return _company_knowledge_decision(matches[0].chunk)
+                company = next(
+                    match.chunk for match in matches if match.chunk.id.startswith("document:")
+                )
+                return _company_knowledge_decision(company)
             if route == AnswerRoute.OPERATOR and self.answer_policy.requires_verified_source(query):
                 return self._escalate(
                     playbook,
@@ -204,7 +262,8 @@ class TriageEngine:
         question = self.next_question(playbook, context)
         if question is not None:
             return Decision(action=DecisionAction.ASK, message=question.text, question=question,
-                            reason=f"не хватает факта: {question.fact}")
+                            reason=f"не хватает факта: {question.fact}",
+                            answer_kind=AnswerKind.PLAYBOOK)
         if playbook.id == "unknown":
             return self._escalate(playbook, "не найден подтверждённый сценарий в базе знаний")
         if playbook.escalate_immediately:
@@ -263,6 +322,7 @@ class TriageEngine:
                 "message": message,
                 "message_source": "llm",
                 "source_ids": validation.source_ids,
+                "citations": _answer_citations(answer, matches),
                 "llm_latency_ms": elapsed,
             })
         except ValidationError as error:
@@ -506,7 +566,8 @@ class TriageEngine:
         if playbook.safety_notice:
             text = f"{playbook.safety_notice} {text}"
         return Decision(action=DecisionAction.ESCALATE, message=text, reason=reason,
-                        escalation_team=playbook.escalation_team)
+                        escalation_team=playbook.escalation_team,
+                        answer_kind=AnswerKind.HANDOFF)
 
     def _questions_and_answers(self, ctx: ConversationContext) -> list[dict[str, str]]:
         answers = []
@@ -620,7 +681,7 @@ def _open_steps(playbook: Playbook, ctx: ConversationContext):
 def _step_decision(step: Step, intro: str, reason: str) -> Decision:
     text = f"{step.title}. {step.instruction}"
     return Decision(action=DecisionAction.STEP, message=f"{intro} {text}" if intro else text,
-                    step=step, reason=reason)
+                    step=step, reason=reason, answer_kind=AnswerKind.PLAYBOOK)
 
 
 def _general_guidance_decision(query: str) -> Decision:
@@ -652,13 +713,14 @@ def _general_guidance_decision(query: str) -> Decision:
             "Сохраните работу, проверьте подключение и один раз перезапустите проблемное "
             "приложение. Не устанавливайте программы и не меняйте системные настройки."
         )
-    prefix = "Общий безопасный совет, не правило компании:"
+    prefix = "Общая рекомендация — не правило компании."
     step = Step(id=step_id, title="Базовая проверка", instruction=instruction)
     return Decision(
         action=DecisionAction.STEP,
         message=f"{prefix} {instruction}",
         step=step,
         reason="низкорисковая обратимая общая рекомендация",
+        answer_kind=AnswerKind.GENERAL,
     )
 
 
@@ -675,6 +737,81 @@ def _company_knowledge_decision(chunk: KnowledgeChunk) -> Decision:
         step=step,
         reason="найден подтверждённый документ компании",
         source_ids=[chunk.id],
+        answer_kind=AnswerKind.DOCUMENT,
+        citations=[Citation(source_id=chunk.id, title=chunk.title, quote=instruction)],
+    )
+
+
+def _answer_citations(answer: GroundedAnswer, matches: list[KnowledgeMatch]) -> list[Citation]:
+    titles = {match.chunk.id: match.chunk.title for match in matches}
+    citations: list[Citation] = []
+    seen: set[tuple[str, str]] = set()
+    for claim in answer.claims:
+        key = (claim.source_id, claim.quote)
+        if (
+            claim.source_id.startswith("document:")
+            and claim.source_id in titles
+            and key not in seen
+        ):
+            citations.append(Citation(
+                source_id=claim.source_id,
+                title=titles[claim.source_id],
+                quote=claim.quote,
+            ))
+            seen.add(key)
+    return citations
+
+
+def _general_how_to_decision(topic: str) -> Decision:
+    guides = {
+        "outlook_auto_reply": (
+            "general.how_to.outlook_auto_reply",
+            "В Outlook откройте «Файл» → «Автоматические ответы», включите их, задайте период "
+            "и текст сообщения. В веб-версии этот пункт обычно находится в «Настройки» → "
+            "«Почта» → «Автоматические ответы»; названия могут немного отличаться по версии.",
+        ),
+        "teams_background": (
+            "general.how_to.teams_background",
+            "До звонка или во время него откройте «Дополнительно» → «Видеоэффекты и параметры», "
+            "выберите размытие либо стандартный фон и проверьте предпросмотр перед применением.",
+        ),
+        "excel_freeze": (
+            "general.how_to.excel_freeze",
+            "В Excel откройте вкладку «Вид» → «Закрепить области» и выберите «Закрепить верхнюю "
+            "строку». Это изменение можно отменить через тот же пункт меню.",
+        ),
+        "print_pdf": (
+            "general.how_to.print_pdf",
+            "Откройте системное окно «Печать» и выберите сохранение в PDF или виртуальный принтер "
+            "PDF. Перед сохранением проверьте диапазон страниц и не включайте конфиденциальные листы.",
+        ),
+        "wallpaper": (
+            "general.how_to.wallpaper",
+            "Откройте системные настройки «Персонализация» или «Обои», выберите изображение и "
+            "способ заполнения экрана. Если настройка заблокирована организацией, не обходите "
+            "ограничение — обратитесь к специалисту.",
+        ),
+        "zip_folder": (
+            "general.how_to.zip_folder",
+            "Нажмите папку правой кнопкой и выберите встроенное действие «Сжать» или «Отправить» → "
+            "«Сжатая ZIP-папка». Не помещайте в архив пароли и секреты; исходная папка сохранится.",
+        ),
+        "shared_calendar": (
+            "general.how_to.shared_calendar",
+            "В разделе «Календарь» Outlook выберите добавление или открытие общего календаря и "
+            "найдите владельца по имени. Если календарь не открывается, владелец должен предоставить "
+            "доступ — помощник не может менять права самостоятельно.",
+        ),
+    }
+    step_id, instruction = guides[topic]
+    prefix = "Общая рекомендация — не правило компании."
+    step = Step(id=step_id, title="Безопасная инструкция", instruction=instruction)
+    return Decision(
+        action=DecisionAction.STEP,
+        message=f"{prefix} {instruction}",
+        step=step,
+        reason=f"разрешённый низкорисковый how-to: {topic}",
+        answer_kind=AnswerKind.GENERAL,
     )
 
 

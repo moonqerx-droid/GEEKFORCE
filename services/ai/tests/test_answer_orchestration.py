@@ -17,7 +17,7 @@ def test_unknown_low_risk_question_gets_fast_general_guidance(kb) -> None:
     assert decision.action == DecisionAction.STEP
     assert decision.step is not None
     assert decision.step.id == "general.browser_cache"
-    assert decision.message.startswith("Общий безопасный совет, не правило компании:")
+    assert decision.message.startswith("Общая рекомендация — не правило компании.")
     assert "сохраните" in decision.message.casefold()
     assert calls == []
 

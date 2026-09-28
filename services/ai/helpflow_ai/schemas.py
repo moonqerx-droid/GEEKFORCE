@@ -32,6 +32,13 @@ class DecisionAction(str, Enum):
     ESCALATE = "escalate"
 
 
+class AnswerKind(str, Enum):
+    PLAYBOOK = "playbook"
+    DOCUMENT = "document"
+    GENERAL = "general"
+    HANDOFF = "handoff"
+
+
 class QuestionKind(str, Enum):
     TEXT = "text"
     YES_NO = "yes_no"
@@ -121,6 +128,26 @@ class KnowledgeMatch(BaseModel):
 
     chunk: KnowledgeChunk
     score: float = Field(ge=0.0, le=1.0)
+
+
+class Citation(BaseModel):
+    """A source fragment safe for presentation in the chat UI."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    source_id: str = Field(min_length=1, max_length=300)
+    title: str = Field(min_length=1, max_length=300)
+    quote: str = Field(min_length=1, max_length=1200)
+
+
+class RetrievedFragment(BaseModel):
+    """Minimal contract accepted from the API knowledge repository."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    source_id: str = Field(pattern=r"^document:", min_length=10, max_length=300)
+    title: str = Field(min_length=1, max_length=300)
+    text: str = Field(min_length=1, max_length=20_000)
 
 
 class EvidenceClaim(BaseModel):
@@ -227,6 +254,8 @@ class Decision(BaseModel):
     source_ids: list[str] = Field(default_factory=list)
     fallback_reason: str | None = None
     llm_latency_ms: int | None = Field(default=None, ge=0)
+    answer_kind: AnswerKind | None = None
+    citations: list[Citation] = Field(default_factory=list, max_length=8)
     # Playbook of the problem this decision is about (differs from the dialogue's
     # playbook_id once the next of several problems is being handled).
     playbook_id: str | None = None

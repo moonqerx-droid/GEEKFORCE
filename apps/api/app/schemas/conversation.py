@@ -1,5 +1,6 @@
 from datetime import datetime
 from enum import StrEnum
+from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
@@ -98,6 +99,12 @@ class CurrentStep(BaseModel):
     instruction: str
 
 
+class CitationRead(BaseModel):
+    source_id: str
+    title: str
+    quote: str
+
+
 class ConversationRead(BaseModel):
     model_config = ConfigDict(from_attributes=True, populate_by_name=True)
 
@@ -124,6 +131,8 @@ class ConversationRead(BaseModel):
     rag_source_ids: list[str] = Field(default_factory=list)
     ai_fallback_reason: str | None = None
     ai_latency_ms: int | None = None
+    answer_kind: Literal["playbook", "document", "general", "handoff"] | None = None
+    citations: list[CitationRead] = Field(default_factory=list)
     assignee_id: str | None = None
     assignee_name: str | None = None
     escalated_at: datetime | None = None
@@ -142,6 +151,8 @@ class ConversationRead(BaseModel):
                 code=model.current_step_code,
                 instruction=model.current_step_instruction,
             )
+        if data.answer_kind is None:
+            data.answer_kind = _infer_answer_kind(model)
         return data
 
 
@@ -149,6 +160,19 @@ class OperatorTicket(ConversationRead):
     original_request: str
     owner_name: str | None = None
     owner_department: str | None = None
+
+
+def _infer_answer_kind(model):
+    if model.status in {"ESCALATED", "IN_PROGRESS"}:
+        return "handoff"
+    codes = [model.current_step_code, *[step.code for step in getattr(model, "steps", [])]]
+    if any(code and code.startswith("general.") for code in codes):
+        return "general"
+    if any(source_id.startswith("document:") for source_id in model.rag_source_ids):
+        return "document"
+    if model.playbook_id and any(message.role == "assistant" for message in model.messages):
+        return "playbook"
+    return None
 
 
 def _strip_required(value: str) -> str:

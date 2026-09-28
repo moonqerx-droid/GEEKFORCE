@@ -37,6 +37,25 @@ _LOW_RISK = re.compile(
     r"подключен(?:ие|а)|интернет|wi-?fi|верси[яю]|закрыть и открыть",
     re.IGNORECASE,
 )
+_HOW_TO = re.compile(
+    r"\bкак\s+(?:настроить|включить|сделать|создать|добавить|получить|подключить(?:ся)?|"
+    r"распечатать|сохранить|сменить|изменить|архивировать|заархивировать|закрепить|размыть)",
+    re.IGNORECASE,
+)
+_GENERAL_HOW_TO_TOPICS: tuple[tuple[str, re.Pattern[str]], ...] = (
+    ("outlook_auto_reply", re.compile(r"(?:автоответ|автоматическ\w* ответ).*outlook|outlook.*(?:автоответ|автоматическ\w* ответ)", re.IGNORECASE)),
+    ("teams_background", re.compile(r"teams.*(?:фон|размыть)|(?:фон|размыть).*teams", re.IGNORECASE)),
+    ("excel_freeze", re.compile(r"excel.*(?:закреп|строк|столб)|(?:закреп|строк|столб).*excel", re.IGNORECASE)),
+    ("print_pdf", re.compile(r"(?:печат|распечат|сохран).*pdf|pdf.*(?:печат|распечат|сохран)", re.IGNORECASE)),
+    ("wallpaper", re.compile(r"(?:обои|фон)\s+(?:рабоч\w*\s+)?стол|сменить\s+обои", re.IGNORECASE)),
+    ("zip_folder", re.compile(r"(?:архив|заархив|zip|сжат).*папк|папк.*(?:архив|zip|сжат)", re.IGNORECASE)),
+    ("shared_calendar", re.compile(r"(?:общ|совместн)\w*\s+календар|календар.*(?:общ|совместн)", re.IGNORECASE)),
+)
+_HARD_HOW_TO_BLOCK = re.compile(
+    r"зарплат|преми|финанс|юрид|персональн\w* данн|безопасност|антивирус|"
+    r"уч[её]тн\w* запис|парол|токен|секрет",
+    re.IGNORECASE,
+)
 
 
 class AnswerPolicy:
@@ -57,6 +76,25 @@ class AnswerPolicy:
         if _LOW_RISK.search(query):
             return AnswerRoute.GENERAL
         return AnswerRoute.OPERATOR
+
+    def procedural_route(self, query: str, playbook_id: str | None) -> AnswerRoute | None:
+        """Classify explicit how-to requests before incident diagnostics start."""
+        if not _HOW_TO.search(query):
+            return None
+        topic = self.general_how_to_topic(query)
+        if _ACCESS_CONTROL.search(query) or _DESTRUCTIVE.search(query) or _HARD_HOW_TO_BLOCK.search(query):
+            return AnswerRoute.OPERATOR
+        if playbook_id == "vpn_connection":
+            return AnswerRoute.PLAYBOOK
+        if topic is not None:
+            return AnswerRoute.GENERAL
+        if _SENSITIVE.search(query):
+            return AnswerRoute.OPERATOR
+        return AnswerRoute.OPERATOR
+
+    @staticmethod
+    def general_how_to_topic(query: str) -> str | None:
+        return next((name for name, pattern in _GENERAL_HOW_TO_TOPICS if pattern.search(query)), None)
 
     @staticmethod
     def requires_verified_source(query: str) -> bool:

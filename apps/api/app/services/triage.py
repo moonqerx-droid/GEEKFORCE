@@ -50,6 +50,28 @@ class TriageDialogueService(DialogueService):
         conversation = Conversation(workflow_version="triage-v1")
         return self.repository.save(conversation)
 
+    def get_conversation(self, conversation_id):
+        conversation = super().get_conversation(conversation_id)
+        conversation.answer_kind = self._answer_kind(conversation)
+        conversation.citations = [
+            citation.model_dump(mode="json")
+            for citation in self.engine.citations_for(conversation.rag_source_ids)
+        ]
+        return conversation
+
+    @staticmethod
+    def _answer_kind(conversation):
+        if conversation.status in {"ESCALATED", "IN_PROGRESS"}:
+            return "handoff"
+        codes = [conversation.current_step_code, *[step.code for step in conversation.steps]]
+        if any(code and code.startswith("general.") for code in codes):
+            return "general"
+        if any(source_id.startswith("document:") for source_id in conversation.rag_source_ids):
+            return "document"
+        if conversation.playbook_id and any(message.role == "assistant" for message in conversation.messages):
+            return "playbook"
+        return None
+
     def _context(self, conversation):
         return ConversationContext(
             # A screenshot sent without words is not the request: skip empty messages.
@@ -250,6 +272,8 @@ class TriageDialogueService(DialogueService):
         conversation.rag_source_ids = list(decision.source_ids)
         conversation.ai_fallback_reason = decision.fallback_reason
         conversation.ai_latency_ms = decision.llm_latency_ms
+        conversation.answer_kind = decision.answer_kind.value if decision.answer_kind else None
+        conversation.citations = [citation.model_dump(mode="json") for citation in decision.citations]
         conversation.current_step_code = None
         conversation.current_step_instruction = None
         playbook = self.engine.kb.get(conversation.playbook_id)

@@ -8,6 +8,8 @@ from .llm import LLMClient, LLMError, LLMSettings
 from .retrieval import KnowledgeRetriever
 from .schemas import (
     Analysis,
+    AnswerKind,
+    Citation,
     ConversationContext,
     Decision,
     DecisionAction,
@@ -19,6 +21,7 @@ from .schemas import (
     KnowledgeMatch,
     Playbook,
     Question,
+    RetrievedFragment,
     Step,
     StepOutcome,
     StepRecord,
@@ -27,6 +30,8 @@ from .schemas import (
 
 __all__ = [
     "Analysis",
+    "AnswerKind",
+    "Citation",
     "AnswerPolicy",
     "AnswerRoute",
     "ConversationContext",
@@ -48,6 +53,7 @@ __all__ = [
     "LLMSettings",
     "Playbook",
     "Question",
+    "RetrievedFragment",
     "Step",
     "StepOutcome",
     "StepRecord",
