@@ -71,6 +71,10 @@ export interface Conversation {
   escalation_summary: string | null;
   escalation_card: Record<string, unknown> | null;
   incident_id: string | null;
+  /** How the current answer was produced; absent on older conversations. */
+  answer_kind?: "playbook" | "document" | "general" | "handoff" | null;
+  /** Company document fragments the current answer is quoted from. */
+  citations?: Citation[];
   rag_source_ids: string[];
   ai_fallback_reason: string | null;
   ai_latency_ms: number | null;
@@ -362,4 +366,10 @@ export interface KnowledgeChunk {
 
 export interface KnowledgeDocumentDetail extends KnowledgeDocument {
   chunks: KnowledgeChunk[];
+}
+
+export interface Citation {
+  source_id: string;
+  title: string;
+  quote: string;
 }

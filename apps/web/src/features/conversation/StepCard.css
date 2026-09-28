@@ -51,3 +51,22 @@
     flex: 1 1 100%;
   }
 }
+
+/* Where a company-document answer comes from: the title, and the exact words on demand. */
+.step-card-source {
+  padding-left: var(--space-3);
+  border-left: 3px solid var(--sand);
+  color: var(--ink-soft);
+  font-size: var(--font-size-sm);
+}
+
+.step-card-source summary {
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.step-card-source blockquote {
+  margin: var(--space-2) 0 0;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}

@@ -269,3 +269,33 @@ describe("ConversationPage during a known outage", () => {
   });
 });
 
+
+describe("ConversationPage with a company document answer", () => {
+  it("shows which document the step comes from and its exact words", async () => {
+    withStoredConversation(makeConversation({
+      id: "doc-answer", status: "TROUBLESHOOTING", playbook_id: "unknown",
+      messages: [makeMessage("user", "Какие суточные положены в командировке?")],
+      current_step: { code: "knowledge.document:d1:0", instruction: "Суточные в командировке по России — 700 рублей в день." },
+      answer_kind: "document",
+      citations: [{ source_id: "document:d1:0", title: "Регламент командировок", quote: "# Командировки\n\nСуточные в командировке по России — 700 рублей в день." }],
+    }));
+    const user = userEvent.setup();
+    render(<ConversationPage />);
+
+    const source = await screen.findByText("Источник: «Регламент командировок»");
+    await user.click(source);
+    expect(screen.getByText(/Суточные в командировке по России — 700 рублей в день\./, { selector: "blockquote *, blockquote" })).toBeInTheDocument();
+  });
+
+  it("shows no source for an ordinary playbook step", async () => {
+    withStoredConversation(makeConversation({
+      id: "playbook-step", status: "TROUBLESHOOTING",
+      current_step: { code: "self_service_reset", instruction: "Сбросьте пароль через портал." },
+      answer_kind: "playbook", citations: [],
+    }));
+    render(<ConversationPage />);
+
+    expect(await screen.findByText("Сбросьте пароль через портал.")).toBeInTheDocument();
+    expect(screen.queryByText(/Источник:/)).not.toBeInTheDocument();
+  });
+});
