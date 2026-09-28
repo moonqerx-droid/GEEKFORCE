@@ -19,5 +19,7 @@ export default defineConfig({
     globals: true,
     setupFiles: ['./src/test/setup.ts'],
     css: true,
+    // Upload flows chain several awaited steps; 5 s was too tight under full parallel runs.
+    testTimeout: 15000,
   },
 })
