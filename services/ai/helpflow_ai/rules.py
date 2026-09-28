@@ -122,8 +122,8 @@ def contains(norm_text: str, keyword: str) -> bool:
     keyword = normalize(keyword)
     if re.search(r"(?<!\w)" + re.escape(keyword), norm_text):
         return True
-    lemma_keyword = morph.lemmatize(keyword)
-    if re.search(r"(?<!\w)" + re.escape(lemma_keyword), morph.lemmatize(norm_text)):
+    lemma_keyword = morph.lemmatize_verbs_with_person(keyword)
+    if re.search(r"(?<!\w)" + re.escape(lemma_keyword), morph.lemmatize_verbs_with_person(norm_text)):
         return True
     return " " in keyword and _phrase_re(keyword).search(norm_text) is not None
 
@@ -142,20 +142,25 @@ def _keyword_weight(keyword: str) -> int:
 
 
 # «никто в офисе не может»: a collective subject with a few words before the verb.
-_NOBODY_CAN_RE = re.compile(r"(?<!\w)никто(?: \S+){1,3} не (?:может|могут|получается|работает)(?!\w)")
+_NOBODY_CAN_RE = re.compile(
+    r"(?<!\w)никто(?: \S+){1,3} не (?:может|могут|получается|работает)(?!\w)|"
+    r"(?<!\w)ни у кого(?: \S+){1,3} (?:не|нет)(?!\w)")
 
 
 # «программа учёта не запускается»: a program named with a word or two before the failure.
 _PROGRAM_FAILS_RE = re.compile(
     r"(?<!\w)(?:программ|приложени|word|ворд|excel|эксель|powerpoint|пауэрпоинт|acrobat|акробат|reader)\w*"
     r"(?: \S+){0,3} (?:не (?:запуска|открыва|устанавлива|стартует)|перестал\w* (?:запуска|открыва)|"
-    r"выда\w* ошибк|закрыва|вылета|краш)"
+    r"выда\w* ошибк|закрыва|вылета|краш)|"
+    r"не (?:получается|удается|могу) (?:установить|обновить) (?:\S+ )?(?:обновлени|программ|приложени)"
 )
 
 
 # «в 1с кончились лицензии»: 1С and a sign-in sign anywhere in the message.
 _ONEC_RE = re.compile(r"(?<!\w)1[сc](?!\w)")
-_ONEC_LOGIN_RE = re.compile(r"лиценз|сеанс|авториз|списк\w* баз|баз\w*(?: \S+){0,2} в списке")
+_ONEC_LOGIN_RE = re.compile(
+    r"лиценз|сеанс|авториз|парол|логин|списк\w* баз|баз\w*(?: \S+){0,2} в списке|"
+    r"(?:не вижу|нет|пропал\w*)(?: \S+){0,2} баз")
 
 
 def score_playbook(norm_text: str, playbook: Playbook) -> int:
@@ -165,14 +170,67 @@ def score_playbook(norm_text: str, playbook: Playbook) -> int:
     if playbook.id == "app_not_starting" and _PROGRAM_FAILS_RE.search(norm_text):
         score += 2
     if playbook.id == "onec_login" and _ONEC_RE.search(norm_text) and _ONEC_LOGIN_RE.search(norm_text):
-        score += 2
+        score += 3  # «1с просит пароль» is about 1С, not the Windows password
     if playbook.id == "slow_performance" and _SLOW_SUBJECT_RE.search(norm_text):
         score += 2
     if playbook.id == "security_incident" and _social_engineering(norm_text):
         score += 3
     if playbook.id == "vpn_connection" and _REMOTE_RE.search(norm_text) and _WORK_NETWORK_RE.search(norm_text):
         score += 3
+    if playbook.id == "password_login" and _DEVICE_LOGIN_RE.search(norm_text):
+        score += 2
+    if playbook.id == "security_incident" and _ANTIVIRUS_EVENT_RE.search(norm_text):
+        score += 2
+    asker = _password_asker(norm_text)
+    if asker is not None and playbook.id == asker:
+        score += 2
+    if playbook.id == "credentials_request" and _SOMEONES_CREDENTIALS_RE.search(norm_text):
+        score += 3
+    if playbook.id == "software_install" and _software_request(norm_text):
+        score += 2
     return score
+
+
+# «антивирус нашёл/заблокировал/удалил…»: an event, not a question about the antivirus.
+_ANTIVIRUS_EVENT_RE = re.compile(
+    r"(?:антивирус|защитник)\w*(?: \S+){0,2} (?:наш[её]л|обнаружил|заблокировал|удалил|ругает|орет|"
+    r"пишет|сработал|помест|предупрежд|карантин)")
+# «аутлук просит пароль»: the program that asks owns the problem, not the Windows password.
+_ASKS_PASSWORD_RE = re.compile(
+    r"(?<!\w)(outlook|аутлук|почт\w*|vpn|впн|forticlient|anyconnect|teams|zoom|зум)"
+    r"(?: \S+){0,2} (?:просит|спрашивает|требует|запрашивает)(?: \S+){0,2} парол")
+_ASKER_PLAYBOOK = {"outlook": "email_outlook", "аутлук": "email_outlook", "vpn": "vpn_connection",
+                   "впн": "vpn_connection", "forticlient": "vpn_connection", "anyconnect": "vpn_connection",
+                   "teams": "video_calls", "zoom": "video_calls", "зум": "video_calls"}
+
+
+def _password_asker(norm_text: str) -> str | None:
+    match = _ASKS_PASSWORD_RE.search(norm_text)
+    if not match:
+        return None
+    word = match.group(1)
+    return "email_outlook" if word.startswith("почт") else _ASKER_PLAYBOOK.get(word)
+
+
+# «не получается зайти на ноутбук»: signing in to the device itself.
+_DEVICE_LOGIN_RE = re.compile(
+    r"(?:войти|зайти|вход\w*|попасть)(?: \S+){0,2} (?:в|на) (?:рабоч\w* )?"
+    r"(?:ноут\w*|комп\w*|windows|учетн\w* запис\w*)")
+# «доступы от админки», «пароль и логин у общего ящика»: someone else's or a shared account.
+_SOMEONES_CREDENTIALS_RE = re.compile(
+    r"(?:логин|парол|доступы|креды)\w*(?: \S+){0,3} (?:от|у|к) (?:\S+ ){0,2}"
+    r"(?:админк|сервер|баз|общ|служебн|сайт|роутер|чуж|коллег|ящик)")
+# «прошу установить на ноутбук zoom», «нужен notion»: a program to install.
+_INSTALL_ASK_RE = re.compile(r"(?:прошу|хочу|нужно|надо|можно)(?: \S+){0,3} (?:установить|поставить)(?!\w)")
+_NEED_PROGRAM_RE = re.compile(r"(?<!\w)нужн?(?:ен|на|но|а) ([a-z][\w+.-]+)")
+_NOT_PROGRAMS = frozenset("vpn crm wifi wi-fi outlook exchange jira confluence sharepoint 1c bitrix amocrm "
+                          "salesforce email e-mail mail".split())
+
+
+def _software_request(norm_text: str) -> bool:
+    if _INSTALL_ASK_RE.search(norm_text):
+        return True
+    return any(name not in _NOT_PROGRAMS for name in _NEED_PROGRAM_RE.findall(norm_text))
 
 
 # «система лагает», «комп висит»: the computer itself is slow (a call that lags is not).
@@ -190,8 +248,14 @@ _SUSPICIOUS_RE = re.compile(
 _PRETEND_RE = re.compile(r"якобы (?:от|из)(?!\w)")
 
 
+# «по ссылке просят ввести пароль»: a link that asks for credentials is phishing too.
+_LINK_ASKS_RE = re.compile(
+    r"(?:по ссылке|перейти|перейдите|пройти по)[^.!?]{0,60}"
+    r"(?:ввести|подтвердить|указать|обновить|сообщить) (?:\S+ ){0,2}(?:парол|логин|данн|код|реквизит)")
+
+
 def _social_engineering(norm_text: str) -> bool:
-    if _PRETEND_RE.search(norm_text):
+    if _PRETEND_RE.search(norm_text) or _LINK_ASKS_RE.search(norm_text):
         return True
     return bool(_GIVEAWAY_RE.search(norm_text) and _SUSPICIOUS_RE.search(norm_text))
 
