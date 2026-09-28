@@ -119,11 +119,12 @@ def vocabulary_from(playbooks: Iterable) -> frozenset[str]:
     """Every form of every word the playbooks use, plus everyday complaint words."""
     words: set[str] = set()
     for playbook in playbooks:
-        texts = [playbook.title, *playbook.keywords, *getattr(playbook, "examples", [])]
+        texts = [playbook.title, *playbook.keywords]
         texts += [hint for hints in playbook.symptoms_hints.values() for hint in hints]
         texts += [q.text for q in playbook.questions] + [s.title + " " + s.instruction for s in playbook.steps]
         for text in texts:
             words.update(_WORD_RE.findall(text.lower().replace("ё", "е")))
+        words.update(_example_words(playbook))
     words.update(GENERAL_LEMMAS)
     return _expand(frozenset(words))
 
@@ -137,9 +138,16 @@ def _expand(words: frozenset[str]) -> frozenset[str]:
 def base_words_from(playbooks: Iterable) -> frozenset[str]:
     words: set[str] = set(GENERAL_LEMMAS)
     for playbook in playbooks:
-        for text in [playbook.title, *playbook.keywords, *getattr(playbook, "examples", [])]:
+        for text in [playbook.title, *playbook.keywords]:
             words.update(_WORD_RE.findall(text.lower().replace("ё", "е")))
+        words.update(_example_words(playbook))
     return frozenset(words)
+
+
+def _example_words(playbook) -> set[str]:
+    """Examples are written with typos and slang on purpose: only dictionary words count."""
+    return {word for text in getattr(playbook, "examples", [])
+            for word in _WORD_RE.findall(text.lower().replace("ё", "е")) if is_known(word)}
 
 
 def use_playbooks(playbooks: Iterable) -> None:

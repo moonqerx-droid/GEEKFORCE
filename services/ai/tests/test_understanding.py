@@ -83,3 +83,16 @@ def test_it_slang_becomes_plain_words(slang, plain):
 ])
 def test_slang_requests_reach_their_scenario_on_rules_alone(kb, text, playbook):
     assert rules.classify(text, kb.playbooks).playbook_id == playbook
+
+
+def test_typos_inside_examples_do_not_become_vocabulary(kb):
+    from helpflow_ai.schemas import Playbook
+
+    typo_example = Playbook(id="typo_demo", title="Пароль", service="Учётная запись", keywords=["пароль"],
+                            examples=["пороль слетел", "пачта не работает"])
+    morph.use_playbooks([*kb.playbooks, typo_example])
+    try:
+        assert morph.correct("пороль") == "пароль"
+        assert morph.correct("пачта") == "почта"
+    finally:
+        morph.use_playbooks(kb.playbooks)
