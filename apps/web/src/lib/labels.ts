@@ -190,6 +190,7 @@ export function formatAgo(iso: string | null | undefined, now = Date.now()): str
 
 export function formatMinutes(value: number | null | undefined): string {
   if (value == null) return "—";
+  if (value < 0.5) return "меньше минуты";
   if (value < 60) return `${Math.round(value)} мин`;
   const hours = Math.floor(value / 60);
   const minutes = Math.round(value % 60);
