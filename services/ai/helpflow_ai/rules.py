@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import re
 from dataclasses import dataclass
+from functools import lru_cache
 
 from .schemas import Playbook, Question, QuestionKind, Urgency
 from .understanding import morph
@@ -121,7 +122,17 @@ def contains(norm_text: str, keyword: str) -> bool:
     if re.search(r"(?<!\w)" + re.escape(keyword), norm_text):
         return True
     lemma_keyword = morph.lemmatize(keyword)
-    return re.search(r"(?<!\w)" + re.escape(lemma_keyword), morph.lemmatize(norm_text)) is not None
+    if re.search(r"(?<!\w)" + re.escape(lemma_keyword), morph.lemmatize(norm_text)):
+        return True
+    return " " in keyword and _phrase_re(keyword).search(norm_text) is not None
+
+
+@lru_cache(maxsize=2048)
+def _phrase_re(keyword: str) -> re.Pattern[str]:
+    """«подозрительн письм» = «подозрительное письмо»: every longer word of a phrase is a
+    stem; short ones («к», «от», «у») stay whole words."""
+    parts = [re.escape(word) + (r"\w*" if len(word) >= 4 else r"(?!\w)") for word in keyword.split(" ")]
+    return re.compile(r"(?<!\w)" + " ".join(parts))
 
 
 def _keyword_weight(keyword: str) -> int:
@@ -129,8 +140,15 @@ def _keyword_weight(keyword: str) -> int:
     return 2 if (" " in keyword or keyword.isdigit()) else 1
 
 
+# «никто в офисе не может»: a collective subject with a few words before the verb.
+_NOBODY_CAN_RE = re.compile(r"(?<!\w)никто(?: \S+){1,3} не (?:может|могут|получается|работает)(?!\w)")
+
+
 def score_playbook(norm_text: str, playbook: Playbook) -> int:
-    return sum(_keyword_weight(kw) for kw in playbook.keywords if contains(norm_text, kw))
+    score = sum(_keyword_weight(kw) for kw in playbook.keywords if contains(norm_text, kw))
+    if playbook.id == "mass_incident" and _NOBODY_CAN_RE.search(norm_text):
+        score += 2
+    return score
 
 
 @dataclass(frozen=True)
