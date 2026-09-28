@@ -18,8 +18,9 @@ function serverMessage(error: ApiError): string | null {
   return detail && typeof detail.message === "string" ? detail.message : null;
 }
 
-// On by default for the demo build; set VITE_SHOW_DEMO_LOGINS=false for a real deployment.
-const SHOW_DEMO = import.meta.env.VITE_SHOW_DEMO_LOGINS !== "false";
+// Shown in `npm run dev` or when a demo build opts in with VITE_SHOW_DEMO_LOGINS=true. Never on by
+// default: a production page must not advertise working credentials.
+const SHOW_DEMO = import.meta.env.DEV || import.meta.env.VITE_SHOW_DEMO_LOGINS === "true";
 
 export function LoginPage() {
   const { login } = useAuth();
