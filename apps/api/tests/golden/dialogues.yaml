@@ -2099,3 +2099,326 @@
   say: ["помогите, беда"]
   playbook: unknown
   tags: [контроль-5]
+
+# --- Контроль-6: слепая группа answers-v3, написана до изменений и замеряется один раз
+# в конце. Разные сотрудники, длина, эмоции, опечатки, две проблемы. Не подгонять.
+
+- id: h6-01
+  say: ["Добрый день! Я бухгалтер, с утра не могу попасть в 1С Бухгалтерию — пишет, что лицензий нет. Отчёт сдавать сегодня до 18:00, помогите пожалуйста"]
+  playbook: onec_login
+  tags: [контроль-6]
+
+- id: h6-02
+  say: ["1с зарплата тормозит жутко, каждое проведение по минуте"]
+  playbook: slow_performance
+  tags: [контроль-6]
+
+- id: h6-03
+  say: ["не распечатывается платёжка, принтер вроде включен"]
+  playbook: printer
+  tags: [контроль-6]
+
+- id: h6-04
+  say: ["банк-клиент не запускаеться после обновления винды"]
+  playbook: app_not_starting
+  tags: [контроль-6]
+
+- id: h6-05
+  say: ["у всего отдела бухгалтерии не открывается общая папка с первичкой"]
+  playbook: mass_incident
+  tags: [контроль-6]
+
+- id: h6-06
+  say: ["мне нужен доступ к папке с авансовыми отчётами"]
+  playbook: access_rights
+  tags: [контроль-6]
+
+- id: h6-07
+  say: ["пришло письмо от налоговой со ссылкой на акт, открыла вложение а там какой-то exe"]
+  playbook: security_incident
+  tags: [контроль-6]
+
+- id: h6-08
+  say: ["сканер на мфу не отправляет на почту"]
+  playbook: ["printer", "email_outlook"]
+  tags: [контроль-6]
+
+- id: h6-09
+  say: ["Клиент ждёт КП, а срм не открывается на ноуте!!! с телефона всё ок"]
+  playbook: crm_login_device_specific
+  tags: [контроль-6]
+
+- id: h6-10
+  say: ["битрикс выкидывает на страницу входа каждые пять минут"]
+  playbook: ["crm_login_device_specific", "password_login"]
+  tags: [контроль-6]
+
+- id: h6-11
+  say: ["не могу дозвониться до клиента через зум, звук пропадает"]
+  playbook: video_calls
+  tags: [контроль-6]
+
+- id: h6-12
+  say: ["не отправляются письма клиентам, висят в исходящих уже час, горит сделка"]
+  playbook: email_outlook
+  tags: [контроль-6]
+
+- id: h6-13
+  say: ["впн из кафе не цепляется, а мне срочно в црм"]
+  playbook: vpn_connection
+  tags: [контроль-6]
+
+- id: h6-14
+  say: ["нужна программа для записи звонков"]
+  playbook: software_install
+  tags: [контроль-6]
+
+- id: h6-15
+  say: ["у меня телефон рабочий не звонит"]
+  playbook: ["unknown", "video_calls"]
+  tags: [контроль-6]
+
+- id: h6-16
+  say: ["амо не грузится, белый экран"]
+  playbook: crm_login_device_specific
+  tags: [контроль-6]
+
+- id: h6-17
+  say: ["я новенький, первый день, мне не выдали доступ к джире"]
+  playbook: access_rights
+  tags: [контроль-6]
+
+- id: h6-18
+  say: ["а где взять пароль от вайфая в офисе?"]
+  playbook: ["credentials_request", "network_wifi", "unknown"]
+  tags: [контроль-6]
+
+- id: h6-19
+  say: ["не понимаю как подключить второй монитор, он не показывает"]
+  playbook: peripherals
+  tags: [контроль-6]
+
+- id: h6-20
+  say: ["мне сказали установить слак, а он просит права админа"]
+  playbook: ["software_install", "app_not_starting"]
+  tags: [контроль-6]
+
+- id: h6-21
+  say: ["не могу войти в комп, пароль от почты не подходит"]
+  playbook: password_login
+  tags: [контроль-6]
+
+- id: h6-22
+  say: ["извините что беспокою, у меня мышка не работает совсем"]
+  playbook: peripherals
+  tags: [контроль-6]
+
+- id: h6-23
+  say: ["не знаю что нажал, пропали все значки с рабочего стола"]
+  playbook: unknown
+  tags: [контроль-6]
+
+- id: h6-24
+  say: ["Через 10 минут совет директоров, проектор не видит мой ноутбук"]
+  playbook: ["peripherals", "unknown"]
+  tags: [контроль-6]
+
+- id: h6-25
+  say: ["у меня в тимс не работает камера, а сейчас важный созвон с партнёрами"]
+  playbook: video_calls
+  tags: [контроль-6]
+
+- id: h6-26
+  say: ["почему у всего отдела продаж лежит срм уже полчаса?!"]
+  playbook: mass_incident
+  tags: [контроль-6]
+
+- id: h6-27
+  say: ["мне нужно чтобы заместителю дали доступ к моему календарю"]
+  playbook: access_rights
+  tags: [контроль-6]
+
+- id: h6-28
+  say: ["ноутбук после поездки не видит вайфай в офисе"]
+  playbook: network_wifi
+  tags: [контроль-6]
+
+- id: h6-29
+  say: ["кто-то от моего имени разослал письма всем контрагентам"]
+  playbook: security_incident
+  tags: [контроль-6]
+
+- id: h6-30
+  say: ["дайте пароль от почты секретаря, её нет, а надо посмотреть письмо"]
+  playbook: credentials_request
+  tags: [контроль-6]
+
+- id: h6-31
+  say: ["кампутер нипускает, пишит неверный пароль"]
+  playbook: password_login
+  tags: [контроль-6]
+
+- id: h6-32
+  say: ["инет пропал в переговорке"]
+  playbook: network_wifi
+  tags: [контроль-6]
+
+- id: h6-33
+  say: ["аутлук завис и не отвичает"]
+  playbook: email_outlook
+  tags: [контроль-6]
+
+- id: h6-34
+  say: ["принтер жуёт бумагу и пищит"]
+  playbook: printer
+  tags: [контроль-6]
+
+- id: h6-35
+  say: ["впн отвалилса опять"]
+  playbook: vpn_connection
+  tags: [контроль-6]
+
+- id: h6-36
+  say: ["клава залипает, пишу а буквы дублируются"]
+  playbook: peripherals
+  tags: [контроль-6]
+
+- id: h6-37
+  say: ["комп тупит жесть после обнавы"]
+  playbook: slow_performance
+  tags: [контроль-6]
+
+- id: h6-38
+  say: ["зум лагает и выкидывает с конфы"]
+  playbook: video_calls
+  tags: [контроль-6]
+
+- id: h6-39
+  say: ["не пускает в учетку с утра"]
+  playbook: password_login
+  tags: [контроль-6]
+
+- id: h6-40
+  say: ["эксель вылитает при открытии файла с макросами"]
+  playbook: app_not_starting
+  tags: [контроль-6]
+
+- id: h6-41
+  say: ["Задолбало уже!!! Третий день интернет отваливается каждые полчаса, я не могу нормально работать"]
+  playbook: network_wifi
+  tags: [контроль-6]
+
+- id: h6-42
+  say: ["Вчера вечером всё работало, сегодня пришла, включила компьютер, а он очень долго думает, программы открываются по несколько минут, даже почта еле грузится"]
+  playbook: slow_performance
+  tags: [контроль-6]
+
+- id: h6-43
+  say: ["Ребят, ну сколько можно, опять принтер на третьем этаже не печатает, уже неделю так"]
+  playbook: printer
+  tags: [контроль-6]
+
+- id: h6-44
+  say: ["я уже всё перепробовала, перезагружала, ничего не помогает, почта не синхронизируется на телефоне"]
+  playbook: email_outlook
+  tags: [контроль-6]
+
+- id: h6-45
+  say: ["СРОЧНО ПОМОГИТЕ НЕ РАБОТАЕТ ВПН А У МЕНЯ ДЕДЛАЙН"]
+  playbook: vpn_connection
+  tags: [контроль-6]
+
+- id: h6-46
+  say: ["Коллеги, у меня странное: курсор сам бегает по экрану и открывает окна"]
+  playbook: security_incident
+  tags: [контроль-6]
+
+- id: h6-47
+  say: ["Мне пришло смс с кодом, хотя я никуда не входил, а потом звонок из «службы безопасности»"]
+  playbook: security_incident
+  tags: [контроль-6]
+
+- id: h6-48
+  say: ["интернет пропадает и из-за этого зум постоянно вылетает"]
+  playbook: network_wifi
+  tags: [контроль-6]
+
+- id: h6-49
+  say: ["не работает впн и не открывается 1с"]
+  playbook: vpn_connection
+  tags: [контроль-6]
+
+- id: h6-50
+  say: ["принтер не печатает, и ещё мышь глючит"]
+  playbook: ["printer", "peripherals"]
+  tags: [контроль-6]
+
+- id: h6-51
+  say: ["почта не отправляет письма, а ещё пароль просит сменить"]
+  playbook: ["email_outlook", "password_login"]
+  tags: [контроль-6]
+
+- id: h6-52
+  say: ["wi-fi тормозит, а в тимсе меня не слышно"]
+  playbook: network_wifi
+  tags: [контроль-6]
+
+- id: h6-53
+  say: ["нужно поставить антивирус на домашний ноут для работы"]
+  playbook: ["software_install", "unknown"]
+  tags: [контроль-6]
+
+- id: h6-54
+  say: ["не открывается сайт госуслуг на рабочем компе"]
+  playbook: ["service_unavailable", "network_wifi", "unknown"]
+  tags: [контроль-6]
+
+- id: h6-55
+  say: ["пропал звук на компьютере вообще, не только в звонках"]
+  playbook: ["peripherals", "unknown", "video_calls"]
+  tags: [контроль-6]
+
+- id: h6-56
+  say: ["после обновления windows не запускается 1с, пишет ошибку компоненты"]
+  playbook: ["app_not_starting", "onec_login"]
+  tags: [контроль-6]
+
+- id: h6-57
+  say: ["корпоративный портал отдаёт 502 у меня и у соседа"]
+  playbook: ["service_unavailable", "mass_incident"]
+  tags: [контроль-6]
+
+- id: h6-58
+  say: ["jira не пускает, пишет что сессия истекла"]
+  playbook: ["service_unavailable", "access_rights", "password_login"]
+  tags: [контроль-6]
+
+- id: h6-59
+  say: ["можно мне права на установку программ на мой компьютер?"]
+  playbook: ["software_install", "access_rights"]
+  tags: [контроль-6]
+
+- id: h6-60
+  say: ["перешёл по ссылке из телеграма якобы от гендиректора"]
+  playbook: security_incident
+  tags: [контроль-6]
+
+- id: h6-61
+  say: ["дайте логин от роутера в переговорке"]
+  playbook: credentials_request
+  tags: [контроль-6]
+
+- id: h6-62
+  say: ["все сотрудники офиса не могут подключиться к вайфаю"]
+  playbook: mass_incident
+  tags: [контроль-6]
+
+- id: h6-63
+  say: ["ничего не работает"]
+  playbook: unknown
+  tags: [контроль-6]
+
+- id: h6-64
+  say: ["помогите пожалуйста"]
+  playbook: unknown
+  tags: [контроль-6]

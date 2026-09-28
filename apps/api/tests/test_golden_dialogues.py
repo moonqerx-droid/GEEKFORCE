@@ -11,7 +11,7 @@ def test_golden_dialogues_meet_the_quality_bar():
     table = summary(results)
     # «контроль-4» is a deliberately hard holdout written before the answers-v2 changes;
     # it has its own floor below and does not dilute the overall bar.
-    core = summary([r for r in results if not {"контроль-4", "контроль-5"} & set(r.tags)])
+    core = summary([r for r in results if not {"контроль-4", "контроль-5", "контроль-6"} & set(r.tags)])
     failures = "\n".join(f"{r.id}: {'; '.join(r.problems)}" for r in results if not r.ok)
 
     # Dialogue behaviour is fully under our control: every golden dialogue must be clean.
