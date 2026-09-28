@@ -245,7 +245,10 @@
   border-top: 1px solid var(--color-border);
 }
 
-.auth-quick-title {
+.auth-form-wrap .auth-quick-title {
+  margin: 0;
+  letter-spacing: 0;
+  font-weight: 700;
   font-size: var(--font-size-md);
 }
 
