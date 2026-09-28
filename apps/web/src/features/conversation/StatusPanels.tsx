@@ -40,10 +40,10 @@ export function OutagePanel({ conversation }: { conversation: Conversation }) {
     <section className="panel panel-outage" role="status" aria-labelledby="outage-title">
       <span className="panel-pulse" aria-hidden="true" />
       <div>
-        <h2 id="outage-title" className="panel-title">Похоже, это общий сбой</h2>
+        <h2 id="outage-title" className="panel-title">Сбой уже чинят</h2>
         <p className="panel-text">
-          {conversation.service ?? "Сервис"} не работает у нескольких коллег, специалисты уже чинят.
-          Ничего проверять у себя не нужно: новости придут сюда, в этот чат.
+          Вы в списке затронутых: когда специалисты напишут про {conversation.service ?? "сервис"}, сообщение
+          появится здесь. Можно просто подождать.
         </p>
       </div>
     </section>

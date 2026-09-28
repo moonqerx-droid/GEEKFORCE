@@ -522,8 +522,14 @@
 
 @media (max-width: 900px) {
   .admin {
-    grid-template-columns: 1fr;
+    /* minmax(0, …) lets wide content shrink instead of widening the whole page */
+    grid-template-columns: minmax(0, 1fr);
     padding: var(--space-4);
+  }
+
+  .load {
+    display: block;
+    overflow-x: auto;
   }
 
   .admin-facts {
