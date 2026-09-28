@@ -22,5 +22,11 @@ describe("role-specific header", () => {
     expect(screen.getByRole("link", { name: "Обзор" })).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Обращения" })).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Пользователи" })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "База знаний" })).toHaveAttribute("href", "/admin/knowledge");
+  });
+
+  it("keeps the knowledge base out of the specialist's menu", () => {
+    render(<MemoryRouter><Header role="operator" name="Иван Петров" onLogout={() => undefined} /></MemoryRouter>);
+    expect(screen.queryByRole("link", { name: "База знаний" })).not.toBeInTheDocument();
   });
 });

@@ -1,5 +1,7 @@
 import { ApiError, ConflictError, NetworkError, NotFoundError, ValidationError } from "./errors";
 import type {
+  KnowledgeDocument,
+  KnowledgeDocumentDetail,
   Attachment,
   Conversation,
   Incident,
@@ -260,6 +262,23 @@ export const api = {
     return request(`/api/operator/incidents/${id}/resolve`, {
       method: "POST", body: JSON.stringify({ message, expected_revision }),
     });
+  },
+
+  listKnowledgeDocuments(signal?: AbortSignal): Promise<KnowledgeDocument[]> {
+    return request("/api/admin/knowledge/documents", {}, signal);
+  },
+
+  getKnowledgeDocument(id: string, signal?: AbortSignal): Promise<KnowledgeDocumentDetail> {
+    return request(`/api/admin/knowledge/documents/${id}`, {}, signal);
+  },
+
+  /** The server extracts the text right away: the answer is already "ready" or "failed". */
+  uploadKnowledgeDocument(file: File): Promise<KnowledgeDocument> {
+    return upload("/api/admin/knowledge/documents", file);
+  },
+
+  deleteKnowledgeDocument(id: string): Promise<void> {
+    return request(`/api/admin/knowledge/documents/${id}`, { method: "DELETE" });
   },
 
   me(signal?: AbortSignal): Promise<AuthUser> {

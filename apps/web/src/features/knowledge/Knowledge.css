@@ -1,0 +1,322 @@
+/* Admin knowledge base: the same page grammar as "Пользователи" — a heading with counts,
+   an information strip to add something, then a plain table that becomes a list on phones. */
+
+.kb {
+  display: grid;
+  gap: var(--space-5);
+  max-width: 1180px;
+  margin: 0 auto;
+  padding: var(--space-6) var(--space-6) var(--space-8);
+}
+
+.kb-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: var(--space-4);
+  padding-bottom: var(--space-5);
+  border-bottom: 2px solid var(--ink);
+}
+
+.kb-title {
+  font-size: clamp(30px, 4vw, 44px);
+  font-weight: 700;
+  letter-spacing: -0.035em;
+}
+
+.kb-sub {
+  max-width: 62ch;
+  margin-top: var(--space-2);
+  color: var(--ink-soft);
+}
+
+.kb-counts {
+  display: flex;
+  gap: var(--space-5);
+  margin: 0;
+}
+
+.kb-counts div {
+  display: grid;
+}
+
+.kb-counts dt {
+  order: 2;
+  color: var(--ink-faint);
+  font-size: var(--font-size-xs);
+}
+
+.kb-counts dd {
+  order: 1;
+  margin: 0;
+  font-size: var(--font-size-lg);
+  font-weight: 700;
+}
+
+/* Upload strip: drop a file anywhere on it. */
+.kb-drop {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-4);
+  padding: var(--space-5);
+  border: 1.5px dashed transparent;
+  border-left: 4px solid var(--blue);
+  border-radius: 0 var(--radius-md) var(--radius-md) 0;
+  background: var(--blue-wash);
+  transition: border-color 150ms var(--ease), background 150ms var(--ease);
+}
+
+.kb-drop-over {
+  border-color: var(--blue);
+  background: #dfe8ff;
+}
+
+.kb-drop-text h2 {
+  font-size: var(--font-size-md);
+}
+
+.kb-drop-text p {
+  max-width: 64ch;
+  margin-top: 6px;
+  color: var(--ink-soft);
+  font-size: var(--font-size-sm);
+}
+
+.kb-pick {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  padding: 0 var(--space-5);
+  border-radius: var(--radius-pill);
+  background: var(--blue);
+  color: #fff;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.kb-pick:hover {
+  background: var(--blue-deep);
+}
+
+/* The real input is visually hidden right before the label: show its focus on the label. */
+#kb-file:focus-visible + .kb-pick {
+  box-shadow: 0 0 0 3px rgba(49, 94, 251, 0.3);
+}
+
+.kb-notice {
+  padding: var(--space-2) var(--space-4);
+  border-radius: var(--radius-md);
+  font-size: var(--font-size-sm);
+}
+
+.kb-notice-done {
+  background: var(--color-success-bg);
+  color: var(--color-success);
+}
+
+.kb-notice-problem {
+  background: var(--color-danger-bg);
+  color: var(--color-danger);
+}
+
+.kb-state {
+  padding: var(--space-6) 0;
+}
+
+.kb-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--font-size-sm);
+}
+
+.kb-table th {
+  padding: 0 var(--space-3) var(--space-2) 0;
+  border-bottom: 1px solid var(--color-border-strong);
+  color: var(--ink-faint);
+  font-size: var(--font-size-xs);
+  font-weight: 600;
+  text-align: left;
+}
+
+.kb-table td {
+  padding: var(--space-2) var(--space-3) var(--space-2) 0;
+  border-bottom: 1px solid var(--color-border);
+  vertical-align: top;
+}
+
+.kb-row-open td {
+  background: var(--blue-wash);
+}
+
+.kb-doc {
+  display: grid;
+  gap: 2px;
+  width: 100%;
+  padding: 4px;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: none;
+  text-align: left;
+}
+
+.kb-doc:focus-visible {
+  box-shadow: 0 0 0 3px rgba(49, 94, 251, 0.3);
+}
+
+.kb-doc-title {
+  color: var(--ink);
+  font-weight: 650;
+}
+
+.kb-doc:hover .kb-doc-title {
+  text-decoration: underline;
+}
+
+.kb-doc-file {
+  color: var(--ink-faint);
+  font-size: var(--font-size-xs);
+  overflow-wrap: anywhere;
+}
+
+.kb-status {
+  font-weight: 600;
+}
+
+.kb-status-ready { color: var(--color-success); }
+.kb-status-processing { color: var(--color-warning); }
+.kb-status-failed { color: var(--color-danger); }
+
+.kb-reason,
+.kb-author {
+  display: block;
+  margin-top: 2px;
+  color: var(--ink-soft);
+  font-size: var(--font-size-xs);
+}
+
+.kb-when {
+  white-space: nowrap;
+}
+
+/* Opened document */
+.kb-panel {
+  display: grid;
+  gap: var(--space-4);
+  padding-top: var(--space-4);
+  border-top: 2px solid var(--ink);
+}
+
+.kb-panel-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: var(--space-3);
+}
+
+.kb-panel-head h2 {
+  font-size: var(--font-size-lg);
+}
+
+.kb-panel-head p {
+  margin-top: 4px;
+  color: var(--ink-soft);
+  font-size: var(--font-size-sm);
+}
+
+.kb-chunks {
+  display: grid;
+  gap: var(--space-3);
+  max-height: 60vh;
+  margin: 0;
+  padding: 0;
+  overflow-y: auto;
+  list-style: none;
+}
+
+.kb-chunks li {
+  padding: var(--space-3) 0 var(--space-3) var(--space-4);
+  border-left: 3px solid var(--sand);
+}
+
+.kb-chunk-heading {
+  display: block;
+  margin-bottom: 4px;
+  color: var(--ink-faint);
+  font-size: var(--font-size-xs);
+  font-weight: 600;
+}
+
+.kb-chunk-text {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.kb-panel-foot {
+  display: grid;
+  gap: var(--space-2);
+  justify-items: start;
+}
+
+.kb-confirm {
+  display: grid;
+  gap: var(--space-2);
+}
+
+.kb-confirm-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+/* Phone: the table becomes a list of documents; each cell labels itself. */
+@media (max-width: 720px) {
+  .kb {
+    padding: var(--space-5) var(--space-4) var(--space-7);
+  }
+
+  .kb-table thead {
+    display: none;
+  }
+
+  .kb-table,
+  .kb-table tbody,
+  .kb-table tr {
+    display: block;
+  }
+
+  .kb-table tr {
+    padding: var(--space-2) 0 var(--space-3);
+    border-bottom: 1px solid var(--color-border);
+  }
+
+  .kb-table td {
+    display: flex;
+    justify-content: space-between;
+    gap: var(--space-3);
+    padding: 2px 0;
+    border: 0;
+    text-align: right;
+  }
+
+  .kb-table td::before {
+    content: attr(data-label);
+    color: var(--ink-faint);
+    font-size: var(--font-size-xs);
+    text-align: left;
+  }
+
+  .kb-table td:first-child::before {
+    display: none;
+  }
+
+  .kb-table td:first-child {
+    text-align: left;
+  }
+
+  .kb-when {
+    white-space: normal;
+  }
+}

@@ -19,6 +19,7 @@ import { ResetPasswordPage } from "./features/auth/ResetPasswordPage";
 import { VerifyEmailPage } from "./features/auth/VerifyEmailPage";
 import { AdminDashboard } from "./features/admin/AdminDashboard";
 import { AdminTeam } from "./features/admin/AdminTeam";
+import { KnowledgePage } from "./features/knowledge/KnowledgePage";
 import { ProfilePage } from "./features/profile/ProfilePage";
 import { EmployeeHistoryPage } from "./pages/EmployeeHistoryPage";
 import { EmployeePage } from "./pages/EmployeePage";
@@ -48,6 +49,7 @@ export default function App() {
       <Route path="/operator" element={<RequireOperator><OperatorPageRoute /></RequireOperator>} />
       <Route path="/admin" element={<RequireAdmin><AdminDashboard /></RequireAdmin>} />
       <Route path="/admin/team" element={<RequireAdmin><AdminTeam /></RequireAdmin>} />
+      <Route path="/admin/knowledge" element={<RequireAdmin><KnowledgePage /></RequireAdmin>} />
       <Route path="/profile" element={<RequireSignedIn><ProfilePage /></RequireSignedIn>} />
     </Route>
     <Route path="*" element={<Navigate to="/" replace />} />

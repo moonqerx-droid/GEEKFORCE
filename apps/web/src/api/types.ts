@@ -327,3 +327,39 @@ export interface RegistrationPayload {
 export type OperatorRegistrationPayload = Omit<RegistrationPayload, "accepted_terms"> & {
   invite_token: string;
 };
+
+/** Mirrors apps/api/app/schemas/knowledge.py. */
+export type KnowledgeStatus = "processing" | "ready" | "failed";
+
+export interface KnowledgeDocument {
+  id: string;
+  title: string;
+  original_filename: string;
+  media_type: string;
+  size_bytes: number;
+  sha256: string;
+  service: string | null;
+  status: KnowledgeStatus;
+  error_message: string | null;
+  extracted_chars: number;
+  chunk_count: number;
+  uploaded_by: string | null;
+  uploaded_by_name: string | null;
+  created_at: string;
+  updated_at: string;
+  processed_at: string | null;
+  revision: number;
+}
+
+export interface KnowledgeChunk {
+  id: string;
+  position: number;
+  text: string;
+  char_count: number;
+  token_count: number;
+  metadata: { heading?: string | null; start?: number; end?: number };
+}
+
+export interface KnowledgeDocumentDetail extends KnowledgeDocument {
+  chunks: KnowledgeChunk[];
+}
