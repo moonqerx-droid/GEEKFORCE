@@ -163,7 +163,7 @@ class TriageDialogueService(DialogueService):
             # Recheck new information locally, without an extra LLM request.
             # The original playbook must not hide a later security/mass incident.
             if previous_status != "NEW":
-                update = TriageEngine(self.engine.kb).analyze(content)
+                update = TriageEngine(self.engine.kb, semantic=self.engine.semantic).analyze(content)
                 if update.should_escalate:
                     conversation.playbook_id = update.recommended_playbook
                     conversation.urgency = "critical"

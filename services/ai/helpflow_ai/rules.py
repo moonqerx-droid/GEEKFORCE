@@ -6,6 +6,7 @@ import re
 from dataclasses import dataclass
 
 from .schemas import Playbook, Question, QuestionKind, Urgency
+from .understanding import morph
 
 URGENCY_ORDER = [Urgency.LOW, Urgency.MEDIUM, Urgency.HIGH, Urgency.CRITICAL]
 MAX_FREE_TEXT_FACT = 300
@@ -106,9 +107,21 @@ def conversation_intent(text: str) -> str | None:
     return None
 
 
+def understand(text: str) -> str:
+    """Normalized text with typos fixed: what every detector below should read."""
+    return morph.correct(normalize(text))
+
+
 def contains(norm_text: str, keyword: str) -> bool:
-    """Word-prefix match: 'парол' matches 'пароль', '500' does not match '1500'."""
-    return re.search(r"(?<!\w)" + re.escape(normalize(keyword)), norm_text) is not None
+    """Word-prefix match: 'парол' matches 'пароль', '500' does not match '1500'.
+
+    Also matches other word forms: «очередь печати» finds «в очереди печати».
+    """
+    keyword = normalize(keyword)
+    if re.search(r"(?<!\w)" + re.escape(keyword), norm_text):
+        return True
+    lemma_keyword = morph.lemmatize(keyword)
+    return re.search(r"(?<!\w)" + re.escape(lemma_keyword), morph.lemmatize(norm_text)) is not None
 
 
 def _keyword_weight(keyword: str) -> int:
@@ -127,7 +140,7 @@ class Classification:
 
 
 def classify(text: str, playbooks: list[Playbook]) -> Classification:
-    norm = normalize(text)
+    norm = understand(text)
     scores = {pb.id: score_playbook(norm, pb) for pb in playbooks}
     for priority_id in PRIORITY_PLAYBOOKS:
         if scores.get(priority_id, 0) > 0:
@@ -198,7 +211,7 @@ def plan_issues(text: str, playbooks: list[Playbook], best_id: str,
     found: dict[str, str] = {}
     best_fails = False
     for clause, failing in split_clauses(text):
-        norm = normalize(clause)
+        norm = understand(clause)
         scores = {pb.id: score_playbook(norm, pb) for pb in candidates}
         if scores.get(best_id, 0) > 0:
             owner = best_id
@@ -225,7 +238,7 @@ def plan_issues(text: str, playbooks: list[Playbook], best_id: str,
 def detect_service(text: str, playbook: Playbook) -> str:
     if playbook.id not in GENERIC_SERVICE_PLAYBOOKS:
         return playbook.service
-    norm = normalize(text)
+    norm = understand(text)
     for service, aliases in SERVICE_ALIASES.items():
         if any(contains(norm, alias) for alias in aliases):
             return service
@@ -234,7 +247,7 @@ def detect_service(text: str, playbook: Playbook) -> str:
 
 def detect_subject(text: str) -> str | None:
     """What the user is talking about, when it is named explicitly."""
-    norm = normalize(text)
+    norm = understand(text)
     for subject, aliases in {**SERVICE_ALIASES, **DEVICE_ALIASES}.items():
         if any(contains(norm, alias) for alias in aliases):
             return subject
@@ -242,7 +255,7 @@ def detect_subject(text: str) -> str | None:
 
 
 def detect_symptoms(text: str, playbook: Playbook) -> list[str]:
-    norm = normalize(text)
+    norm = understand(text)
     return [
         label
         for label, hints in playbook.symptoms_hints.items()
@@ -268,7 +281,7 @@ def _time_pressure_reasons(norm: str) -> list[str]:
 
 def detect_urgency(text: str, playbook: Playbook) -> tuple[Urgency, str]:
     """Return urgency and a human-readable reason."""
-    norm = normalize(text)
+    norm = understand(text)
     if playbook.id == "security_incident":
         return Urgency.CRITICAL, "возможный инцидент информационной безопасности"
     if playbook.id == "mass_incident":
@@ -341,7 +354,7 @@ _ERROR_PHRASE_RE = re.compile(
 
 def extract_facts(text: str) -> dict[str, str]:
     """Pull normalized facts out of free text."""
-    norm = normalize(text)
+    norm = understand(text)
     facts: dict[str, str] = {}
     for fact, value, pattern in _FACT_PATTERNS:
         if fact not in facts and re.search(pattern, norm):
@@ -370,7 +383,7 @@ def extract_error_text(text: str) -> str | None:
 
 def parse_answer(question: Question, text: str) -> str:
     """Turn the user's reply to a specific question into a fact value."""
-    norm = normalize(text)
+    norm = understand(text)
     if question.kind == QuestionKind.YES_NO:
         return _parse_yes_no(norm, question.invert)
     if question.kind == QuestionKind.CHOICE:
@@ -424,7 +437,7 @@ def _parse_yes_no(norm: str, invert: bool) -> str:
 
 def parse_confirmation(text: str) -> bool | None:
     """Interpret the answer to 'is the problem solved?'. None = unclear."""
-    norm = normalize(text)
+    norm = understand(text)
     if _UNKNOWN_RE.search(norm):
         return None
     if re.search(r"не (помог|работает|решен|получ|восстанов|открыва|заработал)|все еще|по-прежнему|опять", norm):

@@ -99,6 +99,9 @@ class Playbook(BaseModel):
     title: str
     service: str
     keywords: list[str]
+    # How people actually describe this problem; used for meaning-based matching and
+    # as typo vocabulary. Plain phrases, not keywords.
+    examples: list[str] = Field(default_factory=list)
     # symptom label -> keywords that reveal it
     symptoms_hints: dict[str, list[str]] = Field(default_factory=dict)
     questions: list[Question] = Field(default_factory=list)

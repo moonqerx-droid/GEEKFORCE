@@ -20,6 +20,8 @@ from .answer_policy import AnswerPolicy, AnswerRoute
 from .evidence import EvidenceValidator
 from .knowledge import KnowledgeBase
 from .llm import LLMClient, LLMError, LLMSettings
+from .understanding import morph
+from .understanding.semantic import SemanticIndex, from_env as semantic_from_env
 from .retrieval import KnowledgeRetriever
 from .schemas import (
     Analysis,
@@ -48,6 +50,12 @@ MAX_QUESTIONS = 3
 MAX_QUESTIONS_URGENT = 1
 MAX_RENDERED_MESSAGE_LENGTH = 1200
 URGENT_LEVELS = (Urgency.HIGH, Urgency.CRITICAL)
+# Meaning-based matching (see TriageEngine._with_meaning); cosine similarity of bge-m3.
+SEMANTIC_MIN = 0.70
+SEMANTIC_UNKNOWN_GAP = 0.05
+SEMANTIC_SWITCH_GAP = 0.06
+SEMANTIC_SAFETY_MIN = 0.75
+SEMANTIC_SAFETY_GAP = 0.10
 URGENT_WORKAROUND_INTRO = "Чтобы успеть, начнём с самого быстрого обходного пути."
 AFTER_WORKAROUND_INTRO = ("Хорошо, так вы не выпадете из работы. Когда будет пара минут, "
                           "давайте разберёмся с причиной, чтобы это не повторилось.")
@@ -66,9 +74,12 @@ _DOCUMENT_INJECTION = re.compile(
 
 
 class TriageEngine:
-    def __init__(self, knowledge: KnowledgeBase, llm: LLMClient | None = None):
+    def __init__(self, knowledge: KnowledgeBase, llm: LLMClient | None = None,
+                 semantic: "SemanticIndex | None" = None):
         self.kb = knowledge
         self.llm = llm
+        self.semantic = semantic
+        morph.use_playbooks(knowledge.playbooks)  # typo vocabulary; cached by content
         self._base_chunks = tuple(knowledge.chunks)
         self._company_chunks: tuple[KnowledgeChunk, ...] = ()
         self._knowledge_lock = RLock()
@@ -78,7 +89,9 @@ class TriageEngine:
     @classmethod
     def from_env(cls) -> "TriageEngine":
         settings = LLMSettings.from_env()
-        return cls(KnowledgeBase.load(), LLMClient(settings) if settings else None)
+        knowledge = KnowledgeBase.load()
+        return cls(knowledge, LLMClient(settings) if settings else None,
+                   semantic=semantic_from_env(knowledge.playbooks))
 
     # --- understanding ------------------------------------------------------
 
@@ -425,8 +438,9 @@ class TriageEngine:
         """All problems of the request in the order to handle them (root cause first)."""
         if not request or best.id in (*rules.PRIORITY_PLAYBOOKS, "unknown") or best.escalate_immediately:
             return [self._issue(best.id, "", request)]
-        classified = rules.classify(request, self.kb.playbooks).playbook_id
-        found = rules.plan_issues(request, self.kb.playbooks, classified, urgency in URGENT_LEVELS)
+        # `best` is what analysis chose (keywords, possibly corrected by meaning); clauses
+        # that mention it belong to it.
+        found = rules.plan_issues(request, self.kb.playbooks, best.id, urgency in URGENT_LEVELS)
         return [self._issue(pid, evidence, request) for pid, evidence in found]
 
     def _issue(self, playbook_id: str, evidence: str, request: str) -> DetectedIssue:
@@ -515,11 +529,38 @@ class TriageEngine:
 
     # --- internals ----------------------------------------------------------
 
+    def _with_meaning(self, text: str, found: rules.Classification) -> rules.Classification:
+        """Let the embedding model correct the keywords when it is clearly more certain.
+
+        Thresholds come from the golden dialogues: where the two disagree, the model is
+        right when it leads by a margin and wrong only when its lead is tiny. Keyword
+        safety scenarios are never overridden, and a mass outage is never inferred from
+        meaning alone (it needs «у всех»-type evidence).
+        """
+        ranked = self.semantic.rank(text) if self.semantic is not None else None
+        if not ranked:
+            return found
+        top, best = ranked[0]
+        gap = best - (ranked[1][1] if len(ranked) > 1 else 0.0)
+        if found.playbook_id in rules.PRIORITY_PLAYBOOKS or top == "mass_incident" or top == found.playbook_id:
+            return found
+        if top in rules.PRIORITY_PLAYBOOKS:
+            confident = best >= SEMANTIC_SAFETY_MIN and gap >= SEMANTIC_SAFETY_GAP
+            return rules.Classification(top, 0.9) if confident else found
+        if found.playbook_id == "unknown":
+            confident = best >= SEMANTIC_MIN and gap >= SEMANTIC_UNKNOWN_GAP
+        else:
+            confident = (best >= SEMANTIC_MIN and gap >= SEMANTIC_SWITCH_GAP
+                         and found.confidence < 0.9)
+        return rules.Classification(top, round(min(0.95, best), 2)) if confident else found
+
     def _rules_analysis(self, message: str, ctx: ConversationContext) -> Analysis:
         original = ctx.original_request.strip()
         text = message if not original or original == message.strip() else f"{original} {message}"
-        classification = rules.classify(text, self.kb.playbooks)
         keep_playbook = ctx.playbook_id and self.kb.has(ctx.playbook_id)
+        classification = rules.classify(text, self.kb.playbooks)
+        if not keep_playbook:
+            classification = self._with_meaning(text, classification)
         playbook = self.kb.get(ctx.playbook_id if keep_playbook else classification.playbook_id)
         urgency, reason = rules.detect_urgency(text, playbook)
         if keep_playbook:

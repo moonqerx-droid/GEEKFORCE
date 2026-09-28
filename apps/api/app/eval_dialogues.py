@@ -10,6 +10,7 @@ no network: the same numbers locally and in CI.
 from __future__ import annotations
 
 import argparse
+import os
 import re
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -153,8 +154,17 @@ def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--verbose", action="store_true", help="print every transcript")
     parser.add_argument("--llm", action="store_true", help="use the provider from the environment")
+    parser.add_argument("--semantic", action="store_true",
+                        help="add meaning-based matching (needs Ollama with bge-m3)")
     args = parser.parse_args()
-    results = run(engine=TriageEngine.from_env() if args.llm else None)
+    engine = TriageEngine.from_env() if args.llm else None
+    if args.semantic:
+        from helpflow_ai.understanding.semantic import OllamaEmbedder, SemanticIndex
+        knowledge = KnowledgeBase.load()
+        url = os.getenv("OLLAMA_BASE_URL", "http://127.0.0.1:11434")
+        engine = TriageEngine(knowledge, semantic=SemanticIndex(OllamaEmbedder(url), knowledge.playbooks,
+                                                                background=False))
+    results = run(engine=engine)
     for result in results:
         mark = "OK  " if result.ok else "FAIL"
         print(f"[{mark}] {result.id:<24} {result.playbook:<26} вопросов: {result.questions}")
