@@ -31,12 +31,14 @@ PUBLIC_URL=$URL
 SITE_ADDRESS=$SITE
 COOKIE_SECURE=$SECURE
 AI_PROVIDER=rules
-SHOW_DEMO_LOGINS=$DEMO
 POSTGRES_PASSWORD=$DB_PASSWORD
 DATABASE_URL=postgresql+psycopg://helpflow:$DB_PASSWORD@db:5432/helpflow
 ENV
   echo "Создан .env (пароль базы сгенерирован)."
 fi
+# The mode follows the latest run: --demo turns demo logins on, a run without it turns them off.
+grep -v '^SHOW_DEMO_LOGINS=' .env > .env.tmp && mv .env.tmp .env
+echo "SHOW_DEMO_LOGINS=$DEMO" >> .env
 
 $COMPOSE up -d --build
 
