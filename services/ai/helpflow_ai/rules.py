@@ -475,18 +475,51 @@ def detect_urgency(text: str, playbook: Playbook) -> tuple[Urgency, str]:
         return Urgency.CRITICAL, "проблема затрагивает клиентов"
 
     not_urgent = re.search(_NOT_URGENT_RE, norm)
-    norm = re.sub(_NOT_URGENT_RE, " ", norm)  # "не срочно" must not trigger "срочн"
-    reasons = _time_pressure_reasons(norm)
-    if re.search(r"срочн|горит|asap|асап|немедленно|прямо сейчас|очень нужно", norm):
-        reasons.append("пользователь отмечает срочность")
-    if re.search(r"не могу работать|работа стоит|вообще ничего не|совсем не работает|клиент ждет", norm):
-        reasons.append("работа сотрудника остановлена")
-
+    reasons = _urgency_reasons(norm)
     if reasons:
         return max_urgency(Urgency.HIGH, playbook.default_urgency), "; ".join(reasons)
     if not_urgent:
         return Urgency.LOW, "пользователь указал, что вопрос не срочный"
     return playbook.default_urgency, "стандартный приоритет для этого типа проблем"
+
+
+def urgency_signal(text: str) -> tuple[Urgency, str] | None:
+    """Only what the words say about urgency, without a scenario's default: «срочно, дайте
+    специалиста» is HIGH, «клиенты не могут оплатить» CRITICAL, a plain message None."""
+    norm = understand(text)
+    if re.search(r"клиент\w* не могут|клиенты жалуются|продажи стоят", norm):
+        return Urgency.CRITICAL, "проблема затрагивает клиентов"
+    reasons = _urgency_reasons(norm)
+    return (Urgency.HIGH, "; ".join(reasons)) if reasons else None
+
+
+def _urgency_reasons(norm: str) -> list[str]:
+    norm = re.sub(_NOT_URGENT_RE, " ", norm)  # "не срочно" must not trigger "срочн"
+    reasons = _time_pressure_reasons(norm)
+    if _URGENT_WORDS_RE.search(norm):
+        reasons.append("пользователь отмечает срочность")
+    if _DEADLINE_RE.search(norm):
+        reasons.append("срок сегодня")
+    if _WAITING_RE.search(norm):
+        reasons.append("сотрудник долго ждёт ответа")
+    # A bare «ничего не работает» stays ambiguous, not urgent (the case's own example).
+    if re.search(r"не могу работать|работа стоит|вообще ничего не|совсем не работает|клиент ждет|"
+                 r"вс[её] (?:легло|упало|встало)", norm):
+        reasons.append("работа сотрудника остановлена")
+    return reasons
+
+
+_URGENT_WORDS_RE = re.compile(
+    r"срочн|горит|горим|аврал|пожар|(?<!\w)sos(?!\w)|asap|асап|немедленно|прямо сейчас|"
+    r"очень (?:нужно|надо)|побыстрее|как можно (?:скорее|быстрее)|"
+    r"(?:помогите|ответьте|сделайте|почините|пожалуйста)\s+быстрее"
+)
+# «дедлайн сегодня до 18:00», «отчёт в налоговую — последний день».
+_DEADLINE_RE = re.compile(
+    r"(?:сегодня|дедлайн)[^.!?]{0,25}до \d{1,2}(?:[:.]\d{2})?|последний день|дедлайн сегодня|сдать сегодня"
+)
+# «жду уже час», «сколько можно ждать»: waiting long for an answer is urgent in itself.
+_WAITING_RE = re.compile(r"жду уже|уже \S+ жду|сколько (?:можно )?ждать|никто не отвечает|до сих пор никто")
 
 
 # --- fact extraction -------------------------------------------------------

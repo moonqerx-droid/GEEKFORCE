@@ -323,3 +323,37 @@ def test_what_can_you_do_in_the_middle_of_a_step_does_not_lose_the_step(client):
     reply = send(client, cid, "помощь")
     assert reply["status"] == "TROUBLESHOOTING" and reply["current_step"]["code"] == step
     assert "Вот что я умею" in reply["messages"][-1]["content"]
+
+
+def test_urgent_request_for_a_specialist_is_urgent(client):
+    cid = client.post("/api/conversations").json()["id"]
+    result = send(client, cid, "срочно дайте мне специалиста")
+    assert result["status"] == "ESCALATED"
+    assert result["urgency"] == "high"
+    assert "срочн" in result["urgency_reason"]
+
+
+def test_a_plain_request_for_a_specialist_keeps_normal_urgency(client):
+    cid = client.post("/api/conversations").json()["id"]
+    result = send(client, cid, "позовите специалиста")
+    assert result["status"] == "ESCALATED"
+    assert result["urgency"] == "normal"
+
+
+def test_urgency_rises_later_in_the_dialogue_and_after_the_hand_off(client):
+    cid = client.post("/api/conversations").json()["id"]
+    current = send(client, cid, "Принтер не печатает")
+    assert current["urgency"] in {"normal", "low"}
+    current = send(client, cid, "очень срочно, через 10 минут совещание, нужно распечатать договор")
+    assert current["urgency"] == "high"
+
+    other = client.post("/api/conversations").json()["id"]
+    send(client, other, "позовите специалиста")
+    after = send(client, other, "клиенты не могут оплатить заказ, ответьте!")
+    assert after["urgency"] == "critical"
+
+
+def test_urgency_never_goes_down(client):
+    cid = client.post("/api/conversations").json()["id"]
+    send(client, cid, "срочно дайте мне специалиста")
+    assert send(client, cid, "ладно, это не срочно")["urgency"] == "high"

@@ -4,7 +4,7 @@ import logging
 from datetime import timedelta
 
 from app.services import ocr
-from helpflow_ai import voice
+from helpflow_ai import rules, voice
 from helpflow_ai.engine import ALSO_REPORTED, CURRENT_QUESTION
 from helpflow_ai import AnswerKind, ConversationContext, DecisionAction, StepRecord, TriageEngine
 from sqlalchemy import select
@@ -139,6 +139,7 @@ class TriageDialogueService(DialogueService):
             content = f"{typed}. {seen}" if typed else seen
         if not content.strip() and self._pending_attachments:
             return self._attachment_only(conversation)
+        self._raise_urgency(conversation, content)
         if conversation.status in {"ESCALATED", "IN_PROGRESS"}:
             # A specialist owns the conversation now: keep the employee's words for them.
             try:
@@ -492,6 +493,21 @@ class TriageDialogueService(DialogueService):
             answer_kind=decision.answer_kind.value if decision.answer_kind else None,
             citations=[citation.model_dump(mode="json") for citation in decision.citations],
         )
+
+    URGENCY_LEVELS = ("low", "normal", "high", "critical")
+
+    def _raise_urgency(self, conversation, content):
+        """Any message may make a request more urgent, never less: «срочно, дайте специалиста»
+        or «через 10 минут встреча, где специалист?» moves it up the specialist's queue."""
+        signal = rules.urgency_signal(content)
+        if signal is None:
+            return
+        urgency, reason = signal
+        level = "normal" if urgency.value == "medium" else urgency.value
+        current = conversation.urgency or "normal"
+        if self.URGENCY_LEVELS.index(level) > self.URGENCY_LEVELS.index(current):
+            conversation.urgency = level
+            conversation.urgency_reason = reason
 
     def _escalate(self, conversation, reason, message=None):
         card = self.engine.build_escalation_card(self._context(conversation), reason)
