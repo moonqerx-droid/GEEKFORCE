@@ -1,0 +1,33 @@
+# Production on one server: docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build
+# Everything is served from one address (PUBLIC_URL); only the web container is exposed.
+services:
+  db:
+    restart: unless-stopped
+
+  api:
+    ports: !reset []
+    environment:
+      AI_PROVIDER: ${AI_PROVIDER:-rules}
+      CORS_ORIGINS: '["${PUBLIC_URL:-http://localhost}"]'
+      APP_PUBLIC_URL: ${PUBLIC_URL:-http://localhost}
+      COOKIE_SECURE: ${COOKIE_SECURE:-false}
+
+  web:
+    build:
+      context: .
+      dockerfile: apps/web/Dockerfile
+      args:
+        SHOW_DEMO_LOGINS: ${SHOW_DEMO_LOGINS:-true}
+    environment:
+      SITE_ADDRESS: ${SITE_ADDRESS:-:80}
+    ports:
+      - "${HTTP_PORT:-80}:80"
+      - "443:443"
+    volumes:
+      - caddy-data:/data
+    depends_on:
+      - api
+    restart: unless-stopped
+
+volumes:
+  caddy-data:

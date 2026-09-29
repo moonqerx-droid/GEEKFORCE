@@ -1,0 +1,14 @@
+# SITE_ADDRESS: a domain (helpflow.example.ru) gets HTTPS from Let's Encrypt automatically;
+# ":80" serves plain HTTP on the server's IP.
+{$SITE_ADDRESS::80} {
+	encode gzip
+	@backend path /api/* /health /docs /openapi.json
+	handle @backend {
+		reverse_proxy api:8000
+	}
+	handle {
+		root * /srv
+		try_files {path} /index.html
+		file_server
+	}
+}
