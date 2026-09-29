@@ -142,6 +142,18 @@ docker compose up -d --build
 
 Проверить стенд одной командой: `python3 scripts/check-case.py` (10 проверок из условия кейса, см. [docs/check-case.md](docs/check-case.md)) или `./scripts/smoke-p0.sh` (Windows: `./scripts/smoke-p0.ps1`). Swagger: <http://localhost:8000/docs>. Остановить: `docker compose down` (данные остаются в volume `helpflow-postgres-data`).
 
+## Развёртывание на сервере
+
+Нужен VPS с Ubuntu или Debian (от 2 ГБ памяти) и, по желанию, домен с A-записью на IP сервера. На сервере:
+
+```bash
+git clone https://github.com/moonqerx-droid/GEEKFORCE.git && cd GEEKFORCE
+sh deploy/setup-server.sh helpflow.example.ru   # с доменом — HTTPS сам (Let's Encrypt)
+sh deploy/setup-server.sh 203.0.113.10          # или просто IP — по HTTP
+```
+
+Скрипт ставит Docker, создаёт `.env` со случайным паролем базы, поднимает PostgreSQL, API и веб (Caddy отдаёт интерфейс и проксирует `/api`; наружу открыты только 80 и 443) и загружает демо-данные. Повторный запуск безопасен: обновить стенд — `git pull && sh deploy/setup-server.sh <тот же адрес>`. На сервере помощник работает на правилах (`AI_PROVIDER=rules`), без Ollama. Для настоящей компании выключите демо-вход: `SHOW_DEMO_LOGINS=false` в `.env`.
+
 ## Архитектура
 
 ```mermaid
@@ -198,6 +210,7 @@ services/ai/            AI-движок helpflow_ai: понимание, сце�
   helpflow_ai/understanding/  опечатки и словоформы (pymorphy3, rapidfuzz), смысловой слой (bge-m3)
 knowledge-base/         17 YAML-сценариев, статьи FAQ, демо-документы компании, тестовые кейсы
 scripts/                check-case.py и smoke-тесты живого стенда
+deploy/                 продакшн: Caddy и скрипт установки на сервер
 docs/                   модели и замеры, уровни ответов, демо-сценарий, скриншоты
 ```
 
