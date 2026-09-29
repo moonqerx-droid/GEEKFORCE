@@ -36,7 +36,7 @@ export const MUTATION_TIMEOUT_MS = Number.isFinite(configuredMutationTimeout)
   ? configuredMutationTimeout
   : 100000;
 
-async function request<T>(
+export async function request<T>(
   path: string,
   init: RequestInit = {},
   signal?: AbortSignal,

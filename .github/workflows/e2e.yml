@@ -1,0 +1,85 @@
+name: E2E
+
+# Browser smoke on the real stack: employee → "Позвать специалиста" → specialist replies →
+# the employee sees the reply. Informational: a failure here does not block Backend or Web.
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Start API and PostgreSQL
+        # No .env: rules-only AI, no SMTP, default local credentials.
+        run: docker compose up -d --build
+
+      - name: Wait for the API
+        run: |
+          for attempt in $(seq 1 60); do
+            curl -sf http://127.0.0.1:8000/health && exit 0
+            sleep 2
+          done
+          docker compose logs api
+          exit 1
+
+      - name: Demo data
+        run: docker compose exec -T api python -m app.seed_demo
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: |
+            apps/web/package-lock.json
+            e2e/package-lock.json
+
+      - name: Build and serve the web app
+        working-directory: apps/web
+        run: |
+          npm ci
+          npm run build
+          # Preview proxies /api to the API on :8000, like the dev server.
+          nohup npx vite preview --host 127.0.0.1 --port 5174 --strictPort > /tmp/preview.log 2>&1 &
+          for attempt in $(seq 1 30); do
+            curl -sf http://127.0.0.1:5174/health && exit 0
+            sleep 1
+          done
+          cat /tmp/preview.log
+          exit 1
+
+      - name: Install Playwright
+        working-directory: e2e
+        run: |
+          npm ci
+          npx playwright install --with-deps chromium
+
+      - name: Run the smoke test
+        working-directory: e2e
+        env:
+          E2E_BASE_URL: http://127.0.0.1:5174
+        run: npx playwright test
+
+      - name: Keep the report on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: |
+            e2e/playwright-report
+            e2e/test-results
+          retention-days: 7
+
+      - name: API logs on failure
+        if: failure()
+        run: docker compose logs api --tail 200
+
+      - name: Stop the stack
+        if: always()
+        run: docker compose down -v

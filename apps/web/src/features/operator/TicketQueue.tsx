@@ -2,6 +2,8 @@ import type { ReactNode } from "react";
 import type { OperatorTicket, TicketScope } from "../../api/types";
 import { EmptyState, ErrorState, Spinner } from "../../components/primitives";
 import { URGENCY_SHORT, formatAgo } from "../../lib/labels";
+import { slaOf } from "./operatorApi";
+import { slaView } from "./sla";
 
 const TABS: { scope: TicketScope; label: string }[] = [
   { scope: "queue", label: "Открытые" },
@@ -64,6 +66,9 @@ export function TicketQueue({
         <ul className="queue-list">
           {tickets.map((ticket) => {
             const mine = ticket.assignee_id === currentUserId;
+            // Only a ticket still waiting for its first reply has a clock to watch.
+            const sla = slaOf(ticket);
+            const clock = sla && !sla.replied_at ? slaView(sla) : null;
             return (
               <li key={ticket.id}>
                 <button
@@ -81,6 +86,7 @@ export function TicketQueue({
                     {ticket.owner_name ?? "Сотрудник"}
                     {ticket.service ? `, ${ticket.service}` : ""}
                   </span>
+                  {clock ? <span className={`queue-sla sla-${clock.tone}`}>{clock.text}</span> : null}
                   {ticket.incident_id ? <span className="queue-incident">Общий сбой</span> : null}
                   {ticket.status === "IN_PROGRESS" ? (
                     <span className={`queue-owner ${mine ? "queue-owner-mine" : ""}`}>

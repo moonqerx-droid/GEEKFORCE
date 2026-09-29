@@ -79,7 +79,7 @@
 .admin-facts {
   grid-column: 1 / -1;
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(5, minmax(0, 1fr));
   border-top: 1px solid var(--color-border);
   border-bottom: 1px solid var(--color-border);
 }
@@ -439,8 +439,109 @@
     grid-template-columns: 1fr 1fr;
   }
 
-  .admin-fact:nth-child(3) {
+  .admin-fact:nth-child(3),
+  .admin-fact:nth-child(5) {
     padding-left: 0;
     border-left: 0;
   }
+}
+
+.admin-fact-note {
+  margin-top: 4px;
+  color: var(--ink-faint);
+  font-size: 11.5px;
+  line-height: 1.35;
+}
+
+.admin-fact-good .admin-fact-value {
+  color: var(--color-success);
+}
+
+/* Reply templates */
+.tpl-list {
+  display: grid;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.tpl-item {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-2) var(--space-4);
+  padding: var(--space-3) 0;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.tpl-item-editing {
+  background: var(--blue-wash);
+}
+
+.tpl-item-text {
+  display: grid;
+  flex: 1 1 320px;
+  gap: 2px;
+  min-width: 0;
+}
+
+.tpl-item-title {
+  font-weight: 650;
+}
+
+.tpl-item-body {
+  color: var(--ink-soft);
+  font-size: var(--font-size-sm);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.tpl-item-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-1);
+}
+
+.tpl-confirm {
+  color: var(--color-danger);
+  font-size: var(--font-size-sm);
+  font-weight: 600;
+}
+
+.tpl-form {
+  display: grid;
+  gap: var(--space-3);
+  padding: var(--space-4);
+  border-left: 4px solid var(--blue);
+  border-radius: 0 var(--radius-md) var(--radius-md) 0;
+  background: var(--blue-wash);
+}
+
+.tpl-form h3 {
+  font-size: var(--font-size-md);
+}
+
+.tpl-field {
+  display: grid;
+  gap: 4px;
+  font-size: var(--font-size-sm);
+  font-weight: 600;
+}
+
+.tpl-field textarea {
+  resize: vertical;
+}
+
+.tpl-form-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: var(--space-2);
+}
+
+.tpl-problem {
+  color: var(--color-danger);
+  font-size: var(--font-size-sm);
 }

@@ -2,7 +2,8 @@
 
 Run from apps/api:  python -m app.seed_demo
 Idempotent: if the demo admin already exists, the history is left as is; an open
-VPN outage for Incident Radar is added only when there is none.
+VPN outage for Incident Radar, the showcase requests with screenshots and the starter
+reply templates are each added only when they are not there yet.
 Every conversation is played through the real rules engine, so escalation cards,
 questions and steps look exactly like production ones.
 """
@@ -20,12 +21,15 @@ from sqlalchemy import select
 
 from app.core.security import hash_password, utc_now
 from app.db.session import SessionLocal
+from app.models.attachment import Attachment
 from app.models.auth import User
 from app.models.conversation import Conversation
 from app.models.incident import Incident
+from app.models.reply_template import ReplyTemplate
 from app.repositories.conversations import ConversationRepository
 from app.services.admin import _aware
 from app.services.knowledge import KnowledgeService, KnowledgeUploadRefused
+from app.services.attachments import AttachmentService
 from app.services.operator import OperatorService
 from app.services.triage import TriageDialogueService
 
@@ -247,16 +251,108 @@ def _documents_dir() -> Path | None:
     return next((candidate for candidate in candidates if candidate.is_dir()), None)
 
 
+ASSETS = Path(__file__).resolve().parent / "demo_assets"
+# Requests with a screenshot waiting for a specialist, and how long ago they were handed over:
+# one past the first-reply norm, one close to it, one joining the VPN outage.
+SHOWCASE = [
+    ("elena", "Outlook не отправляет письма, выскакивает ошибка 0x800CCC0E, скрин приложила. Срочно, клиент ждёт ответ",
+     "outlook-0x800ccc0e.png", 75),
+    ("dmitry", "1С пишет, что нет свободной лицензии, не могу провести платёж. Через 30 минут закрытие дня",
+     "1c-license.png", 52),
+    ("sergey", "VPN не подключается, ошибка 809, скриншот прикладываю", "vpn-809.png", 20),
+]
+RATED_REQUEST = "Не открывается общий диск S:, пишет «Нет доступа к сетевой папке»"
+RATED_COMMENT = "Быстро и без лишних вопросов, спасибо!"
+
+STARTER_TEMPLATES = [
+    ("Сброс зависшей сессии",
+     "{имя}, сбросила зависшую сессию на сервере. Закройте программу, откройте заново и войдите ещё раз."),
+    ("Доступ выдан",
+     "{имя}, доступ открыт. Выйдите из учётной записи и войдите снова, чтобы права применились."),
+    ("Нужны подробности",
+     "{имя}, чтобы разобраться быстрее, пришлите, пожалуйста, скриншот ошибки целиком и время, когда она появилась."),
+    ("Проверим, что всё работает",
+     "{имя}, проверьте, пожалуйста: сейчас всё работает? Если да, закрою обращение."),
+]
+
+
+def seed_showcase(session_factory=SessionLocal) -> bool:
+    """Requests with screenshots for the specialist's desk and one resolved, rated request."""
+    with session_factory() as session:
+        if session.scalar(select(Attachment).where(Attachment.filename == SHOWCASE[0][2])) is not None:
+            return False
+        people = {user.email.split("@")[0]: user for user in session.scalars(
+            select(User).where(User.email.like(f"%@{DOMAIN}"))
+        ).all()}
+        if not all(key in people for key in ("anna", "ivan", *(key for key, *_ in SHOWCASE))):
+            return False
+        repository = ConversationRepository(session)
+        dialogue = TriageDialogueService(repository, TriageEngine(KnowledgeBase.load(), None))
+        files = AttachmentService(session)
+        now = utc_now()
+
+        for key, text, asset, minutes_ago in SHOWCASE:
+            owner = people[key]
+            conversation = dialogue.create_conversation()
+            conversation.owner_id = owner.id
+            session.commit()
+            shot = files.store(conversation, owner, asset, (ASSETS / asset).read_bytes())
+            dialogue.handle_message(conversation.id, text, attachments=[shot])
+            dialogue.escalate(conversation.id)  # "Позвать специалиста"
+            _shift(repository.get(conversation.id), now - timedelta(minutes=minutes_ago))
+            session.commit()
+
+        anna, ivan = people["anna"], people["ivan"]
+        conversation = dialogue.create_conversation()
+        conversation.owner_id = ivan.id
+        session.commit()
+        dialogue.handle_message(conversation.id, RATED_REQUEST)
+        dialogue.escalate(conversation.id)
+        specialist = OperatorService(session)
+        specialist.assign(conversation.id, anna)
+        specialist.reply(conversation.id, anna, "Иван, доступ открыт. Выйдите из учётной записи и войдите снова, "
+                                                  "чтобы права применились.")
+        specialist.resolve(conversation.id, anna, "Выдан доступ к общему диску S: по согласованию с руководителем")
+        rated = repository.get(conversation.id)
+        start = now - timedelta(days=1, hours=2)
+        _shift(rated, start)
+        rated.escalated_at = start + timedelta(minutes=2)
+        rated.assigned_at = start + timedelta(minutes=4)
+        rated.first_operator_reply_at = start + timedelta(minutes=7)
+        rated.resolved_at = start + timedelta(minutes=19)
+        rated.rating, rated.rating_comment = 5, RATED_COMMENT
+        session.commit()
+        return True
+
+
+def seed_templates(session_factory=SessionLocal) -> bool:
+    """A few ready-made replies so "Шаблоны" is not empty on first run."""
+    with session_factory() as session:
+        if session.scalar(select(ReplyTemplate)) is not None:
+            return False
+        admin = session.scalar(select(User).where(User.email == f"admin@{DOMAIN}"))
+        for title, body in STARTER_TEMPLATES:
+            session.add(ReplyTemplate(title=title, body=body, created_by=admin.id if admin else None))
+        session.commit()
+        return True
+
+
 def main() -> None:
     created = seed()
     outage = seed_incident()
     documents = seed_documents()
     if documents:
         print(f"Загружено документов компании: {documents} (раздел «База знаний»).")
+    showcase = seed_showcase()
+    templates = seed_templates()
     if not created:
         print(f"Демо-данные уже есть. Вход: admin@{DOMAIN} / {PASSWORD}")
         if outage:
             print("Добавлен свежий сбой VPN для радара инцидентов.")
+        if showcase:
+            print("Добавлены обращения со скриншотами для специалиста и одно решённое с оценкой.")
+        if templates:
+            print("Добавлены шаблоны ответов.")
         return
     print("Демо-данные созданы. Пароль всех аккаунтов:", PASSWORD)
     print(f"  Админ:     admin@{DOMAIN}")
