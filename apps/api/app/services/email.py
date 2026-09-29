@@ -1,5 +1,6 @@
 from dataclasses import dataclass
 from email.message import EmailMessage
+import logging
 import smtplib
 from typing import Protocol
 
@@ -23,6 +24,19 @@ class MemoryEmailSender:
 
     def send(self, message: EmailPayload) -> None:
         self.messages.append(message)
+
+
+logger = logging.getLogger(__name__)
+
+
+class UnconfiguredEmailSender(MemoryEmailSender):
+    """No SMTP settings: nothing can be sent, so say so in the log instead of failing silently."""
+
+    def send(self, message: EmailPayload) -> None:
+        super().send(message)
+        # Neither the code nor the address is logged: logs are read by more people than the mailbox.
+        logger.warning("email.not_sent: SMTP is not configured — set SMTP_USERNAME, "
+                       "SMTP_PASSWORD and SMTP_FROM_EMAIL in .env")
 
 
 class SmtpEmailSender:

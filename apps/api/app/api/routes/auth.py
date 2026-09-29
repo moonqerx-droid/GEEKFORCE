@@ -17,7 +17,7 @@ from app.services.auth import (
     AuthService, DuplicateEmail, EmailDeliveryFailed, EmailNotVerified, InvalidCredentials,
     InvalidCurrentPassword, InvalidInvite, InvalidOrExpiredToken,
 )
-from app.services.email import EmailSender, MemoryEmailSender, SmtpEmailSender
+from app.services.email import EmailSender, SmtpEmailSender, UnconfiguredEmailSender
 from app.services.rate_limit import InMemoryRateLimiter, RateLimitExceeded
 
 
@@ -40,7 +40,7 @@ _rate_limiter = InMemoryRateLimiter()
 def get_email_sender() -> EmailSender:
     settings = get_settings()
     if not settings.smtp_username or not settings.smtp_password or not settings.smtp_from_email:
-        return MemoryEmailSender()
+        return UnconfiguredEmailSender()
     return SmtpEmailSender(
         host=settings.smtp_host, port=settings.smtp_port, username=settings.smtp_username,
         password=settings.smtp_password, from_email=settings.smtp_from_email,

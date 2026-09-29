@@ -62,3 +62,9 @@ else
   echo "Готово: $URL"
   echo "Демо-аккаунты не создавались. Первый руководитель: ADMIN_EMAIL и ADMIN_PASSWORD в .env, затем повторите запуск."
 fi
+
+if ! grep -q '^SMTP_PASSWORD=..*' .env; then
+  echo
+  echo "Почта не настроена: коды подтверждения при регистрации не будут приходить."
+  echo "Добавьте в .env SMTP_USERNAME, SMTP_PASSWORD (пароль приложения Яндекса), SMTP_FROM_EMAIL и повторите запуск."
+fi
