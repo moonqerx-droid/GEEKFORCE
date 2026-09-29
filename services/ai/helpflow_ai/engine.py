@@ -20,7 +20,7 @@ from .answer_policy import AnswerPolicy, AnswerRoute
 from .evidence import EvidenceValidator
 from .knowledge import KnowledgeBase
 from .llm import LLMClient, LLMError, LLMSettings
-from . import answering, voice
+from . import answering, capabilities, voice
 from .understanding import morph
 from .understanding.semantic import SemanticIndex, from_env as semantic_from_env
 from .retrieval import KnowledgeRetriever
@@ -277,6 +277,12 @@ class TriageEngine:
                             f"Передаю вопрос {voice.to_whom(playbook.escalation_team)} — ответ придёт сюда."),
             })
         return decision
+
+    def capabilities(self) -> str:
+        """The answer to «что ты умеешь?»: scenarios and the company documents loaded right now."""
+        with self._knowledge_lock:
+            titles = [chunk.title for chunk in self._company_chunks]
+        return capabilities.describe(self.kb.playbooks, titles)
 
     def answer_follow_up(self, message: str, previous: str = "") -> Decision | None:
         """A new question typed right after a document answer («а за рубежом?»): its answer

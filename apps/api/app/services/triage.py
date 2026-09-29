@@ -29,10 +29,6 @@ class TriageDialogueService(DialogueService):
             "Привет! Я помогу разобраться с технической проблемой. "
             "Опишите, пожалуйста, что не работает или какое сообщение об ошибке вы видите."
         ),
-        "help": (
-            "Я могу уточнить симптомы, предложить безопасные шаги проверки и, если они не помогут, "
-            "передать обращение специалисту вместе с собранным контекстом. Просто опишите проблему своими словами."
-        ),
         "thanks": "Пожалуйста! Если проблема ещё не решена, продолжим с предыдущего вопроса.",
     }
 
@@ -158,6 +154,15 @@ class TriageDialogueService(DialogueService):
             try:
                 self._message(conversation, "user", typed)
                 self._escalate(conversation, "пользователь запросил специалиста")
+                return self._commit(conversation)
+            except Exception:
+                self.repository.session.rollback()
+                raise
+        if intent == "help" and conversation.status in {"NEW", "CLARIFYING", "VERIFYING", "TROUBLESHOOTING"}:
+            # «Что ты умеешь?» at any point: the list, and the conversation stays where it was.
+            try:
+                self._message(conversation, "user", typed)
+                self._message(conversation, "assistant", self.engine.capabilities())
                 return self._commit(conversation)
             except Exception:
                 self.repository.session.rollback()

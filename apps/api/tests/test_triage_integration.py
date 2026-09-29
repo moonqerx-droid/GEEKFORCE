@@ -298,3 +298,28 @@ def test_request_for_an_admin_password_is_refused_with_an_explanation(client):
     assistant = [message for message in state["messages"] if message["role"] == "assistant"]
     assert "не сообщаю" in assistant[-1]["content"]
     assert state["escalation_card"]["recommended_team"] == "Администраторы доступа"
+
+
+def test_what_can_you_do_lists_the_abilities_and_keeps_the_conversation_going(client):
+    cid = client.post("/api/conversations").json()["id"]
+    first = send(client, cid, "Что ты умеешь?")
+    assert first["status"] == "NEW"
+    assert "Разбираю технические проблемы" in first["messages"][-1]["content"]
+    assert "VPN" in first["messages"][-1]["content"]
+
+    # The next message is the real request: «что ты умеешь?» is not taken as the problem.
+    after = send(client, cid, "Не подключается VPN из дома")
+    assert after["playbook_id"] == "vpn_connection"
+
+
+def test_what_can_you_do_in_the_middle_of_a_step_does_not_lose_the_step(client):
+    cid = client.post("/api/conversations").json()["id"]
+    current = send(client, cid, "Принтер не печатает")
+    while current["status"] == "CLARIFYING":
+        current = send(client, cid, "Не знаю")
+    assert current["status"] == "TROUBLESHOOTING"
+    step = current["current_step"]["code"]
+
+    reply = send(client, cid, "помощь")
+    assert reply["status"] == "TROUBLESHOOTING" and reply["current_step"]["code"] == step
+    assert "Вот что я умею" in reply["messages"][-1]["content"]

@@ -11,6 +11,8 @@ const EXAMPLES = [
   "Нужен доступ к папке отдела на общем диске",
 ];
 
+export const ABILITIES_QUESTION = "Что ты умеешь?";
+
 const PROMISES = [
   ["Своими словами", "Названия систем и категории знать не нужно."],
   ["Только нужные вопросы", "Если ответ уже есть в тексте, переспрашивать не будем."],
@@ -22,9 +24,12 @@ export function WelcomeScreen({
   firstName,
   onExample,
   onReport,
+  onAsk,
 }: {
   firstName?: string;
   onExample: (text: string) => void;
+  /** Sends a question to the assistant at once: «Что ты умеешь?» shows every topic it covers. */
+  onAsk?: (text: string) => void;
   /** Starts a request right away; the radar adds it to the outage, so the employee hears when it is fixed. */
   onReport?: (text: string) => void;
 }) {
@@ -65,6 +70,14 @@ export function WelcomeScreen({
       <p className="welcome-lead">
         Расскажите, как коллеге, и приложите скриншот ошибки, если он есть. Дальше разберёмся вместе, по шагам.
       </p>
+      {onAsk ? (
+        <p className="welcome-abilities">
+          <button type="button" className="welcome-abilities-button" onClick={() => onAsk(ABILITIES_QUESTION)}>
+            Что ты умеешь?
+          </button>
+          <span>Покажу, с какими проблемами помогаю и на какие вопросы о правилах компании отвечаю.</span>
+        </p>
+      ) : null}
       <ul className="welcome-promises">
         {PROMISES.map(([title, text]) => (
           <li key={title}><strong>{title}</strong><span>{text}</span></li>
