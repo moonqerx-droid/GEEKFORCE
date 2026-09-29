@@ -17,7 +17,7 @@ services:
       context: .
       dockerfile: apps/web/Dockerfile
       args:
-        SHOW_DEMO_LOGINS: ${SHOW_DEMO_LOGINS:-true}
+        SHOW_DEMO_LOGINS: ${SHOW_DEMO_LOGINS:-false}
     environment:
       SITE_ADDRESS: ${SITE_ADDRESS:-:80}
     ports:

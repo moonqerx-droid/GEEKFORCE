@@ -4,8 +4,8 @@ WORKDIR /web
 COPY apps/web/package.json apps/web/package-lock.json ./
 RUN npm ci
 COPY apps/web/ ./
-# A demo stand for the jury shows one-click demo logins; set to false for a real company.
-ARG SHOW_DEMO_LOGINS=true
+# One-click demo logins (known password) only for a demo stand: deploy/setup-server.sh --demo.
+ARG SHOW_DEMO_LOGINS=false
 RUN VITE_SHOW_DEMO_LOGINS=$SHOW_DEMO_LOGINS npm run build
 
 FROM caddy:2-alpine

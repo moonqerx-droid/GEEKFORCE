@@ -148,11 +148,11 @@ docker compose up -d --build
 
 ```bash
 git clone https://github.com/moonqerx-droid/GEEKFORCE.git && cd GEEKFORCE
-sh deploy/setup-server.sh helpflow.example.ru   # с доменом — HTTPS сам (Let's Encrypt)
-sh deploy/setup-server.sh 203.0.113.10          # или просто IP — по HTTP
+sh deploy/setup-server.sh helpflow.example.ru --demo   # демо-стенд для жюри, HTTPS сам (Let's Encrypt)
+sh deploy/setup-server.sh 203.0.113.10 --demo          # или просто IP — по HTTP
 ```
 
-Скрипт ставит Docker, создаёт `.env` со случайным паролем базы, поднимает PostgreSQL, API и веб (Caddy отдаёт интерфейс и проксирует `/api`; наружу открыты только 80 и 443) и загружает демо-данные. Повторный запуск безопасен: обновить стенд — `git pull && sh deploy/setup-server.sh <тот же адрес>`. На сервере помощник работает на правилах (`AI_PROVIDER=rules`), без Ollama. Для настоящей компании выключите демо-вход: `SHOW_DEMO_LOGINS=false` в `.env`.
+Скрипт ставит Docker, создаёт `.env` со случайным паролем базы, поднимает PostgreSQL, API и веб (Caddy отдаёт интерфейс и проксирует `/api`; наружу открыты только 80 и 443) и с флагом `--demo` загружает демо-данные с кнопками быстрого входа. **Демо-пароль `DemoPass123` публичный, в том числе у руководителя** — на демо-стенде не храните настоящие данные. Без `--demo` аккаунты не создаются: первого руководителя задают `ADMIN_EMAIL` и `ADMIN_PASSWORD` в `.env`. Повторный запуск безопасен: обновить стенд — `git pull && sh deploy/setup-server.sh <тот же адрес>`. На сервере помощник работает на правилах (`AI_PROVIDER=rules`), без Ollama.
 
 ## Архитектура
 
