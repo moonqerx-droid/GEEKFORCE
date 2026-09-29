@@ -99,6 +99,16 @@ def lemma(word: str) -> str:
     return analyzer.parse(word)[0].normal_form.replace("ё", "е")
 
 
+@lru_cache(maxsize=65536)
+def known_noun(word: str) -> str | None:
+    """The dictionary form of a word the dictionary knows as a noun; None for anything else."""
+    analyzer = _analyzer()
+    if analyzer is None or not analyzer.word_is_known(word):
+        return None
+    parse = analyzer.parse(word)[0]
+    return parse.normal_form.replace("ё", "е") if parse.tag.POS == "NOUN" else None
+
+
 @lru_cache(maxsize=8192)
 def lemmatize(norm_text: str) -> str:
     """The normalized text with every known word in its dictionary form."""

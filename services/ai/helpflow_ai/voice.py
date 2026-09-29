@@ -9,6 +9,8 @@ from __future__ import annotations
 
 import re
 
+from .answer_policy import AnswerPolicy
+
 # Team code → how to say «передаю …» to the employee.
 _TEAM_FOR_EMPLOYEE = {
     "service desk l1": "специалисту поддержки",
@@ -43,7 +45,8 @@ def acknowledgement(text: str) -> str:
     """One sentence that shows the employee was heard, or "" when plain business is best."""
     if _FRUSTRATED.search(text) or _shouting(text):
         return "Понимаю, это выбивает из работы — разберёмся."
-    if _RECURRING.search(text):
+    if _RECURRING.search(text) and not AnswerPolicy.is_information_question(text):
+        # «Опять не печатает» is a recurring problem; «можно использовать пароль снова?» is a question.
         return "Жаль, что это повторяется — отмечу это для специалиста."
     return ""
 

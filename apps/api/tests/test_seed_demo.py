@@ -85,12 +85,30 @@ def test_seed_loads_the_demo_company_documents(factory):
 
     seed(total=12, session_factory=factory)
 
-    assert seed_documents(session_factory=factory) == 3
+    from app.seed_demo import DOCUMENT_TITLES
+
+    assert seed_documents(session_factory=factory) == len(DOCUMENT_TITLES) == 10
     assert seed_documents(session_factory=factory) == 0, "a second run adds nothing"
     with factory() as session:
         documents = session.query(KnowledgeDocument).all()
-        assert sorted(d.title for d in documents) == ["Инструкция по VPN", "Правила паролей", "Регламент командировок"]
+        assert sorted(d.title for d in documents) == sorted(DOCUMENT_TITLES.values())
         assert all(d.status == "ready" and d.chunks for d in documents)
+
+
+def test_an_edited_document_replaces_the_earlier_upload(factory, tmp_path):
+    from app.models.knowledge import KnowledgeDocument
+    from app.seed_demo import seed_documents
+
+    seed(total=4, session_factory=factory)
+    rules = tmp_path / "travel-regulations.md"
+    rules.write_text("# Командировки\n\nСуточные по России — 700 рублей в день.\n", encoding="utf-8")
+    assert seed_documents(session_factory=factory, directory=tmp_path) == 1
+    rules.write_text("# Командировки\n\nСуточные по России — 900 рублей в день.\n", encoding="utf-8")
+    assert seed_documents(session_factory=factory, directory=tmp_path) == 1
+
+    with factory() as session:
+        [document] = session.query(KnowledgeDocument).all()
+        assert "900 рублей" in document.chunks[0].text  # the stale 700 is gone, not quoted next to it
 
 
 def test_employee_gets_an_answer_from_a_seeded_document(factory):

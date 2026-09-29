@@ -81,10 +81,11 @@ CASES = (
     Case(
         "outlook-how-to",
         "Безопасный how-to",
-        "Как включить автоответ в Outlook?",
+        # A safe how-to no company document covers («автоответ» is in the demo mail rules now).
+        "Как закрепить верхнюю строку в Excel?",
         ("TROUBLESHOOTING",),
         ("general",),
-        ("unknown", "email_outlook"),
+        ("unknown", "app_not_starting"),
         assistant_contains=("общая рекомендация",),
     ),
     Case(

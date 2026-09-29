@@ -123,6 +123,7 @@ class TriageEngine:
         morph.use_playbooks(knowledge.playbooks)  # typo vocabulary; cached by content
         self._base_chunks = tuple(knowledge.chunks)
         self._company_chunks: tuple[KnowledgeChunk, ...] = ()
+        self._company_words: set[str] = set()
         self._knowledge_lock = RLock()
         self.retriever = KnowledgeRetriever(list(self._base_chunks))
         self.answer_policy = AnswerPolicy()
@@ -217,8 +218,10 @@ class TriageEngine:
             keywords=[],
             escalation_team="Service Desk L1",
         ) for fragment in parsed)
+        words = answering.corpus_words([text for chunk in chunks for text in (chunk.title, chunk.text)])
         with self._knowledge_lock:
             self._company_chunks = chunks
+            self._company_words = words
             self.retriever = KnowledgeRetriever([*self._base_chunks, *chunks])
 
     @staticmethod
@@ -303,6 +306,9 @@ class TriageEngine:
         best = None
         with self._knowledge_lock:
             candidates = self._company_chunks
+            words = self._company_words
+        if candidates and answering.unknown_subjects(query, words):
+            return None  # the question is about something no document mentions
         # Company documents are few and short: read every fragment instead of trusting a
         # keyword search to shortlist them («суточных» must still find «Суточные»).
         for chunk in candidates:
@@ -313,6 +319,8 @@ class TriageEngine:
         if best is None:
             return None
         chunk, found = best
+        if not answering.covers_subjects(query, f"{chunk.title} {found.text}"):
+            return None  # a close-looking sentence about something else is not an answer
         text = found.text
         if re.search(r"ошибк|что\s+(?:значит|означает)|что\s+делать", query, re.IGNORECASE):
             # «Что значит ошибка 809?»: the explanation and the sentence after it — what to do.
@@ -337,9 +345,13 @@ class TriageEngine:
                 # A question, not a complaint: company documents count even when the words
                 # also fit a scenario («какие требования к паролю?»), and only the sentences
                 # that answer it are said.
+                # No sentence answers it: an honest hand-off, not the whole fragment the search
+                # happened to find by a heading word («зарплата» in «Отпуск без сохранения зарплаты»).
                 best = self._best_document(query)
                 if best is not None:
                     company, focused = best
+                elif company is not None and not _speaks_about(query, company):
+                    company = None
             elif company is not None:
                 found = answering.focus(query, _safe_company_excerpt(company.text), company.title)
                 focused = found.text if found else None
@@ -465,6 +477,17 @@ class TriageEngine:
             if route == AnswerRoute.GENERAL:
                 return _general_guidance_decision(query)
             if route == AnswerRoute.COMPANY:
+                if self.answer_policy.is_information_question(query):
+                    # A question gets the sentence that answers it or an honest hand-off.
+                    best = self._best_document(query)
+                    if best is not None:
+                        return _company_knowledge_decision(*best)
+                    company = next(
+                        match.chunk for match in matches if match.chunk.id.startswith("document:")
+                    )
+                    if not _speaks_about(query, company):
+                        return self._escalate(playbook, "нет подтверждённого источника для ответа на вопрос")
+                    return _company_knowledge_decision(company)
                 company = next(
                     match.chunk for match in matches if match.chunk.id.startswith("document:")
                 )
@@ -1055,6 +1078,13 @@ def _current_question(context: ConversationContext) -> str:
     """The question being answered: the latest follow-up, else the first request."""
     return (context.known_facts.get(CURRENT_QUESTION)
             or context.original_request or _first_user_message(context))
+
+
+def _speaks_about(query: str, chunk: KnowledgeChunk) -> bool:
+    """Whether a fragment found by search is about what was asked. Its headings do not count:
+    «Отпуск без сохранения зарплаты» does not make a rule about holiday pay answer «когда зарплата?»."""
+    said = " ".join(answering.sentences(_safe_company_excerpt(chunk.text)))
+    return answering.covers_subjects(query, f"{chunk.title} {said}")
 
 
 def _company_knowledge_decision(chunk: KnowledgeChunk, focused: str | None = None) -> Decision:

@@ -348,3 +348,31 @@ def test_a_title_word_alone_does_not_make_an_answer(kb) -> None:
         "text": "Командировку согласует руководитель подразделения за пять рабочих дней до поездки.",
     }])
     assert _ask(engine, "как оформить больничный?").answer_kind != AnswerKind.DOCUMENT
+
+
+def test_a_question_about_what_no_document_mentions_is_not_answered(kb) -> None:
+    engine = TriageEngine(kb)
+    engine.set_company_fragments([{
+        "source_id": "document:vacation:1", "title": "Отпуска — Как оформить отпуск",
+        "text": "Отпускные перечисляются не позднее чем за три дня до начала отпуска.\n\n"
+                "## Отпуск без сохранения зарплаты\n\nТакой отпуск согласует руководитель.",
+    }])
+    # «перечисл…» is shared, but no document ever says «зарплата»: an honest hand-off, not holiday pay.
+    assert _ask(engine, "Когда перечислят зарплату?").answer_kind != AnswerKind.DOCUMENT
+    assert _ask(engine, "Когда перечисляют отпускные?").answer_kind == AnswerKind.DOCUMENT
+
+
+def test_clipped_words_are_understood_as_the_full_ones(kb) -> None:
+    engine = TriageEngine(kb)
+    engine.set_company_fragments([{
+        "source_id": "document:equipment:1", "title": "Рабочее место — Личные устройства",
+        "text": "Подключать личные ноутбуки к корпоративной сети Wi-Fi запрещено.",
+    }])
+    # «ноут» is «ноутбук»: not an unknown subject.
+    assert _ask(engine, "можно подключить личный ноут к рабочей сети?").answer_kind == AnswerKind.DOCUMENT
+
+
+def test_a_question_with_again_gets_no_sympathy_for_a_repeated_problem() -> None:
+    from helpflow_ai import voice
+    assert voice.acknowledgement("можно ли использовать старый пароль снова?") == ""
+    assert voice.acknowledgement("опять не печатает принтер") != ""

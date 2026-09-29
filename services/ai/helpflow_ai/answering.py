@@ -16,6 +16,8 @@ from dataclasses import dataclass
 
 from .understanding import morph
 
+from .understanding import morph
+
 _WORD = re.compile(r"[a-zа-яё0-9]+", re.IGNORECASE)
 _SENTENCE_END = re.compile(r"(?<=[.!?])\s+|\n+")
 _HEADING = re.compile(r"^#{1,6}\s+")
@@ -107,3 +109,66 @@ def focus(question: str, text: str, title: str = "", limit: int = 2) -> Focus | 
     ranked = sorted((item for item in scored if item[0] >= best_own * 0.8), reverse=True)[:limit]
     chosen = sorted(ranked, key=lambda item: item[2])
     return Focus(" ".join(item[3] for item in chosen), round(best_total, 2))
+
+
+# Nouns that frame a question rather than name its subject: «в этом году», «какие требования
+# к паролю», «что сказано в регламенте», «какой длины». The subject is the other noun.
+_FRAME_NOUNS = frozenset(
+    "время год раз день неделя месяц случай дело вопрос человек вещь способ образ помощь "
+    "ситуация проблема сотрудник компания требование документ регламент правило инструкция "
+    "политика положение порядок условие норма ограничение срок длина размер сумма стоимость "
+    "количество число максимум минимум".split()
+)
+
+
+def corpus_words(texts: list[str]) -> set[str]:
+    """Every word of the company documents in its dictionary form, for `unknown_subjects`."""
+    return {morph.lemma(word) for text in texts for word in _WORD.findall(text.lower().replace("ё", "е"))}
+
+
+def unknown_subjects(question: str, corpus: set[str]) -> list[str]:
+    """Nouns of the question that no company document ever mentions.
+
+    «Когда перечислят зарплату?» shares «перечисл…» with a rule about holiday pay; if no
+    document says «зарплата» at all, the documents cannot answer it, however close a
+    sentence looks. Only dictionary nouns count: slang and typos are left to the matcher.
+    """
+    stems = {word[:STEM] for word in corpus if len(word) >= STEM}
+    missing = []
+    for noun in _subjects(question):
+        if not _mentioned(noun, corpus, stems):
+            missing.append(noun)
+    return missing
+
+
+def _subjects(question: str) -> list[str]:
+    """Dictionary nouns of the question that name what it is about, in order, without repeats."""
+    subjects = []
+    for word in _WORD.findall(question.lower().replace("ё", "е")):
+        noun = morph.known_noun(word)
+        if noun is not None and noun not in _FRAME_NOUNS and noun not in subjects:
+            subjects.append(noun)
+    return subjects
+
+
+def _mentioned(noun: str, words: set[str], stems: set[str]) -> bool:
+    """The noun, its stem, a related word («граница» → «рубеж») or a clipped form it abbreviates
+    («комп» → «компьютер», «ноут» → «ноутбук») occurs among `words`."""
+    if noun in words or (len(noun) >= STEM and noun[:STEM] in stems):
+        return True
+    if any(related in words for related in _RELATED.get(noun, ())):
+        return True
+    return len(noun) >= 4 and any(word.startswith(noun) for word in words)
+
+
+def covers_subjects(question: str, answer: str) -> bool:
+    """Whether the chosen answer speaks about what was asked: at least half of the question's
+    subject nouns appear in it. «Когда перечислят зарплату?» is not answered by a sentence
+    about holiday pay, even when «зарплата» occurs elsewhere in the same document."""
+    subjects = _subjects(question)
+    if not subjects:
+        return True
+    present = corpus_words([answer])
+    stems = {word[:STEM] for word in present if len(word) >= STEM}
+    covered = sum(_mentioned(noun, present, stems) for noun in subjects)
+    return covered * 2 >= len(subjects)

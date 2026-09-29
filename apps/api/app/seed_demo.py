@@ -10,6 +10,7 @@ questions and steps look exactly like production ones.
 
 from __future__ import annotations
 
+import hashlib
 import os
 import random
 from datetime import timedelta
@@ -215,14 +216,22 @@ def seed_incident(seed_value: int = 7, session_factory=SessionLocal) -> bool:
 
 # Company documents the demo stand answers from; the admin could upload the same files by hand.
 DOCUMENT_TITLES = {
-    "travel-regulations.md": "Регламент командировок",
-    "vpn-guide.md": "Инструкция по VPN",
     "password-rules.md": "Правила паролей",
+    "vpn-guide.md": "Инструкция по VPN",
+    "travel-regulations.md": "Регламент командировок",
+    "vacation-sick-leave.md": "Отпуска и больничные",
+    "workplace-equipment.md": "Рабочее место и оборудование",
+    "information-security.md": "Информационная безопасность",
+    "office-rules.md": "Офис: пропуска, переговорные, парковка",
+    "software-and-access.md": "Программы и доступы",
+    "email-rules.md": "Корпоративная почта",
+    "support-rules.md": "Техподдержка: часы работы и сроки",
 }
 
 
 def seed_documents(session_factory=SessionLocal, directory: Path | None = None) -> int:
-    """Upload the demo company documents as the demo admin; already uploaded ones are skipped."""
+    """Upload the demo company documents as the demo admin. An unchanged file is skipped; an edited
+    one replaces the earlier upload with the same title, so the stand never quotes stale rules."""
     directory = directory or _documents_dir()
     files = sorted(path for path in directory.glob("*.md") if path.name in DOCUMENT_TITLES) if directory else []
     added = 0
@@ -232,14 +241,20 @@ def seed_documents(session_factory=SessionLocal, directory: Path | None = None) 
             return 0
         knowledge = KnowledgeService(session)
         for path in files:
+            content, title = path.read_bytes(), DOCUMENT_TITLES[path.name]
+            digest = hashlib.sha256(content).hexdigest()
+            stale = [document for document in knowledge.list_documents()
+                     if document.title == title and document.sha256 != digest]
             try:
-                knowledge.upload(path.name, path.read_bytes(), "text/markdown", admin,
-                                 title=DOCUMENT_TITLES[path.name])
+                knowledge.upload(path.name, content, "text/markdown", admin, title=title)
                 added += 1
             except KnowledgeUploadRefused as refused:
                 if refused.status_code != 409:  # 409: this very file is already in the knowledge base
                     raise
                 session.rollback()
+                continue
+            for document in stale:
+                knowledge.delete(document.id, admin)
     return added
 
 
