@@ -9,6 +9,7 @@ import { IncidentRadar } from "./IncidentRadar";
 import { IncidentWorkspace } from "./IncidentWorkspace";
 import { TicketQueue } from "./TicketQueue";
 import { TicketWorkspace } from "./TicketWorkspace";
+import { useQueueView } from "./useQueueView";
 import { useTicket, useTicketQueue } from "./useTickets";
 import "./OperatorPage.css";
 
@@ -32,6 +33,7 @@ export function OperatorPage() {
   const onChanged = useCallback(() => { void reloadQueue(); }, [reloadQueue]);
   const current = useTicket(selectedId, onChanged);
   const currentUserId = user?.id ?? "";
+  const view = useQueueView(queue.tickets, scope, currentUserId);
 
   const select = (id: string) => setParams((prev) => {
     const next = new URLSearchParams(prev);
@@ -48,14 +50,20 @@ export function OperatorPage() {
   const incident = incidentId ? radar.incidents?.find((item) => item.id === incidentId) ?? null : null;
 
   const ticket = current.ticket;
+  // «Предыдущее / Следующее» walk the queue exactly as it is shown on the left.
+  const position = view.order.findIndex((item) => item.id === selectedId);
+  const neighbour = (step: number) => (position < 0 ? undefined : view.order[position + step]);
+  const previous = neighbour(-1);
+  const next = neighbour(1);
 
   return (
     <div className="operator">
       <TicketQueue
         scope={scope}
         onScopeChange={setScope}
-        tickets={queue.tickets}
         status={queue.status}
+        total={queue.tickets.length}
+        view={view}
         selectedId={selectedId}
         onSelect={select}
         currentUserId={currentUserId}
@@ -87,6 +95,9 @@ export function OperatorPage() {
         onReply={current.reply}
         onResolve={current.resolve}
         onShowCard={() => setCardOpen(true)}
+        position={position >= 0 ? { index: position + 1, total: view.order.length } : null}
+        onPrevious={previous ? () => select(previous.id) : undefined}
+        onNext={next ? () => select(next.id) : undefined}
       />}
       {cardOpen ? <button type="button" className="operator-scrim" aria-label="Скрыть карточку" onClick={() => setCardOpen(false)} /> : null}
       <div className={`operator-side ${cardOpen ? "operator-side-open" : ""}`}>

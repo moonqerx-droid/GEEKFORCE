@@ -111,9 +111,31 @@ def conversation_intent(text: str) -> str | None:
         return "thanks"
     if _HELP_RE.fullmatch(cleaned):
         return "help"
-    if _OPERATOR_REQUEST_RE.search(cleaned):
+    if _OPERATOR_REQUEST_RE.search(cleaned) or _asks_only_for_a_person(cleaned):
         return "operator"
     return None
+
+
+# «живого человека дайте»: the person first, the verb after.
+_PERSON_THEN_VERB_RE = re.compile(
+    r"(?<!\w)(?:специалист|оператор|живо\w* человек|человек|админ)\w*(?: \S+){0,2} "
+    r"(?:позов|пригласите|дайте|давайте|соедин|нужен|нужна|нужно|подключ)"
+)
+_PERSON_RE = re.compile(r"^(?:специалист|оператор|человек|сотрудник поддержки|поддержк|админ)\w*$")
+# Words that only add pressure or politeness around the person asked for.
+_FILLER = frozenset(
+    "срочно очень пожалуйста плиз пж мне нам живого живой живым скорее быстрее быстро прошу "
+    "ну уже эй а и с со к ко нужен нужна нужно".split()
+)
+
+
+def _asks_only_for_a_person(cleaned: str) -> bool:
+    """«СРОЧНО СПЕЦИАЛИСТА», «оператора!», «специалиста пожалуйста, очень срочно»: nothing but the
+    person asked for and words around it. «Специалист сказал перезагрузить» names no request."""
+    if _PERSON_THEN_VERB_RE.search(cleaned):
+        return True
+    rest = [word for word in cleaned.split() if word not in _FILLER]
+    return len(rest) == 1 and bool(_PERSON_RE.match(rest[0]))
 
 
 def understand(text: str) -> str:

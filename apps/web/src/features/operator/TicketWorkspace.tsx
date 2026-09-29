@@ -20,8 +20,15 @@ export function TicketWorkspace({
   onReply,
   onResolve,
   onShowCard,
+  position,
+  onPrevious,
+  onNext,
 }: {
   onShowCard: () => void;
+  /** Where this ticket is in the queue as shown: «3 из 45». */
+  position?: { index: number; total: number } | null;
+  onPrevious?: () => void;
+  onNext?: () => void;
   ticket: OperatorTicket | null;
   loading: boolean;
   busy: boolean;
@@ -42,7 +49,7 @@ export function TicketWorkspace({
         {loading ? <Spinner label="Открываем обращение…" /> : (
           <EmptyState
             title="Выберите обращение"
-            description="Слева — очередь, срочные наверху. У каждого обращения уже есть карточка от помощника: что случилось, что спрашивали и что пробовали."
+            description="Слева — очередь: новые сверху, порядок можно сменить. Поиск и фильтр по срочности — над списком, стрелки ↑ ↓ переключают обращения. У каждого обращения уже есть карточка от помощника."
           />
         )}
       </section>
@@ -57,9 +64,16 @@ export function TicketWorkspace({
 
   return (
     <section className="workspace" aria-label="Переписка по обращению" ref={threadRef}>
+      {position ? (
+        <nav className="workspace-nav" aria-label="Переход по очереди">
+          <button type="button" className="workspace-nav-button" disabled={!onPrevious} onClick={onPrevious}>← Предыдущее</button>
+          <span className="workspace-nav-position num">{position.index} из {position.total}</span>
+          <button type="button" className="workspace-nav-button" disabled={!onNext} onClick={onNext}>Следующее →</button>
+        </nav>
+      ) : null}
       <header className="workspace-head">
         <div>
-          <h1 className="workspace-title">{ticket.summary || ticket.original_request}</h1>
+          <h1 className="workspace-title" title={ticket.summary || ticket.original_request}>{ticket.summary || ticket.original_request}</h1>
           <p className="workspace-sub">
             {ticket.owner_name ?? "Сотрудник"}, обращение от {formatDateTime(ticket.created_at)}
           </p>
