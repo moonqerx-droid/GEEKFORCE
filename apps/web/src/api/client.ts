@@ -1,6 +1,7 @@
 import { ApiError, ConflictError, NetworkError, NotFoundError, ValidationError } from "./errors";
 import type {
   KnownIssue,
+  AdminConversation,
   KnowledgeDocument,
   KnowledgeDocumentDetail,
   Attachment,
@@ -284,6 +285,16 @@ export const api = {
 
   deleteKnowledgeDocument(id: string): Promise<void> {
     return request(`/api/admin/knowledge/documents/${id}`, { method: "DELETE" });
+  },
+
+  listAdminConversations(query: string, signal?: AbortSignal): Promise<AdminConversation[]> {
+    const params = new URLSearchParams(query.trim() ? { q: query.trim() } : {});
+    return request(`/api/admin/conversations?${params}`, {}, signal);
+  },
+
+  /** Removes the conversation with its messages and attachments; there is no undo. */
+  deleteAdminConversation(id: string): Promise<void> {
+    return request(`/api/admin/conversations/${id}`, { method: "DELETE" });
   },
 
   me(signal?: AbortSignal): Promise<AuthUser> {

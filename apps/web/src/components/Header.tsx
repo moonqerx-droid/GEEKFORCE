@@ -18,6 +18,7 @@ const NAV: Record<UserRole, { to: string; label: string; end?: boolean }[]> = {
     { to: "/operator", label: "Обращения" },
     { to: "/admin/team", label: "Пользователи" },
     { to: "/admin/knowledge", label: "База знаний" },
+    { to: "/admin/chats", label: "Все чаты" },
   ],
 };
 

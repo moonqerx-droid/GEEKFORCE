@@ -1,0 +1,118 @@
+/* «Все чаты»: the same page grammar as «База знаний» — a heading, a search strip, a plain list. */
+
+.chats {
+  display: grid;
+  gap: var(--space-5);
+  max-width: 1180px;
+  margin: 0 auto;
+  padding: var(--space-6) var(--space-6) var(--space-8);
+}
+
+.chats-head {
+  padding-bottom: var(--space-5);
+  border-bottom: 2px solid var(--ink);
+}
+
+.chats-title {
+  font-size: clamp(30px, 4vw, 44px);
+  font-weight: 700;
+  letter-spacing: -0.035em;
+}
+
+.chats-sub {
+  max-width: 62ch;
+  margin-top: var(--space-2);
+  color: var(--color-text-muted);
+}
+
+.chats-search {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.chats-search input {
+  flex: 1 1 280px;
+  min-height: 44px;
+  padding: 0 var(--space-3);
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+  color: var(--color-text);
+  font: inherit;
+}
+
+.chats-notice {
+  padding: var(--space-3);
+  border-radius: var(--radius-md);
+  background: var(--sea-wash);
+  color: var(--sea);
+}
+
+.chats-list {
+  display: grid;
+  gap: var(--space-3);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.chats-row {
+  display: grid;
+  gap: var(--space-2);
+  padding: var(--space-4);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  background: var(--color-surface);
+}
+
+.chats-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2) var(--space-3);
+  color: var(--color-text-muted);
+  font-size: 14px;
+}
+
+.chats-email {
+  color: var(--color-text-faint);
+  overflow-wrap: anywhere;
+}
+
+.chats-first {
+  overflow-wrap: anywhere;
+}
+
+.chats-match {
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-sm);
+  background: var(--color-accent-soft);
+  overflow-wrap: anywhere;
+}
+
+.chats-match span {
+  font-weight: 600;
+}
+
+.chats-actions,
+.chats-confirm-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.chats-confirm {
+  display: grid;
+  gap: var(--space-2);
+}
+
+.chats-error {
+  color: var(--color-accent-ink);
+}
+
+@media (max-width: 720px) {
+  .chats {
+    padding: var(--space-5) var(--space-4) var(--space-7);
+  }
+}

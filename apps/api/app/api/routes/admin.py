@@ -19,6 +19,7 @@ from app.schemas.admin_users import (
 )
 from app.schemas.profile import FullOperatorMetrics
 from app.services.admin import AdminService, SelfDeactivation, UserExists, UserNotFound
+from app.services.conversation_admin import ConversationAdminService, ConversationNotFound
 from app.services.email import EmailPayload, EmailSender, MemoryEmailSender
 from app.services.user_admin import (
     LastActiveAdmin,
@@ -185,3 +186,39 @@ def user_metrics(
         ).for_operator(user_id, days)
     except OperatorMetricsNotFound as exc:
         raise HTTPException(status_code=404, detail="Специалист не найден") from exc
+
+
+class AdminConversationRead(BaseModel):
+    id: str
+    status: str
+    created_at: datetime
+    owner_name: str | None
+    owner_email: str | None
+    first_message: str
+    match: str | None
+    messages: int
+
+
+def get_conversation_admin_service(db: Annotated[Session, Depends(get_db)]) -> ConversationAdminService:
+    return ConversationAdminService(db)
+
+
+ConversationAdminDependency = Annotated[ConversationAdminService, Depends(get_conversation_admin_service)]
+
+
+@router.get("/conversations", response_model=list[AdminConversationRead])
+def list_conversations(
+    service: ConversationAdminDependency,
+    _admin: AdminDependency,
+    q: Annotated[str, Query(max_length=100)] = "",
+    limit: Annotated[int, Query(ge=1, le=500)] = 100,
+):
+    return service.list(q, limit)
+
+
+@router.delete("/conversations/{conversation_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_conversation(conversation_id: str, service: ConversationAdminDependency, admin: AdminDependency):
+    try:
+        service.delete(conversation_id, admin)
+    except ConversationNotFound as exc:
+        raise HTTPException(status_code=404, detail="Обращение не найдено") from exc

@@ -386,3 +386,16 @@ export interface KnownIssue {
   affected: number;
   update: string | null;
 }
+
+/** A row in the support lead's list of every conversation (GET /api/admin/conversations). */
+export interface AdminConversation {
+  id: string;
+  status: ConversationStatus;
+  created_at: string;
+  owner_name: string | null;
+  owner_email: string | null;
+  first_message: string;
+  /** The message that contains the searched words, when searching. */
+  match: string | null;
+  messages: number;
+}
