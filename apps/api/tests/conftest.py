@@ -14,6 +14,16 @@ from app.repositories.incidents import IncidentRepository
 from app.services.incidents import IncidentService
 
 
+@pytest.fixture(autouse=True)
+def fresh_rate_limits():
+    """Rate limits live in the process; every test starts with none spent."""
+    from app.api.routes import auth
+
+    auth._rate_limiter._events.clear()
+    yield
+    auth._rate_limiter._events.clear()
+
+
 @pytest.fixture
 def db_session() -> Session:
     engine = create_engine(

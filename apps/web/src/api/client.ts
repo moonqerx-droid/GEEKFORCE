@@ -326,11 +326,11 @@ export const api = {
     return request("/api/auth/verify-email", { method: "POST", body: JSON.stringify({ email, code }) }, signal);
   },
 
-  resendVerification(email: string, signal?: AbortSignal): Promise<{ code: string }> {
+  resendVerification(email: string, signal?: AbortSignal): Promise<{ code: string; retry_after?: number }> {
     return request("/api/auth/resend-verification", { method: "POST", body: JSON.stringify({ email }) }, signal);
   },
 
-  forgotPassword(email: string, signal?: AbortSignal): Promise<{ code: string }> {
+  forgotPassword(email: string, signal?: AbortSignal): Promise<{ code: string; retry_after?: number }> {
     return request("/api/auth/forgot-password", { method: "POST", body: JSON.stringify({ email }) }, signal);
   },
 

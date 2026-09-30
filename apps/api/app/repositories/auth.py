@@ -45,6 +45,14 @@ class AuthRepository:
         self.session.execute(update(AuthSession).where(*conditions).values(revoked_at=utc_now()))
         self.session.commit()
 
+    def email_token_times(self, user_id: str, purpose: str, since) -> list:
+        """When emails of this kind were sent to the user since `since` — for the resend cooldown."""
+        return list(self.session.scalars(
+            select(EmailToken.created_at).where(
+                EmailToken.user_id == user_id, EmailToken.purpose == purpose, EmailToken.created_at >= since,
+            )
+        ).all())
+
     def add_email_token(self, token: EmailToken) -> EmailToken:
         self.session.add(token)
         self.session.commit()
