@@ -44,6 +44,8 @@ class DialogueSimulator:
 
     def _decide(self):
         decision = self.engine.decide(self.ctx)
+        if decision.remember:
+            self.ctx = self.ctx.model_copy(update={"known_facts": {**self.ctx.known_facts, **decision.remember}})
         if decision.action == DecisionAction.ASK:
             self.ctx = self.ctx.model_copy(
                 update={"asked_facts": [*self.ctx.asked_facts, decision.question.fact]}

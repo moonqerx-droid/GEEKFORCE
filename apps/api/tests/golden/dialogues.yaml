@@ -2955,3 +2955,40 @@
   playbook: vpn_connection
   expect_fact: {error_code: "12345"}
   tags: [диалог, коды]
+
+# --- Две проблемы в одном обращении (замечание жюри): обе разбираются до конца --------
+
+- id: two-access-and-printer
+  say: ["нужен доступ к папке отдела на общем диске, и ещё принтер не печатает", "ничего не пишет", "@helped"]
+  playbook: access_rights
+  end: escalated
+  expect_text: ["специалист"]
+  tags: [диалог, две-проблемы]
+
+- id: two-printer-and-install
+  # Обе проблемы для специалиста: принтер разбираем по шагам, а в итоге передаём обе.
+  say: ["принтер не печатает, а ещё нужно установить visio", "@not_helped", "@not_helped", "@not_helped"]
+  end: escalated
+  expect_text: ["visio", "принтер"]
+  forbid_text: ["Сейчас с этим всё в порядке"]
+  tags: [диалог, две-проблемы]
+
+- id: two-mail-and-printer-solved
+  say: ["принтер не печатает и не приходят письма", "в браузере", "нет", "@helped", "@helped", "да, всё работает"]
+  end: resolved
+  expect_text: ["обе проблемы решены"]
+  forbid_text: ["Сейчас с этим всё в порядке"]
+  tags: [диалог, две-проблемы]
+
+- id: two-crm-access-and-mail
+  say: ["дайте доступ к crm и почта не приходит"]
+  playbook: [email_outlook, access_rights]
+  expect_text: ["почт"]
+  forbid_end: escalated
+  tags: [диалог, две-проблемы]
+
+- id: two-root-cause-still-checks
+  say: ["не работает впн и не открывается почта"]
+  playbook: vpn_connection
+  expect_text: ["несколько проблем"]
+  tags: [диалог, две-проблемы]

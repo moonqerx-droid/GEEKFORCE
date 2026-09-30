@@ -290,7 +290,11 @@ class TriageDialogueService(DialogueService):
                     conversation.status = "RESOLVED"
                     conversation.resolved_at = utc_now()
                     conversation.resolved_by = "assistant"
-                    self._message(conversation, "assistant", "Отлично, проблема решена. Обращение закрыто.")
+                    solved = self.engine.problem_count(self._context(conversation))
+                    text = ("Отлично, обе проблемы решены. Обращение закрыто." if solved == 2 else
+                            "Отлично, все проблемы из обращения решены. Обращение закрыто." if solved > 2 else
+                            "Отлично, проблема решена. Обращение закрыто.")
+                    self._message(conversation, "assistant", text)
                 elif solved is False:
                     conversation.verification_failed = True
                     self._advance(conversation)
@@ -460,6 +464,10 @@ class TriageDialogueService(DialogueService):
             intro = f"{intro} {seen_intro}".strip()  # sympathy first, then what was read
             self._screenshot_intro = ""
         decision = decision or self.engine.decide(self._context(conversation))
+        if decision.remember:
+            # «This problem waits for a specialist», «the second problem has started»: kept with
+            # the conversation, so the next turn and the hand-off card know it.
+            conversation.known_facts = {**conversation.known_facts, **decision.remember}
         conversation.rag_source_ids = list(decision.source_ids)
         conversation.ai_fallback_reason = decision.fallback_reason
         conversation.ai_latency_ms = decision.llm_latency_ms

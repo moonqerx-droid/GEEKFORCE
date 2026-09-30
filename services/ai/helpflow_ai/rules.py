@@ -376,6 +376,11 @@ FAILURE_RE = _FAILURE_RE = re.compile(
 )
 
 
+_REQUEST_RE = re.compile(
+    r"(?<!\w)(?:нуж(?:ен|на|но|ны)|надо|дайте|выдайте|откройте|предоставьте|установите|поставьте|"
+    r"прошу|хочу (?:установить|поставить|получить))(?!\w)")
+
+
 # "ошибка 403", "пишет «Сессия истекла»": details of a neighbouring problem, not a problem.
 _DETAIL_RE = re.compile(r"^(?:пишет|выда[её]т|показывает|ошибка|error|код|сообщение)(?!\w)|^[«\"“\d]")
 
@@ -395,7 +400,8 @@ def split_clauses(text: str) -> list[tuple[str, bool]]:
             if not part:
                 continue
             detail = bool(_DETAIL_RE.search(normalize(part)))
-            failing = not detail and bool(_FAILURE_RE.search(normalize(part)))
+            # A request («нужен доступ», «установите visio») is a problem to handle too.
+            failing = not detail and bool(_FAILURE_RE.search(normalize(part)) or _REQUEST_RE.search(normalize(part)))
             if parts and not detail and not failing and parts[-1][1] and len(part.split()) <= 3:
                 failing = True
             parts.append([part, failing, detail])

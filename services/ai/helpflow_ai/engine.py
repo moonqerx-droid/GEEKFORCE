@@ -153,6 +153,12 @@ class TriageEngine:
             analysis = self._merge_llm(analysis, message, ctx)
         return self._finalize(analysis, ctx)
 
+    def problem_count(self, context: ConversationContext) -> int:
+        """How many problems this dialogue handles (one request may hold several)."""
+        if not context.playbook_id or not context.original_request.strip():
+            return 1
+        return len(self._issue_plan(context))
+
     @staticmethod
     def is_root_cause(playbook_id: str) -> bool:
         return playbook_id in rules.ROOT_CAUSE_PLAYBOOKS
@@ -439,12 +445,16 @@ class TriageEngine:
                 return decision
         return self._render_decision(decision, context)
 
-    def _decide_rules(self, context: ConversationContext) -> Decision:
+    def _decide_rules(self, context: ConversationContext, nested: bool = False) -> Decision:
         # Facts stated in the first message count as known even if the caller lost them.
         stated = rules.extract_facts(context.original_request) if context.original_request else {}
         context = context.model_copy(update={"known_facts": {**stated, **context.known_facts}})
         plan = self._issue_plan(context)
         index, needs_check = self._progress(plan, context)
+        handed = [i for i in plan if context.known_facts.get(_handoff_fact(i.playbook_id))]
+        if index is None and handed and not context.verification_failed:
+            # Everything the employee could do is done: one hand-off for what is left.
+            return self._final_handoff(plan, handed, context)
         last = context.completed_steps[-1] if context.completed_steps else None
         after_workaround = bool(last and self._is_workaround(last.step_id))
         if (
@@ -482,9 +492,61 @@ class TriageEngine:
                             playbook_id=issue.playbook_id, answer_kind=AnswerKind.PLAYBOOK)
         playbook = self.kb.get(issue.playbook_id)
         decision = self._work_on(playbook, context, last, after_workaround)
-        if len(plan) > 1 and not context.asked_facts and not context.completed_steps:
+        if (decision.action == DecisionAction.ESCALATE and len(plan) > 1
+                and playbook.id not in (*rules.PRIORITY_PLAYBOOKS, *rules.ROOT_CAUSE_PLAYBOOKS)):
+            # (A root cause the specialist has to fix — internet, VPN — goes to them with the rest:
+            # mail or calls are not worth troubleshooting without it.)
+            # This problem needs a specialist, but the others may not: note it and go on,
+            # so the second problem of the request is not lost behind the first one.
+            fact = _handoff_fact(playbook.id)
+            later = context.model_copy(update={"known_facts": {**context.known_facts, fact: decision.reason}})
+            if self._progress(plan, later)[0] is None and handed:
+                # The last open problem also needs a specialist: one hand-off naming all of them.
+                final = self._final_handoff(plan, [*handed, issue], later)
+                return final.model_copy(update={"remember": {fact: decision.reason}})
+            if self._progress(plan, later)[0] is not None:
+                following = self._decide_rules(later, nested=True)
+                message = following.message
+                if following.action != DecisionAction.ESCALATE:
+                    what = issue.evidence or issue.title
+                    message = (f"С «{what}» нужен специалист — передам это вместе с остальным, "
+                               f"повторять ничего не придётся. {message}")
+                if len(plan) > 1 and not nested and not context.asked_facts and not context.completed_steps:
+                    message = f"{_plan_intro(plan)} {message}"
+                return following.model_copy(update={
+                    "message": message, "remember": {fact: decision.reason, **following.remember},
+                })
+        started = _started_fact(playbook.id)
+        if index > 0 and not context.known_facts.get(started) and not self._started(playbook, context):
+            # Said once, when the dialogue moves on to this problem.
+            what = issue.evidence or issue.title
+            ordinal = _ORDINALS[min(index, len(_ORDINALS) - 1)]
+            decision = decision.model_copy(update={
+                "message": f"Переходим {ordinal} проблеме — «{what}». {decision.message}",
+                "remember": {**decision.remember, started: "yes"},
+            })
+        if len(plan) > 1 and not nested and not context.asked_facts and not context.completed_steps:
             decision = decision.model_copy(update={"message": f"{_plan_intro(plan)} {decision.message}"})
         return decision.model_copy(update={"playbook_id": playbook.id})
+
+    def _started(self, playbook: Playbook, context: ConversationContext) -> bool:
+        """Whether this problem already got a step or its «прошло само?» check."""
+        step_ids = {step.id for step in playbook.steps}
+        return (any(r.step_id in step_ids for r in context.completed_steps)
+                or _check_fact(playbook.id) in context.asked_facts)
+
+    def _final_handoff(self, plan: list[DetectedIssue], handed: list[DetectedIssue],
+                       context: ConversationContext) -> Decision:
+        first = self.kb.get(handed[0].playbook_id)
+        reasons = "; ".join(f"{i.evidence or i.title} — {context.known_facts[_handoff_fact(i.playbook_id)]}"
+                            for i in handed)
+        decision = self._escalate(first, f"нужен специалист: {reasons}", context.known_facts)
+        names = ", ".join(f"«{i.evidence or i.title}»" for i in handed)
+        done = "С остальным разобрались. " if len(handed) < len(plan) else ""
+        return decision.model_copy(update={
+            "message": f"{done}Осталось то, что делает специалист: {names}. {decision.message}",
+            "playbook_id": first.id,
+        })
 
     def _work_on(self, playbook: Playbook, context: ConversationContext, last, after_workaround: bool) -> Decision:
         """Next action for one problem: workaround, question, step or hand-off."""
@@ -721,14 +783,17 @@ class TriageEngine:
         for index, issue in enumerate(plan):
             playbook = self.kb.get(issue.playbook_id)
             answer = ctx.known_facts.get(_check_fact(playbook.id))
-            if answer == "yes":
+            if answer == "yes" or ctx.known_facts.get(_handoff_fact(playbook.id)):
                 continue
             step_ids = {step.id for step in playbook.steps}
             own = [r for r in ctx.completed_steps if r.step_id in step_ids and not self._is_workaround(r.step_id)]
             if own and own[-1].outcome == StepOutcome.HELPED:
                 continue
             started = any(r.step_id in step_ids for r in ctx.completed_steps)
-            needs_check = (index > 0 and answer is None and not started
+            # Only a fixed root cause (internet, VPN) may have fixed this one too: ask then;
+            # otherwise go straight to the next problem instead of «всё ли в порядке?».
+            after_root_cause = index > 0 and plan[index - 1].playbook_id in rules.ROOT_CAUSE_PLAYBOOKS
+            needs_check = (after_root_cause and answer is None and not started
                            and _check_fact(playbook.id) not in ctx.asked_facts)
             return index, needs_check
         return None, False
@@ -748,6 +813,8 @@ class TriageEngine:
         statuses = []
         for i, issue in enumerate(plan):
             status = "resolved" if i < index else "pending" if i > index or needs_check else "in_progress"
+            if ctx.known_facts.get(_handoff_fact(issue.playbook_id)):
+                status = "handed_off"
             statuses.append(issue.model_copy(update={"status": status}))
         return statuses
 
@@ -996,11 +1063,11 @@ class TriageEngine:
             if ctx.verification_failed:
                 tried += "; при проверке сотрудник ответил, что проблема осталась"
             parts.append(f"Пробовали: {tried}.")
-        others = card.issues[1:]
-        if others:
-            labels = {"pending": "не разбирали", "in_progress": "в работе", "resolved": "решено"}
-            parts.append("Ещё в обращении: " + "; ".join(
-                f"{i.evidence or i.title} — {labels[i.status]}" for i in others) + ".")
+        if len(card.issues) > 1:
+            labels = {"pending": "не разбирали", "in_progress": "в работе", "resolved": "решено",
+                      "handed_off": "передано специалисту"}
+            parts.append("Проблемы в обращении: " + "; ".join(
+                f"{i.evidence or i.title} — {labels[i.status]}" for i in card.issues) + ".")
         parts.append(f"Почему передано: {_plain_reason(card.escalation_reason)}.")
         return " ".join(parts)
 
@@ -1027,11 +1094,23 @@ def _check_fact(playbook_id: str) -> str:
     return f"issue_resolved.{playbook_id}"
 
 
+_ORDINALS = ["к первой", "ко второй", "к третьей", "к четвёртой", "к пятой"]
+
+
+def _handoff_fact(playbook_id: str) -> str:
+    return f"handoff.{playbook_id}"
+
+
+def _started_fact(playbook_id: str) -> str:
+    return f"started.{playbook_id}"
+
+
 def _check_question(issue: DetectedIssue) -> Question:
     what = issue.evidence or issue.title
     return Question(
         fact=_check_fact(issue.playbook_id),
-        text=f"С этим разобрались! Теперь следующая проблема — «{what}». Сейчас с этим всё в порядке?",
+        text=(f"Первая проблема решена — возможно, «{what}» прошло само. "
+              "Проверьте, пожалуйста: сейчас с этим всё в порядке?"),
         kind=QuestionKind.YES_NO,
     )
 

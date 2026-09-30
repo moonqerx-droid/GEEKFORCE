@@ -228,7 +228,8 @@ class DetectedIssue(BaseModel):
     evidence: str = ""
     # For the escalation card: pending = not handled yet, in_progress = being solved,
     # resolved = a step helped or the user said it went away.
-    status: Literal["pending", "in_progress", "resolved"] = "pending"
+    # handed_off = needs a specialist; the other problems were worked through meanwhile.
+    status: Literal["pending", "in_progress", "resolved", "handed_off"] = "pending"
 
 
 class Analysis(BaseModel):
@@ -297,6 +298,8 @@ class Decision(BaseModel):
     # Playbook of the problem this decision is about (differs from the dialogue's
     # playbook_id once the next of several problems is being handled).
     playbook_id: str | None = None
+    # Facts the caller keeps with the conversation («this problem waits for a specialist»).
+    remember: dict[str, str] = Field(default_factory=dict)
 
 
 class EscalationCard(BaseModel):

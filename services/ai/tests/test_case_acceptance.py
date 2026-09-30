@@ -294,10 +294,14 @@ def test_problems_are_worked_through_one_by_one(simulate):
     assert sim.decision.action == DecisionAction.STEP
     assert sim.decision.step.id == "restart_outlook"
 
+    # Outlook was not a root cause: straight on to Zoom, no «всё ли в порядке?».
     sim.step_result(StepOutcome.HELPED)
-    assert sim.decision.action == DecisionAction.ASK
-    assert "Zoom" in sim.decision.message
-    sim.answer("да, звук появился")
+    assert "Переходим к третьей проблеме" in sim.decision.message and "zoom" in sim.decision.message.lower()
+    assert sim.decision.playbook_id == "video_calls"
+    while sim.decision.action == DecisionAction.ASK:
+        sim.answer("нет")
+    assert sim.decision.action == DecisionAction.STEP
+    sim.step_result(StepOutcome.HELPED)
     assert sim.decision.action == DecisionAction.VERIFY
     assert sim.verify("да, всё работает") is True
 
