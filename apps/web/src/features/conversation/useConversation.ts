@@ -2,7 +2,6 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { api } from "../../api/client";
 import { ApiError, ConflictError, NetworkError, NotFoundError, ValidationError } from "../../api/errors";
 import type { Conversation, StepOutcome } from "../../api/types";
-import { takeScenario } from "../../lib/scenario";
 
 const STORAGE_KEY = "helpflow.conversationId";
 
@@ -216,17 +215,7 @@ export function useConversation(): ConversationState {
     }
   }, []);
 
-  const startWithMessageRef = useRef<(content: string, files?: File[]) => Promise<void>>(async () => undefined);
-
   useEffect(() => {
-    // A case scenario picked on the login page opens as a fresh request with its words already sent.
-    const scenario = takeScenario();
-    if (scenario) {
-      storeId(null);
-      setPhase("ready");
-      void startWithMessageRef.current(scenario, []).catch(() => undefined);
-      return () => abortRef.current?.abort();
-    }
     void restore();
     return () => abortRef.current?.abort();
   }, [restore]);
@@ -429,8 +418,6 @@ export function useConversation(): ConversationState {
       setSending(false);
     }
   }, [conversation]);
-
-  startWithMessageRef.current = startWithMessage;
 
   return {
     mergeIntoSimilar,

@@ -5,7 +5,6 @@ import { ApiError } from "../../api/client";
 import { AuthLayout } from "./AuthLayout";
 import { Field } from "./Field";
 import { useAuth } from "./AuthProvider";
-import { rememberScenario } from "../../lib/scenario";
 
 /** Seeded by `python -m app.seed_demo`; one click signs in, so a demo shows every role in seconds. */
 const DEMO_ACCOUNTS = [
@@ -14,15 +13,6 @@ const DEMO_ACCOUNTS = [
   { role: "руководитель", title: "Руководитель поддержки", person: "Администратор", what: "Метрики, команда и база знаний", email: "admin@helpflow.demo", Icon: ChartColumn },
 ];
 const DEMO_PASSWORD = "DemoPass123";
-
-/** The five request types from the case: one click signs in as an employee and sends it. */
-const CASE_SCENARIOS = [
-  { title: "Простое", text: "Забыл пароль от учётки, не срочно" },
-  { title: "Неоднозначное", text: "Ничего не работает, помогите пожалуйста" },
-  { title: "Несколько симптомов", text: "Outlook не синхронизируется, а ещё в Zoom нет звука и интернет постоянно отваливается" },
-  { title: "Нерешаемое самостоятельно", text: "Нужен доступ к папке бухгалтерии на общем диске" },
-  { title: "Срочное", text: "Через 5 минут звонок с клиентом, не запускается Teams, горит!" },
-];
 function serverMessage(error: ApiError): string | null {
   const detail = error.detail as { message?: unknown } | null | undefined;
   return detail && typeof detail.message === "string" ? detail.message : null;
@@ -66,26 +56,6 @@ export function LoginPage() {
       <button className="auth-submit" disabled={busy}>{busy ? "Входим…" : "Войти"}</button>
       <div className="auth-links"><Link to="/forgot-password">Забыли пароль?</Link><Link to="/register">Создать аккаунт</Link></div>
     </form>
-    {SHOW_DEMO ? (
-      <section className="auth-quick auth-scenarios" aria-labelledby="auth-scenarios-title">
-        <h2 id="auth-scenarios-title" className="auth-quick-title">Проверка кейса за две минуты</h2>
-        <p className="auth-quick-text">Пять типов обращений из условия кейса. Кнопка входит как сотрудник и отправляет обращение — останется посмотреть, что ответит помощник.</p>
-        <ol className="auth-scenario-list">
-          {CASE_SCENARIOS.map((scenario, index) => (
-            <li key={scenario.title}>
-              <button type="button" className="auth-scenario" disabled={busy}
-                onClick={() => { rememberScenario(scenario.text); void signIn(DEMO_ACCOUNTS[0].email, DEMO_PASSWORD, true); }}>
-                <span className="auth-scenario-number num" aria-hidden="true">{index + 1}</span>
-                <span className="auth-quick-body">
-                  <span className="auth-quick-name">{scenario.title}</span>
-                  <span className="auth-quick-what">«{scenario.text}»</span>
-                </span>
-              </button>
-            </li>
-          ))}
-        </ol>
-      </section>
-    ) : null}
     {SHOW_DEMO ? (
       <section className="auth-quick" aria-labelledby="auth-quick-title">
         <h2 id="auth-quick-title" className="auth-quick-title">Быстрый вход</h2>

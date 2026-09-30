@@ -1,53 +1,12 @@
-import { render, screen, waitFor } from "@testing-library/react";
+import { screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { MemoryRouter } from "react-router-dom";
 import { HttpResponse, http } from "msw";
-import { afterEach, describe, expect, it } from "vitest";
+import { describe, expect, it } from "vitest";
 import { makeConversation, makeMessage, makeTicket } from "../test/fixtures";
 import { makeUser, renderAs } from "../test/render";
 import { server } from "../test/server";
-import { AuthProvider } from "./auth/AuthProvider";
-import { LoginPage } from "./auth/LoginPage";
 import { EmployeePage } from "../pages/EmployeePage";
 import { OperatorPage } from "./operator/OperatorPage";
-
-afterEach(() => window.sessionStorage.clear());
-
-describe("the jury's case scenarios", () => {
-  it("one click signs in as an employee and remembers the scenario to send", async () => {
-    let body: Record<string, unknown> | undefined;
-    server.use(
-      http.get("*/api/auth/me", () => HttpResponse.json({}, { status: 401 })),
-      http.post("*/api/auth/login", async ({ request }) => {
-        body = await request.json() as Record<string, unknown>;
-        return HttpResponse.json({ id: "u1", email: "ivan@helpflow.demo", first_name: "Иван", last_name: "Петров",
-          role: "employee", department: "sales", email_verified: true, must_change_password: false });
-      }),
-    );
-    render(<MemoryRouter><AuthProvider><LoginPage /></AuthProvider></MemoryRouter>);
-
-    expect(screen.getByRole("region", { name: "Проверка кейса за две минуты" })).toHaveTextContent("Нерешаемое самостоятельно");
-    await userEvent.click(screen.getByRole("button", { name: /Срочное/ }));
-
-    await waitFor(() => expect(body).toMatchObject({ email: "ivan@helpflow.demo", password: "DemoPass123" }));
-    expect(window.sessionStorage.getItem("helpflow.scenario")).toBe("Через 5 минут звонок с клиентом, не запускается Teams, горит!");
-  });
-
-  it("the employee page starts a fresh request with the scenario already sent", async () => {
-    let sent: Record<string, unknown> | undefined;
-    window.sessionStorage.setItem("helpflow.scenario", "Ничего не работает, помогите пожалуйста");
-    server.use(
-      http.post("*/api/conversations", () => HttpResponse.json(makeConversation({ id: "s1" }), { status: 201 })),
-      http.post("*/api/conversations/s1/messages", async ({ request }) => {
-        sent = await request.json() as Record<string, unknown>;
-        return HttpResponse.json(makeConversation({ id: "s1", status: "CLARIFYING", revision: 2 }));
-      }),
-    );
-    renderAs(<EmployeePage />, undefined, "/employee");
-    await waitFor(() => expect(sent).toMatchObject({ content: "Ничего не работает, помогите пожалуйста" }));
-    expect(window.sessionStorage.getItem("helpflow.scenario")).toBeNull();  // once, not on every reload
-  });
-});
 
 describe("«Почему спрашиваю»", () => {
   it("shows why the question on screen is asked", async () => {
