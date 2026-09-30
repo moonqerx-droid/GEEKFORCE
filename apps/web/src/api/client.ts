@@ -176,6 +176,11 @@ export const api = {
     return upload(`/api/operator/tickets/${conversationId}/attachments`, file);
   },
 
+  /** «Продолжить там»: the words move to the earlier open request; this duplicate is removed. */
+  mergeIntoSimilar(id: string): Promise<Conversation> {
+    return request(`/api/conversations/${id}/merge`, { method: "POST" });
+  },
+
   rateConversation(id: string, rating: number, comment?: string): Promise<Conversation> {
     return request(`/api/conversations/${id}/rating`, {
       method: "POST", body: JSON.stringify({ rating, comment }),

@@ -5,6 +5,7 @@ import type { Metrics, Urgency } from "../../api/types";
 import { ErrorState, Spinner } from "../../components/primitives";
 import { URGENCY_SHORT, formatMinutes, plural } from "../../lib/labels";
 import { ActiveIncidents } from "./ActiveIncidents";
+import { AdminLearning } from "./AdminLearning";
 import { AdminTemplates } from "./AdminTemplates";
 import { SlaFact } from "./SlaFact";
 import { DailyChart } from "./DailyChart";
@@ -156,6 +157,7 @@ export function AdminDashboard() {
         ) : <p className="admin-note">В команде пока нет специалистов. <Link to="/admin/team">Создать специалиста</Link></p>}
       </section>
       <AdminTemplates />
+      <AdminLearning />
     </div>
   );
 }

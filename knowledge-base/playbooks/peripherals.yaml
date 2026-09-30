@@ -32,6 +32,7 @@ questions:
   # Wired or wireless changes the first step for a mouse or keyboard.
   - fact: connection
     text: Мышь или клавиатура подключены проводом или беспроводные?
+    why: "У беспроводной мыши чаще всего садится батарейка, у проводной — порт или кабель."
     kind: choice
     when_symptoms: [мышь или тачпад, клавиатура]
     unless_symptoms: [раскладка, док-станция]

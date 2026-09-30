@@ -39,7 +39,8 @@ DialogueDependency = Annotated[DialogueService, Depends(get_dialogue_service)]
 def serialize(conversation, service: DialogueService | None = None) -> ConversationRead:
     replies = service.quick_replies(conversation) if service is not None else None
     similar = service.similar_open(conversation) if service is not None else None
-    return ConversationRead.from_model(conversation, quick_replies=replies, similar=similar)
+    reason = service.question_reason(conversation) if isinstance(service, TriageDialogueService) else None
+    return ConversationRead.from_model(conversation, quick_replies=replies, similar=similar, question_reason=reason)
 
 
 def not_found() -> HTTPException:
@@ -136,6 +137,25 @@ def escalate(
     ensure_owned(db, conversation_id, user)
     try:
         return serialize(service.escalate(conversation_id), service)
+    except ConversationNotFound as exc:
+        raise not_found() from exc
+    except DialogueConflict as exc:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
+
+
+@router.post("/{conversation_id}/merge", response_model=ConversationRead)
+def merge_into_similar(
+    conversation_id: str,
+    service: DialogueDependency,
+    db: Annotated[Session, Depends(get_db)],
+    user: Annotated[User, Depends(require_employee)],
+) -> ConversationRead:
+    """Continue in the earlier open request about the same problem; this duplicate is removed."""
+    ensure_owned(db, conversation_id, user)
+    if not isinstance(service, TriageDialogueService):
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Нельзя объединить это обращение")
+    try:
+        return serialize(service.merge_into_similar(conversation_id), service)
     except ConversationNotFound as exc:
         raise not_found() from exc
     except DialogueConflict as exc:

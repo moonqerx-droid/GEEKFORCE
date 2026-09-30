@@ -357,3 +357,12 @@ def test_urgency_never_goes_down(client):
     cid = client.post("/api/conversations").json()["id"]
     send(client, cid, "срочно дайте мне специалиста")
     assert send(client, cid, "ладно, это не срочно")["urgency"] == "high"
+
+
+def test_a_clarifying_question_comes_with_its_reason(client):
+    cid = client.post("/api/conversations").json()["id"]
+    asked = send(client, cid, "Не могу войти в CRM с ноутбука")
+    assert asked["status"] == "CLARIFYING"
+    assert asked["question_reason"]  # «Почему спрашиваю» is shown under the question
+    answered = send(client, cid, "Да, подключен")
+    assert answered["status"] != "CLARIFYING" or answered["question_reason"] != asked["question_reason"]

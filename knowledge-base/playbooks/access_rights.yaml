@@ -43,9 +43,11 @@ symptoms_hints:
 questions:
   - fact: resource
     text: К чему нужен доступ? Подойдёт название папки, системы или ссылка.
+    why: "Доступ выдают к конкретной папке или системе — без названия заявку не выполнить."
     kind: text
   - fact: had_access_before
     text: Раньше у вас был доступ к этому ресурсу?
+    why: "Если доступ был и пропал — это сбой, проверим его; если нужен впервые — оформим заявку."
     kind: yes_no
     # For a new access request the answer does not change anything: it goes to admins.
     unless_symptoms: [нужен новый доступ]

@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { api } from "../../api/client";
 import { ApiError, ConflictError, NetworkError, NotFoundError, ValidationError } from "../../api/errors";
 import type { Conversation, StepOutcome } from "../../api/types";
+import { takeScenario } from "../../lib/scenario";
 
 const STORAGE_KEY = "helpflow.conversationId";
 
@@ -32,6 +33,8 @@ export interface ConversationState {
   retryFailedMessage: (id: number) => Promise<void>;
   rate: (rating: number, comment?: string) => Promise<void>;
   dismissNotice: () => void;
+  /** Continue in the earlier open request about the same problem; this one is removed. */
+  mergeIntoSimilar: () => Promise<void>;
 }
 
 /** While a specialist owns the conversation, their replies arrive by polling. */
@@ -213,7 +216,17 @@ export function useConversation(): ConversationState {
     }
   }, []);
 
+  const startWithMessageRef = useRef<(content: string, files?: File[]) => Promise<void>>(async () => undefined);
+
   useEffect(() => {
+    // A case scenario picked on the login page opens as a fresh request with its words already sent.
+    const scenario = takeScenario();
+    if (scenario) {
+      storeId(null);
+      setPhase("ready");
+      void startWithMessageRef.current(scenario, []).catch(() => undefined);
+      return () => abortRef.current?.abort();
+    }
     void restore();
     return () => abortRef.current?.abort();
   }, [restore]);
@@ -395,7 +408,32 @@ export function useConversation(): ConversationState {
     }
   }, [conversation]);
 
+  const mergeIntoSimilar = useCallback(async () => {
+    if (!conversation?.similar_open || mutationRef.current) return;
+    mutationRef.current = true;
+    setSending(true);
+    try {
+      const target = await api.mergeIntoSimilar(conversation.id);
+      createdRef.current = null;
+      storeId(target.id);
+      try {
+        window.history.replaceState(window.history.state, "", `${window.location.pathname}?conversation=${target.id}`);
+      } catch {
+        // History API unavailable — the stored id still opens the right request on reload.
+      }
+      setConversation(target);
+    } catch (err) {
+      setError(describeError(err));
+    } finally {
+      mutationRef.current = false;
+      setSending(false);
+    }
+  }, [conversation]);
+
+  startWithMessageRef.current = startWithMessage;
+
   return {
+    mergeIntoSimilar,
     phase,
     conversation,
     error,

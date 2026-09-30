@@ -1,6 +1,7 @@
 from typing import Annotated, Literal
 
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
+from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from app.core.config import get_settings
@@ -24,6 +25,7 @@ from app.api.dependencies.auth import require_operator
 from app.models.auth import User
 from app.services.dialogue import ConversationNotFound, DialogueConflict
 from app.services.operator import OperatorService
+from app.services.reply_draft import draft_reply
 
 router = APIRouter(prefix="/api/operator", tags=["operator"])
 
@@ -73,6 +75,22 @@ def list_tickets(
 @router.get("/tickets/{conversation_id}", response_model=OperatorTicketWithSla)
 def get_ticket(conversation_id: str, service: ServiceDependency, _user: OperatorDependency) -> OperatorTicketWithSla:
     return run(lambda: service.get(conversation_id))
+
+
+class ReplyDraftRead(BaseModel):
+    text: str
+    based_on: str | None = None
+
+
+@router.get("/tickets/{conversation_id}/draft", response_model=ReplyDraftRead)
+def reply_draft(conversation_id: str, service: ServiceDependency, user: OperatorDependency) -> ReplyDraftRead:
+    """A first reply written from the card and from what helped colleagues: edit and send."""
+    try:
+        conversation = service.get(conversation_id)
+    except ConversationNotFound as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Ticket not found") from exc
+    draft = draft_reply(service.session, conversation, user)
+    return ReplyDraftRead(text=draft.text, based_on=draft.based_on)
 
 
 @router.post("/tickets/{conversation_id}/assign", response_model=OperatorTicketWithSla)

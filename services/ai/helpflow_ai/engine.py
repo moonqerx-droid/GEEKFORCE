@@ -123,6 +123,8 @@ class TriageEngine:
         morph.use_playbooks(knowledge.playbooks)  # typo vocabulary; cached by content
         self._base_chunks = tuple(knowledge.chunks)
         self._company_chunks: tuple[KnowledgeChunk, ...] = ()
+        # Steps the support lead approved from specialists' resolutions: playbook id -> steps.
+        self._learned_steps: dict[str, tuple[Step, ...]] = {}
         self._company_words: set[str] = set()
         self._knowledge_lock = RLock()
         self.retriever = KnowledgeRetriever(list(self._base_chunks))
@@ -277,6 +279,24 @@ class TriageEngine:
                             f"Передаю вопрос {voice.to_whom(playbook.escalation_team)} — ответ придёт сюда."),
             })
         return decision
+
+    def set_learned_steps(self, items: list[dict]) -> None:
+        """Replace the steps learned from closed requests («что помогло коллегам»). Each item has
+        `id`, `playbook_id` and `instruction`; they are offered after the scenario's own steps."""
+        learned: dict[str, list[Step]] = {}
+        for item in items:
+            learned.setdefault(item["playbook_id"], []).append(Step(
+                id=f"learned.{item['id']}", title="Решение, которое помогло коллегам",
+                instruction=item["instruction"].strip(),
+            ))
+        with self._knowledge_lock:
+            self._learned_steps = {key: tuple(steps) for key, steps in learned.items()}
+
+    def _next_learned_step(self, playbook: Playbook, context: ConversationContext) -> Step | None:
+        with self._knowledge_lock:
+            steps = self._learned_steps.get(playbook.id, ())
+        done = {record.step_id for record in context.completed_steps}
+        return next((step for step in steps if step.id not in done), None)
 
     def capabilities(self) -> str:
         """The answer to «что ты умеешь?»: scenarios and the company documents loaded right now."""
@@ -537,8 +557,13 @@ class TriageEngine:
             return decision.model_copy(update={"message": f"{note} {decision.message}"})
         own_ids = {s.id for s in playbook.steps}
         tried_here = any(r.step_id in own_ids for r in context.completed_steps)
+        only_workarounds = step is not None and all(s.workaround for s in _open_steps(playbook, context))
+        learned = self._next_learned_step(playbook, context)
+        if learned is not None and (step is None or (tried_here and only_workarounds)):
+            # The scenario's own steps are used up: before a hand-off, what helped colleagues.
+            return _step_decision(learned, "", "решение из закрытых обращений, одобренное руководителем")
         if (step is not None and tried_here and context.urgency not in URGENT_LEVELS
-                and all(s.workaround for s in _open_steps(playbook, context))):
+                and only_workarounds):
             # Diagnosis is exhausted: hand off now and leave the workaround as a tip, rather
             # than one more step for someone who already pressed «не помогло».
             decision = self._escalate(playbook, f"выполнено шагов: {len(context.completed_steps)}, "

@@ -52,6 +52,8 @@ class Question(BaseModel):
 
     fact: str
     text: str
+    # «Почему я спрашиваю»: how the answer changes the next step, shown under the question.
+    why: str | None = None
     kind: QuestionKind = QuestionKind.TEXT
     # For CHOICE: normalized value -> keywords that select it.
     options: dict[str, list[str]] = Field(default_factory=dict)

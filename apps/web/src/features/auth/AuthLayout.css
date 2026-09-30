@@ -363,3 +363,46 @@
     grid-template-columns: 1fr;
   }
 }
+
+/* «Проверка кейса за две минуты»: the five request types, one click each. */
+.auth-scenario-list {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.auth-scenario {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3);
+  width: 100%;
+  padding: 8px 12px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+  color: var(--ink);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: border-color 150ms var(--ease), box-shadow 150ms var(--ease);
+}
+
+.auth-scenario:hover:not(:disabled) {
+  border-color: var(--coral);
+  box-shadow: var(--shadow-sm);
+}
+
+.auth-scenario-number {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: var(--coral-wash);
+  color: var(--color-accent-ink);
+  font-size: 12px;
+  font-weight: 700;
+}

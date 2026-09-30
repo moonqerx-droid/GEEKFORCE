@@ -34,6 +34,7 @@ questions:
   # Only when it is unclear what 1С says: every symptom has its own path.
   - fact: error_text
     text: Что пишет 1С при входе? Например, «нет свободной лицензии», «неправильное имя пользователя» или «нет базы в списке».
+    why: "Нехватка лицензий, неверный пароль и пропавшая база решаются разными шагами."
     kind: text
     only_without_symptoms: true
 steps:

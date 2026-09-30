@@ -7,9 +7,10 @@ from app.services import ocr
 from helpflow_ai import rules, voice
 from helpflow_ai.engine import ALSO_REPORTED, CURRENT_QUESTION
 from helpflow_ai import AnswerKind, ConversationContext, DecisionAction, StepRecord, TriageEngine
-from sqlalchemy import select
+from sqlalchemy import select, update
 from sqlalchemy.orm.exc import StaleDataError
 
+from app.models.attachment import Attachment
 from app.models.conversation import Conversation, Message, TroubleshootingStep, utc_now
 from app.core.config import get_settings
 from app.repositories.conversations import ConversationRepository
@@ -17,6 +18,7 @@ from app.repositories.incidents import IncidentRepository
 from app.schemas.conversation import StepOutcome
 from app.services.dialogue import DialogueConflict, DialogueService
 from app.services.incidents import IncidentService
+from app.services import learning
 from app.services.company_knowledge import company_knowledge_chunks
 
 
@@ -44,6 +46,8 @@ class TriageDialogueService(DialogueService):
             chunk.as_retrieved_fragment()
             for chunk in company_knowledge_chunks(repository.session)
         ])
+        # What helped colleagues, approved by the support lead: offered before a hand-off.
+        self.engine.set_learned_steps(learning.engine_items(repository.session))
         settings = get_settings()
         self.incident_service = incident_service or IncidentService(
             IncidentRepository(repository.session),
@@ -338,6 +342,35 @@ class TriageDialogueService(DialogueService):
             .limit(1)
         )
 
+    def merge_into_similar(self, conversation_id):
+        """«Продолжить там»: the new request's words move to the employee's earlier open one about
+        the same problem, and the duplicate disappears — nothing to explain twice, nothing left over."""
+        conversation = self.get_conversation(conversation_id)
+        target = self.similar_open(conversation)
+        if target is None:
+            raise DialogueConflict("there is no similar open conversation to continue")
+        try:
+            for message in sorted(conversation.messages, key=lambda item: item.id):
+                if message.role != "user":
+                    continue
+                moved = Message(role="user", content=message.content)
+                moved.attachments.extend(message.attachments)
+                target.messages.append(moved)
+            self.repository.session.flush()
+            # Files belong to the conversation too: move them before the duplicate is deleted.
+            self.repository.session.execute(
+                update(Attachment).where(Attachment.conversation_id == conversation.id)
+                .values(conversation_id=target.id)
+            )
+            target.updated_at = utc_now()
+            self.repository.session.flush()
+            self.repository.session.delete(conversation)
+            self.repository.session.commit()
+        except Exception:
+            self.repository.session.rollback()
+            raise
+        return self.get_conversation(target.id)
+
     def quick_replies(self, conversation) -> list[str]:
         """One-tap answers while the assistant waits for a reply to a closed question."""
         if conversation.status != "CLARIFYING" or not conversation.asked_facts:
@@ -346,6 +379,16 @@ class TriageDialogueService(DialogueService):
         if fact in conversation.known_facts:
             return []
         return self.engine.quick_replies(conversation.playbook_id, fact)
+
+    def question_reason(self, conversation) -> str | None:
+        """Why the question on screen is asked: its answer decides the next step."""
+        if conversation.status != "CLARIFYING" or not conversation.asked_facts:
+            return None
+        fact = conversation.asked_facts[-1]
+        if fact in conversation.known_facts:
+            return None
+        playbook = self.engine.kb.get(conversation.playbook_id)
+        return next((question.why for question in playbook.questions if question.fact == fact), None)
 
     STEP_TEXT_UNCLEAR = (
         "Не удалось понять, как прошёл шаг. Напишите «помогло» или «не помогло» — или нажмите кнопку "
@@ -470,6 +513,10 @@ class TriageDialogueService(DialogueService):
         playbook = self.engine.kb.get(conversation.playbook_id)
         conversation.missing_facts = [q.fact for q in playbook.questions if q.fact not in conversation.known_facts]
         if decision.action == DecisionAction.ESCALATE:
+            if "источника для ответа на вопрос" in (decision.reason or "") and conversation.playbook_id in (None, "unknown"):
+                # A question the documents do not answer: the specialist sees a question, not «Не определён».
+                conversation.service = "Вопрос о правилах компании"
+                conversation.summary = self._context(conversation).original_request[:200] or conversation.summary
             # The engine explains the hand-off in its own words (what it already noted, who takes it).
             self._escalate(conversation, decision.reason, message=decision.message)
             return
@@ -486,6 +533,8 @@ class TriageDialogueService(DialogueService):
             # A question about the rules is not a «Проблема со входом»: name what was asked about.
             document = decision.citations[0].title.split(" — ")[0]
             conversation.summary = f"Вопрос по документу «{document}»"
+            # «Где» in the card: the document's subject, not «Не определён».
+            conversation.service = f"Правила компании: {document}"
         self._message(
             conversation,
             "assistant",

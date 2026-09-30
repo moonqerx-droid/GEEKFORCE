@@ -25,6 +25,7 @@ symptoms_hints:
 questions:
   - fact: mail_client
     text: Где вы работаете с почтой — в программе Outlook или в браузере?
+    why: "В программе Outlook и в браузере почта чинится разными шагами."
     kind: choice
     options:
       outlook: [outlook, аутлук, программ, приложени]
@@ -34,6 +35,7 @@ questions:
       web: В браузере
   - fact: error_text
     text: Есть ли сообщение об ошибке? Если да — что в нём написано?
+    why: "По тексту ошибки видно, дело в пароле, в ящике или в подключении."
     kind: text
 steps:
   - id: check_web_mail

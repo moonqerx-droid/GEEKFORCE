@@ -37,3 +37,9 @@ def test_the_answer_lists_scenarios_and_the_loaded_documents(kb):
 
 def test_without_documents_the_answer_says_nothing_about_them(kb):
     assert "документам компании" not in TriageEngine(kb).capabilities()
+
+
+def test_every_clarifying_question_says_why_it_is_asked(kb):
+    missing = [f"{playbook.id}.{question.fact}" for playbook in kb.playbooks
+               for question in playbook.questions if not (question.why or "").strip()]
+    assert missing == []

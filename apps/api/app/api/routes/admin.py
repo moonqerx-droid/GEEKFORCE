@@ -20,6 +20,7 @@ from app.schemas.admin_users import (
 from app.schemas.profile import FullOperatorMetrics
 from app.services.admin import AdminService, SelfDeactivation, UserExists, UserNotFound
 from app.services.conversation_admin import ConversationAdminService, ConversationNotFound
+from app.services.learning import LearnedStepNotFound, LearningRefused, LearningService
 from app.services.email import EmailPayload, EmailSender, MemoryEmailSender
 from app.services.user_admin import (
     LastActiveAdmin,
@@ -222,3 +223,78 @@ def delete_conversation(conversation_id: str, service: ConversationAdminDependen
         service.delete(conversation_id, admin)
     except ConversationNotFound as exc:
         raise HTTPException(status_code=404, detail="Обращение не найдено") from exc
+
+
+class LearningSuggestionRead(BaseModel):
+    conversation_id: str
+    playbook_id: str
+    playbook_title: str
+    request: str
+    resolution: str
+    specialist: str | None
+    resolved_at: datetime | None
+
+
+class LearnedStepRead(BaseModel):
+    id: str
+    playbook_id: str
+    playbook_title: str
+    instruction: str
+    source_conversation_id: str | None
+    source_resolution: str | None
+    created_at: datetime
+
+
+class LearningRead(BaseModel):
+    suggestions: list[LearningSuggestionRead]
+    steps: list[LearnedStepRead]
+
+
+class LearnedStepCreate(BaseModel):
+    playbook_id: str = Field(min_length=1, max_length=120)
+    instruction: str = Field(min_length=1, max_length=600)
+    source_conversation_id: str | None = Field(default=None, max_length=36)
+
+
+def get_learning_service(db: Annotated[Session, Depends(get_db)]) -> LearningService:
+    from app.api.routes.conversations import get_triage_engine
+
+    titles = {playbook.id: playbook.title for playbook in get_triage_engine().kb.playbooks}
+    return LearningService(db, titles)
+
+
+LearningDependency = Annotated[LearningService, Depends(get_learning_service)]
+
+
+def _step_read(step, service: LearningService) -> LearnedStepRead:
+    return LearnedStepRead(
+        id=step.id, playbook_id=step.playbook_id, playbook_title=service.titles.get(step.playbook_id, step.playbook_id),
+        instruction=step.instruction, source_conversation_id=step.source_conversation_id,
+        source_resolution=step.source_resolution, created_at=step.created_at,
+    )
+
+
+@router.get("/learning", response_model=LearningRead)
+def learning_overview(service: LearningDependency, _admin: AdminDependency):
+    """Specialists' resolutions that could become scenario steps, and the steps approved so far."""
+    return LearningRead(
+        suggestions=[LearningSuggestionRead(**item.__dict__) for item in service.suggestions()],
+        steps=[_step_read(step, service) for step in service.steps()],
+    )
+
+
+@router.post("/learning/steps", response_model=LearnedStepRead, status_code=status.HTTP_201_CREATED)
+def add_learned_step(payload: LearnedStepCreate, service: LearningDependency, admin: AdminDependency):
+    try:
+        step = service.add(payload.playbook_id, payload.instruction, admin, payload.source_conversation_id)
+    except LearningRefused as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    return _step_read(step, service)
+
+
+@router.delete("/learning/steps/{step_id}", status_code=status.HTTP_204_NO_CONTENT)
+def remove_learned_step(step_id: str, service: LearningDependency, admin: AdminDependency):
+    try:
+        service.remove(step_id, admin)
+    except LearnedStepNotFound as exc:
+        raise HTTPException(status_code=404, detail="Шаг не найден") from exc

@@ -32,6 +32,8 @@ export const handlers = [
 
   http.get("*/api/operator/templates", () => HttpResponse.json([])),
 
+  http.get("*/api/admin/learning", () => HttpResponse.json({ suggestions: [], steps: [] })),
+
   http.get("*/api/operator/sla", () => HttpResponse.json({
     days: 7, met: 0, missed: 0, breached_open: 0, pending: 0, met_rate: null,
     targets: { critical: 15, high: 60, normal: 240, low: 240 },

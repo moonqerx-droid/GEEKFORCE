@@ -37,9 +37,11 @@ symptoms_hints:
 questions:
   - fact: colleagues_affected
     text: У коллег этот сервис тоже не открывается?
+    why: "Если сервис не открывается у всех, это общий сбой, и специалист займётся им сразу."
     kind: yes_no
   - fact: error_text
     text: Что показывается на экране вместо сервиса? Например, «502 Bad Gateway».
+    why: "Код ошибки подсказывает, где сбой: на сервере или у вас."
     kind: text
 steps:
   - id: hard_refresh

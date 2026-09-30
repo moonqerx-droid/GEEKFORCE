@@ -26,3 +26,22 @@ def test_an_unclear_request_is_not_matched(client):
     start(client, "Помогите, всё сломалось")
     again = start(client, "Помогите, всё сломалось")
     assert again["similar_open"] is None
+
+
+def test_continue_there_moves_the_words_and_removes_the_duplicate(client):
+    first = start(client, "Не подключается VPN из дома")
+    second = start(client, "впн опять не работает")
+
+    merged = client.post(f"/api/conversations/{second['id']}/merge")
+    assert merged.status_code == 200, merged.text
+    body = merged.json()
+    assert body["id"] == first["id"]
+    assert body["messages"][-1]["role"] == "user"
+    assert body["messages"][-1]["content"] == "впн опять не работает"
+    assert client.get(f"/api/conversations/{second['id']}").status_code == 404
+    assert second["id"] not in [item["id"] for item in client.get("/api/conversations").json()]
+
+
+def test_nothing_to_merge_into_is_a_conflict(client):
+    printer = start(client, "принтер не печатает")
+    assert client.post(f"/api/conversations/{printer['id']}/merge").status_code == 409

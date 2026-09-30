@@ -38,9 +38,11 @@ symptoms_hints:
 questions:
   - fact: error_text
     text: Какую ошибку показывает VPN-клиент при подключении?
+    why: "У каждой ошибки VPN своё решение: 809 — домашний роутер, 691 — пароль."
     kind: text
   - fact: internet_works
     text: Без VPN интернет работает — сайты вроде yandex.ru открываются?
+    why: "Если нет интернета вообще, дело не в VPN — начнём с подключения к сети."
     kind: yes_no
 steps:
   - id: check_internet

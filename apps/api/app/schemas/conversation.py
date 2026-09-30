@@ -142,6 +142,8 @@ class ConversationRead(BaseModel):
     citations: list[CitationRead] = Field(default_factory=list)
     # One-tap answers to the question the assistant just asked (empty for free text).
     quick_replies: list[str] = Field(default_factory=list)
+    # «Почему я спрашиваю»: why the question on screen matters for the next step.
+    question_reason: str | None = None
     # The employee's other open request about the same problem, if this one is a repeat.
     similar_open: "SimilarOpen | None" = None
     assignee_id: str | None = None
@@ -155,9 +157,11 @@ class ConversationRead(BaseModel):
     rating_comment: str | None = None
 
     @classmethod
-    def from_model(cls, model, quick_replies: list[str] | None = None, similar=None) -> "ConversationRead":
+    def from_model(cls, model, quick_replies: list[str] | None = None, similar=None,
+                   question_reason: str | None = None) -> "ConversationRead":
         data = cls.model_validate(model, from_attributes=True)
         data.quick_replies = list(quick_replies or [])
+        data.question_reason = question_reason
         if similar is not None:
             data.similar_open = SimilarOpen(id=similar.id, summary=similar.summary)
         if model.current_step_code and model.current_step_instruction:

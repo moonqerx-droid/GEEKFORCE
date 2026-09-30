@@ -22,6 +22,7 @@ symptoms_hints:
 questions:
   - fact: colleagues_affected
     text: У коллег это тоже работает медленно?
+    why: "Если тормозит у всех — это сервер или сеть, а не ваш компьютер."
     kind: yes_no
 steps:
   - id: close_heavy_apps

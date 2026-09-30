@@ -87,7 +87,8 @@ def test_seed_loads_the_demo_company_documents(factory):
 
     from app.seed_demo import DOCUMENT_TITLES
 
-    assert seed_documents(session_factory=factory) == len(DOCUMENT_TITLES) == 10
+    # seed() loads them before playing the history; a second run adds nothing.
+    assert len(DOCUMENT_TITLES) == 10
     assert seed_documents(session_factory=factory) == 0, "a second run adds nothing"
     with factory() as session:
         documents = session.query(KnowledgeDocument).all()
@@ -107,7 +108,7 @@ def test_an_edited_document_replaces_the_earlier_upload(factory, tmp_path):
     assert seed_documents(session_factory=factory, directory=tmp_path) == 1
 
     with factory() as session:
-        [document] = session.query(KnowledgeDocument).all()
+        [document] = session.query(KnowledgeDocument).filter_by(title="Регламент командировок").all()
         assert "900 рублей" in document.chunks[0].text  # the stale 700 is gone, not quoted next to it
 
 
@@ -185,3 +186,52 @@ def test_starter_templates_are_added_once(factory):
         templates = session.scalars(select(ReplyTemplate)).all()
         assert len(templates) >= 3
         assert any("{имя}" in item.body for item in templates)
+
+
+
+def test_the_seeded_history_answers_from_the_documents(factory):
+    """History and live answers agree: no «в документах нет» from before the documents were loaded."""
+    from app.models.conversation import Message
+
+    seed(total=60, session_factory=factory)
+    with factory() as session:
+        vacation = session.query(Message).filter(Message.content.like("%отпуск%"), Message.role == "user").all()
+        for asked in vacation:
+            reply = session.query(Message).filter(
+                Message.conversation_id == asked.conversation_id, Message.id > asked.id,
+                Message.role == "assistant").order_by(Message.id).first()
+            assert reply is None or "ответа на этот вопрос нет" not in reply.content, asked.content
+
+
+def test_reset_history_replays_it_for_the_same_people(factory):
+    from app.models.auth import User
+    from app.seed_demo import reset_history
+
+    seed(total=8, session_factory=factory)
+    seed_incident(session_factory=factory)
+    with factory() as session:
+        people = session.query(User).count()
+    assert reset_history(session_factory=factory) > 0
+    with factory() as session:
+        assert session.query(Conversation).count() == 0 and not open_incidents(session)
+    assert seed(total=8, session_factory=factory) is True
+    with factory() as session:
+        assert session.query(User).count() == people  # nobody duplicated
+        assert session.query(Conversation).count() == 8
+
+
+def test_a_seeded_resolution_belongs_to_its_scenario(factory):
+    """The reply draft quotes these: a phishing report must not be «fixed» with VPN certificates."""
+    from app.models.conversation import Message
+    from app.seed_demo import GENERIC_RESOLUTION, RESOLUTIONS
+
+    seed(total=60, session_factory=factory)
+    with factory() as session:
+        closed = session.query(Conversation).filter(Conversation.resolved_by == "operator").all()
+        assert closed
+        for conversation in closed:
+            summary = session.query(Message).filter(
+                Message.conversation_id == conversation.id,
+                Message.content.like("Обращение закрыто. Итог: %")).one().content.split("Итог: ", 1)[1]
+            allowed = RESOLUTIONS.get(conversation.playbook_id) or [GENERIC_RESOLUTION]
+            assert summary in allowed, (conversation.playbook_id, summary)

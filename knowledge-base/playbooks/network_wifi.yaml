@@ -42,6 +42,7 @@ symptoms_hints:
 questions:
   - fact: location
     text: Вы сейчас в офисе или работаете из дома?
+    why: "В офисе и дома интернет чинится по-разному: офисную сеть проверяем мы, домашнюю — вы."
     kind: choice
     options:
       office: [офис, на работе]
@@ -51,6 +52,7 @@ questions:
       remote: Дома или в другом месте
   - fact: colleagues_affected
     text: У коллег рядом интернет работает нормально?
+    why: "Если не работает у всех — это общий сбой, и проверять что-то у себя не нужно."
     kind: yes_no
     # "да, у коллег работает" means the problem is local -> colleagues_affected=no
     invert: true
