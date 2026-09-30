@@ -566,7 +566,9 @@ class TriageEngine:
                     message = (f"С «{what}» нужен специалист — передам это вместе с остальным, "
                                f"повторять ничего не придётся. {message}")
                 if len(plan) > 1 and not nested and not context.asked_facts and not context.completed_steps:
-                    message = f"{_plan_intro(plan)} {message}"
+                    # The first problem goes to a specialist at once: no «начнём с первой».
+                    listed = "; ".join(i.evidence or i.title for i in plan)
+                    message = f"Вижу сразу несколько проблем: {listed}. {message}"
                 return following.model_copy(update={
                     "message": message, "remember": {fact: decision.reason, **following.remember},
                 })

@@ -141,7 +141,7 @@ export function CasePassport({ conversation, audience }: {
           <ol className="passport-steps">
             {steps.map((step) => (
               <li key={step.id}>
-                <span>{firstSentence(step.instruction)}</span>
+                <span>{step.title ?? firstSentence(step.instruction)}</span>
                 <Badge tone={OUTCOME_TONE[step.outcome]}>{OUTCOME_LABEL[step.outcome]}</Badge>
               </li>
             ))}

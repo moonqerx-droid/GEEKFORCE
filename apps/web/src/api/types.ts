@@ -43,6 +43,8 @@ export interface CompletedStep {
   outcome: StepOutcome;
   position: number;
   created_at: string;
+  /** The step's own title; older records have only the text. */
+  title?: string | null;
 }
 
 export interface CurrentStep {

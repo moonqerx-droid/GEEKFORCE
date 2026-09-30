@@ -25,6 +25,7 @@ def test_a_problem_for_a_specialist_does_not_stop_the_other_one(simulate, engine
     assert sim.decision.action in (DecisionAction.ASK, DecisionAction.STEP)
     assert sim.decision.playbook_id == "printer"
     assert "специалист" in sim.decision.message and "принтер" in sim.decision.message.lower()
+    assert "Начнём с первой" not in sim.decision.message
     assert sim.ctx.known_facts.get("handoff.access_rights")
 
     while sim.decision.action == DecisionAction.ASK:

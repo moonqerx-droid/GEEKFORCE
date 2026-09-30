@@ -50,3 +50,15 @@ def test_both_problems_solved_close_with_both_named(client):
 
     assert "Переходим ко второй проблеме" in " ".join(m["content"] for m in state["messages"])
     assert "обе проблемы" in last_reply(state).lower()
+
+
+def test_completed_steps_carry_their_title(client):
+    cid = client.post("/api/conversations").json()["id"]
+    state = send(client, cid, "нужен доступ к папке отдела на общем диске, и ещё принтер не печатает")
+    assert state["status"] == "TROUBLESHOOTING"
+
+    state = step(client, cid, "helped")
+
+    assert state["completed_steps"][0]["title"] == "Проверьте, что принтер включён и выбран"
+    ticket = client.get(f"/api/operator/tickets/{cid}").json()
+    assert ticket["completed_steps"][0]["title"] == "Проверьте, что принтер включён и выбран"

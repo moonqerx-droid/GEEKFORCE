@@ -1,5 +1,6 @@
 from datetime import datetime, timezone
 from enum import StrEnum
+from functools import lru_cache
 from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
@@ -99,6 +100,8 @@ class StepRead(BaseModel):
     outcome: StepOutcome
     position: int
     created_at: datetime
+    # The step's own title («Очистите очередь печати»), not the whole message it came with.
+    title: str | None = None
 
 
 class CurrentStep(BaseModel):
@@ -170,6 +173,9 @@ class ConversationRead(BaseModel):
             )
         if data.answer_kind is None:
             data.answer_kind = _infer_answer_kind(model)
+        titles = _step_titles()
+        for step in data.completed_steps:
+            step.title = titles.get(step.code)
         if model.status in ("ESCALATED", "IN_PROGRESS"):
             from app.services.sla import sla_for
 
@@ -239,3 +245,14 @@ class ResolveCreate(BaseModel):
     summary: str = Field(min_length=1, max_length=2000)
 
     _summary = field_validator("summary")(_strip_required)
+
+
+@lru_cache(maxsize=1)
+def _step_titles() -> dict[str, str]:
+    """Step id → title from the knowledge base (error-code steps included)."""
+    from helpflow_ai.knowledge import KnowledgeBase
+
+    try:
+        return {step.id: step.title for playbook in KnowledgeBase.load().playbooks for step in playbook.steps}
+    except Exception:  # noqa: BLE001 — titles are a nicety; the step text is still there
+        return {}
