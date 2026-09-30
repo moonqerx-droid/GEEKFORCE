@@ -118,6 +118,35 @@ class Playbook(BaseModel):
     default_urgency: Urgency = Urgency.MEDIUM
 
 
+class ErrorCode(BaseModel):
+    """One error code from knowledge-base/error-codes: what it means and what to do."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    code: str
+    # Other spellings or neighbouring codes with the same meaning and steps.
+    also: list[str] = Field(default_factory=list)
+    playbook: str
+    title: str
+    meaning: str
+    steps: list[Step] = Field(default_factory=list)
+    # After the code's own steps failed: straight to a specialist, skip the generic steps.
+    escalate_after_steps: bool = False
+    # A generic code (HTTP 403, 502) explains what happened but does not pick the scenario.
+    decides_scenario: bool = True
+
+    @property
+    def codes(self) -> list[str]:
+        """Canonical spellings: the main code first."""
+        from .rules import canonical_code
+
+        return list(dict.fromkeys(canonical_code(code) for code in (self.code, *self.also)))
+
+    @property
+    def step_prefix(self) -> str:
+        return f"code.{self.codes[0]}."
+
+
 class KnowledgeChunk(BaseModel):
     """One approved, attributable fragment available to grounded replies."""
 

@@ -8,7 +8,7 @@ from pathlib import Path
 import yaml
 from pydantic import ValidationError
 
-from .schemas import KnowledgeChunk, Playbook
+from .schemas import ErrorCode, KnowledgeChunk, Playbook, Step
 
 FALLBACK_PLAYBOOK_ID = "unknown"
 _REPO_ROOT = Path(__file__).resolve().parents[3]
@@ -24,7 +24,9 @@ class KnowledgeBase:
         self,
         playbooks: list[Playbook],
         chunks: list[KnowledgeChunk] | None = None,
+        error_codes: list[ErrorCode] | None = None,
     ):
+        playbooks = _with_code_steps(playbooks, error_codes or [])
         ids = [playbook.id for playbook in playbooks]
         duplicates = {pid for pid in ids if ids.count(pid) > 1}
         if duplicates:
@@ -38,6 +40,12 @@ class KnowledgeBase:
         if chunk_duplicates:
             raise KnowledgeBaseError(f"Duplicate chunk ids: {sorted(chunk_duplicates)}")
         self._chunks = tuple(approved_chunks)
+        self._error_codes: dict[str, ErrorCode] = {}
+        for entry in error_codes or []:
+            for code in entry.codes:
+                if code in self._error_codes:
+                    raise KnowledgeBaseError(f"Error code {code} is described twice")
+                self._error_codes[code] = entry
 
     @classmethod
     def load(cls, kb_dir: str | Path | None = None) -> "KnowledgeBase":
@@ -50,7 +58,9 @@ class KnowledgeBase:
         article_chunks: list[KnowledgeChunk] = []
         for path in sorted((root / "articles").glob("*.yaml")):
             article_chunks.extend(_load_articles(path))
-        return cls(playbooks, [*_playbook_chunks(playbooks), *article_chunks])
+        error_codes = [entry for path in sorted((root / "error-codes").glob("*.yaml"))
+                       for entry in _load_error_codes(path)]
+        return cls(playbooks, [*_playbook_chunks(playbooks), *article_chunks], error_codes)
 
     @property
     def playbooks(self) -> list[Playbook]:
@@ -66,6 +76,43 @@ class KnowledgeBase:
 
     def has(self, playbook_id: str) -> bool:
         return playbook_id in self._playbooks
+
+    def error_code(self, code: str) -> ErrorCode | None:
+        from .rules import canonical_code
+
+        return self._error_codes.get(canonical_code(code))
+
+    def find_error_code(self, codes: list[str], prefer: str | None = None) -> tuple[str, ErrorCode] | None:
+        """The first known code of a message; one of the current scenario wins over others."""
+        known = [(code, self._error_codes[code]) for code in codes if code in self._error_codes]
+        if not known:
+            return None
+        return next(((code, entry) for code, entry in known if entry.playbook == prefer), known[0])
+
+
+def _load_error_codes(path: Path) -> list[ErrorCode]:
+    try:
+        data = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
+        default = data.get("playbook")
+        return [ErrorCode.model_validate({"playbook": default, **item}) for item in data.get("codes", [])]
+    except (yaml.YAMLError, ValidationError, AttributeError) as error:
+        raise KnowledgeBaseError(f"Invalid error codes {path.name}: {error}") from error
+
+
+def _with_code_steps(playbooks: list[Playbook], error_codes: list[ErrorCode]) -> list[Playbook]:
+    """Each code's steps join its scenario, shown only when the message has that code."""
+    by_id = {playbook.id: playbook for playbook in playbooks}
+    extra: dict[str, list[Step]] = {}
+    for entry in error_codes:
+        if entry.playbook not in by_id:
+            raise KnowledgeBaseError(f"Error code {entry.code}: unknown playbook {entry.playbook}")
+        for step in entry.steps:
+            extra.setdefault(entry.playbook, []).append(step.model_copy(update={
+                "id": f"{entry.step_prefix}{step.id}",
+                "when": {**step.when, "error_code": entry.codes},
+            }))
+    return [playbook.model_copy(update={"steps": [*extra.get(playbook.id, []), *playbook.steps]})
+            if playbook.id in extra else playbook for playbook in playbooks]
 
 
 def _load_playbook(path: Path) -> Playbook:

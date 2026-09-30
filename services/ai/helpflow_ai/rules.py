@@ -604,6 +604,9 @@ def extract_facts(text: str) -> dict[str, str]:
     error_text = extract_error_text(text)
     if error_text:
         facts["error_text"] = error_text
+    codes = extract_error_codes(text)
+    if codes:
+        facts["error_code"] = codes[0]
     resource = _RESOURCE_RE.search(text)
     if resource:
         facts["resource"] = resource.group(1).strip()[:MAX_FREE_TEXT_FACT]
@@ -629,6 +632,57 @@ def _software(text: str) -> str | None:
     words = list(dropwhile(lambda w: w.lower() in _NOT_A_NAME, words))
     name = list(takewhile(lambda w: w and w.lower() not in _NOT_A_NAME, words))[:2]
     return " ".join(name)[:MAX_FREE_TEXT_FACT] or None
+
+
+# --- error codes -------------------------------------------------------------
+
+_HEX_CODE_RE = re.compile(r"(?<![\w])0x[0-9a-f]{3,8}(?![\w])", re.IGNORECASE)
+_SYMBOLIC_CODE_RE = re.compile(r"(?<![\w:])(?:net::)?(?:err_[a-z_]+|dns_probe_[a-z_]+)(?![\w])", re.IGNORECASE)
+# A code needs context: «ошибка 809», «код 691», «пишет 5003», «809 ошибка».
+_CODE_AFTER_WORD_RE = re.compile(
+    r"(?:ошибк\w*|код\w*|error|err|пишет|выда[её]т|показывает|сообщени\w*)\s*[:№#]?\s*[-—]?\s*"
+    r"(0x[0-9a-f]{3,8}|[0-9a-f]{8}|\d{2,6}|\d\.\d\.\d{1,3})"
+    r"(?![\w.])(?!\s*(?:мин|час|сек|раз|руб|%|шт|дн|кабинет))",
+    re.IGNORECASE,
+)
+_CODE_BEFORE_WORD_RE = re.compile(r"(?<![\w.])(\d{2,6})\s*(?:-?[яй]|-?ая)?\s*ошибк", re.IGNORECASE)
+_HTTP_CODE_RE = re.compile(r"(?<![\w.])([45]\d\d)(?![\w.])(?!\s*(?:мин|час|сек|раз|руб|%|шт|дн|кабинет))")
+_HTTP_PHRASES = ("bad gateway", "service unavailable", "gateway timeout", "internal server error",
+                 "forbidden", "access denied", "unauthorized")
+
+
+def canonical_code(raw: str) -> str:
+    """One spelling per code: «0x709» → «0x00000709», «80070005» → «0x80070005», «err_x» → «ERR_X»."""
+    code = raw.strip().upper()
+    if re.fullmatch(r"0X[0-9A-F]{1,8}", code):
+        return f"0x{int(code, 16):08X}"
+    if re.fullmatch(r"[0-9A-F]{8}", code) and (re.search(r"[A-F]", code) or code[0] in "8C"):
+        return f"0x{code}"
+    return code
+
+
+def extract_error_codes(text: str) -> list[str]:
+    """Error codes named in a message, in canonical spelling, in the order written."""
+    norm = normalize(text)
+    found: list[tuple[int, str]] = []
+    for match in _HEX_CODE_RE.finditer(norm):
+        found.append((match.start(), match.group(0)))
+    for match in _SYMBOLIC_CODE_RE.finditer(norm):
+        found.append((match.start(), match.group(0)))
+    for pattern in (_CODE_AFTER_WORD_RE, _CODE_BEFORE_WORD_RE):
+        for match in pattern.finditer(norm):
+            value = match.group(1)
+            if re.fullmatch(r"[0-9a-f]{8}", value) and not canonical_code(value).startswith("0x"):
+                continue  # eight plain digits without a hex sign: not a Windows code
+            found.append((match.start(1), value))
+    for match in _HTTP_CODE_RE.finditer(norm):
+        found.append((match.start(1), match.group(1)))
+    for phrase in _HTTP_PHRASES:
+        position = norm.find(phrase)
+        if position >= 0:
+            found.append((position, phrase))
+    codes = [canonical_code(value) for _, value in sorted(found)]
+    return list(dict.fromkeys(codes))
 
 
 def extract_error_text(text: str) -> str | None:
