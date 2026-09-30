@@ -80,6 +80,7 @@ SUBJECT_SERVICE_PLAYBOOKS = {"slow_performance", "peripherals", "app_not_startin
 # How facts read in the specialist's card: short labels and plain values, never codes.
 FACT_LABELS = {
     "error_code": "Код ошибки",
+    "tried_steps": "Сам уже пробовал",
     "error_text": "Что на экране",
     "other_device_works": "С другого устройства работает",
     "since_when": "Когда началось",
@@ -153,7 +154,10 @@ class TriageEngine:
         """Understand the first message (or re-analyze with more context)."""
         if not message or not message.strip():
             raise ValueError("message must not be empty")
-        ctx = context or ConversationContext(original_request=message)
+        message, tried = rules.split_tried(message)
+        ctx = _without_tried(context or ConversationContext(original_request=message))
+        if tried:
+            ctx = ctx.model_copy(update={"known_facts": {**ctx.known_facts, TRIED_FACT: "; ".join(tried)}})
         analysis = self._rules_analysis(message, ctx)
         if self.llm is not None and self.llm.supports_analysis:
             analysis = self._merge_llm(analysis, message, ctx)
@@ -313,6 +317,7 @@ class TriageEngine:
 
     def decide(self, context: ConversationContext) -> Decision:
         """Choose the flow with rules, then optionally improve only its wording."""
+        context = _without_tried(context)
         decision = self._decide_flow(context)
         query = _current_question(context)
         if (
@@ -418,6 +423,8 @@ class TriageEngine:
                     company, focused = best
                 elif company is not None and not _speaks_about(query, company):
                     company = None
+            elif company is not None and context.known_facts.get(TRIED_FACT):
+                company = None  # came from «Решить самому»: the document was already read there
             elif company is not None:
                 found = answering.focus(query, _safe_company_excerpt(company.text), company.title)
                 focused = found.text if found else None
@@ -884,7 +891,9 @@ class TriageEngine:
 
     def build_escalation_card(self, context: ConversationContext, reason: str = "") -> EscalationCard:
         request = context.original_request or _first_user_message(context)
-        context = context.model_copy(update={"original_request": request})
+        written = request
+        context = _without_tried(context.model_copy(update={"original_request": request}))
+        request = context.original_request
         issues = self._issue_statuses(self._issue_plan(context), context)
         current = next((i for i in issues if i.status == "in_progress"), issues[0])
         # The team of the problem the dialogue stopped on.
@@ -892,7 +901,7 @@ class TriageEngine:
         analysis = self._rules_analysis(request, context) if request.strip() else None
         urgency = analysis.urgency if analysis else playbook.default_urgency
         card = EscalationCard(
-            original_request=request,
+            original_request=written,
             summary=analysis.summary if analysis else playbook.title,
             service=analysis.service if analysis else playbook.service,
             urgency=rules.max_urgency(urgency, context.urgency or urgency),
@@ -1155,6 +1164,22 @@ _BARE_CODE_RE = re.compile(r"(?:0x)?[0-9a-f]{3,8}|[a-z]+(?:_[a-z]+)+|\d{2,6}", r
 _ORDINALS = ["к первой", "ко второй", "к третьей", "к четвёртой", "к пятой"]
 
 
+TRIED_FACT = "tried_steps"
+
+
+def _without_tried(ctx: ConversationContext) -> ConversationContext:
+    """The request without its «Уже пробовал: …» tail; the tried steps become a fact."""
+    request, tried = rules.split_tried(ctx.original_request)
+    messages = [
+        {**m, "content": rules.split_tried(str(m.get("content", "")))[0]} if m.get("role") == "user" else m
+        for m in ctx.messages
+    ]
+    if not tried and messages == ctx.messages:
+        return ctx
+    facts = {**ctx.known_facts, TRIED_FACT: "; ".join(tried)} if tried else ctx.known_facts
+    return ctx.model_copy(update={"original_request": request, "messages": messages, "known_facts": facts})
+
+
 def _handoff_fact(playbook_id: str) -> str:
     return f"handoff.{playbook_id}"
 
@@ -1213,10 +1238,12 @@ def _applicable_questions(playbook: Playbook, ctx: ConversationContext) -> list[
 def _open_steps(playbook: Playbook, ctx: ConversationContext):
     """Steps not tried yet whose fact and symptom conditions hold, in playbook order."""
     done = {record.step_id for record in ctx.completed_steps}
+    # Steps the employee already did on their own («Уже пробовал: …»): not offered again.
+    tried = {title.lower() for title in ctx.known_facts.get(TRIED_FACT, "").split("; ") if title}
     facts = ctx.known_facts
     described = _described_symptoms(playbook, ctx)
     for step in playbook.steps:
-        if step.id in done or not _symptoms_allow(step, described):
+        if step.id in done or step.title.lower() in tried or not _symptoms_allow(step, described):
             continue
         if any(facts.get(key) not in values for key, values in step.when.items()):
             continue

@@ -68,3 +68,30 @@ def test_nothing_found_says_so(help_engine):
     result = help_engine.self_help("ыыы")
 
     assert result.code is None and result.guide is None and result.document is None
+
+
+TRIED = ("впн пишет ошибка 809. Уже пробовал: Подключитесь к интернету с телефона; "
+         "Перезагрузите домашний роутер")
+
+
+def test_tried_steps_do_not_change_the_scenario(kb):
+    analysis = TriageEngine(kb).analyze(TRIED)
+
+    assert analysis.recommended_playbook == "vpn_connection"
+    assert analysis.known_facts["tried_steps"] == "Подключитесь к интернету с телефона; Перезагрузите домашний роутер"
+
+
+def test_tried_steps_are_not_offered_again(simulate):
+    sim = simulate(TRIED)
+
+    # Both self-service steps for 809 were done: the next one is the specialist's.
+    assert sim.decision.action.value == "escalate"
+    assert "делает специалист" in sim.decision.message
+
+
+def test_the_card_says_what_was_tried(engine, simulate):
+    sim = simulate(TRIED)
+    card = engine.build_escalation_card(sim.ctx, sim.decision.reason)
+
+    assert "Сам уже пробовал — Подключитесь к интернету с телефона" in card.ai_summary
+    assert card.original_request == TRIED

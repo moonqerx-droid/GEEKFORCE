@@ -138,6 +138,19 @@ def _asks_only_for_a_person(cleaned: str) -> bool:
     return len(rest) == 1 and bool(_PERSON_RE.match(rest[0]))
 
 
+# «…. Уже пробовал: шаг; шаг» — added by «Решить самому» when self-help did not work.
+_TRIED_RE = re.compile(r"[.!]?\s*Уже пробовал[аи]?:\s*(.+)$", re.IGNORECASE | re.DOTALL)
+
+
+def split_tried(text: str) -> tuple[str, list[str]]:
+    """The request itself and the steps the employee says they already tried."""
+    match = _TRIED_RE.search(text or "")
+    if not match:
+        return text, []
+    tried = [item.strip(" .") for item in match.group(1).split(";") if item.strip(" .")]
+    return text[:match.start()].strip(), tried
+
+
 def understand(text: str) -> str:
     """Normalized text with typos fixed: what every detector below should read."""
     return morph.correct(normalize(text))

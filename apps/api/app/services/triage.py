@@ -491,7 +491,10 @@ class TriageDialogueService(DialogueService):
             conversation.current_step_instruction = decision.message
         else:
             conversation.status = "VERIFYING"
-        if decision.answer_kind == AnswerKind.DOCUMENT and decision.citations and not conversation.steps:
+        asked = self._context(conversation).original_request
+        if (decision.answer_kind == AnswerKind.DOCUMENT and decision.citations and not conversation.steps
+                and ("?" in asked or self.engine.answer_policy.is_information_question(asked)
+                     or self.engine.answer_policy.asks_about_rules(asked))):
             # A question about the rules is not a «Проблема со входом»: name what was asked about.
             document = decision.citations[0].title.split(" — ")[0]
             conversation.summary = f"Вопрос по документу «{document}»"

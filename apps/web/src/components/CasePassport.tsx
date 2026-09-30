@@ -50,7 +50,9 @@ export function CasePassport({ conversation, audience }: {
   }
 
   const card = asCard(conversation.escalation_card);
-  const facts = Object.entries(conversation.known_facts ?? {}).filter(([, value]) => value);
+  // «handoff.*», «started.*», «issue_resolved.*» are the assistant's own bookkeeping, not facts.
+  const facts = Object.entries(conversation.known_facts ?? {})
+    .filter(([key, value]) => value && !/^(handoff|started|issue_resolved)\./.test(key));
   const steps = [...conversation.completed_steps].sort((a, b) => a.position - b.position);
   const ticket = "original_request" in conversation ? conversation : null;
   const files = conversation.messages.flatMap((message) => message.attachments ?? []);
