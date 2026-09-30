@@ -238,3 +238,24 @@ def test_a_seeded_resolution_belongs_to_its_scenario(factory):
                 Message.content.like("Обращение закрыто. Итог: %")).one().content.split("Итог: ", 1)[1]
             allowed = RESOLUTIONS.get(conversation.playbook_id) or [GENERIC_RESOLUTION]
             assert summary in allowed, (conversation.playbook_id, summary)
+
+
+def test_a_rerun_confirms_an_outage_left_as_a_candidate(factory):
+    """A server seeded before this change keeps an unconfirmed VPN outage: a re-run confirms it."""
+    from app.models.incident import IncidentUpdate
+
+    seed(total=12, session_factory=factory)
+    seed_incident(session_factory=factory)
+    with factory() as session:
+        [incident] = open_incidents(session)
+        for update in session.scalars(select(IncidentUpdate).where(IncidentUpdate.incident_id == incident.id)):
+            session.delete(update)
+        incident.status = "CANDIDATE"
+        session.commit()
+
+    seed_incident(session_factory=factory)
+
+    with factory() as session:
+        [incident] = open_incidents(session)
+        assert incident.status == "ACTIVE"
+        assert incident.updates

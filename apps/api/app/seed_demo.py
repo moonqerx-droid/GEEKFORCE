@@ -235,7 +235,13 @@ def seed_incident(seed_value: int = 7, session_factory=SessionLocal) -> bool:
         people = {user.email.split("@")[0]: user for user in session.scalars(
             select(User).where(User.email.like(f"%@{DOMAIN}"))
         ).all()}
-        if already_open is not None or not all(key in people for key, *_ in OUTAGE):
+        if already_open is not None:
+            if already_open.status == "CANDIDATE":
+                # Seeded before the demo confirmed it: confirm now, so employees see it.
+                _confirm_outage(session, already_open, people)
+                return True
+            return False
+        if not all(key in people for key, *_ in OUTAGE):
             return False
         dialogue = TriageDialogueService(ConversationRepository(session), TriageEngine(KnowledgeBase.load(), None))
         repository = ConversationRepository(session)
@@ -253,12 +259,17 @@ def seed_incident(seed_value: int = 7, session_factory=SessionLocal) -> bool:
             Incident.status.in_(("CANDIDATE", "ACTIVE")), Incident.service == "vpn",
         ))
         if outage is not None:
-            settings = get_settings()
-            IncidentService(
-                IncidentRepository(session), threshold=settings.incident_similarity_threshold,
-                min_cluster_size=settings.incident_min_cluster_size, window_minutes=settings.incident_window_minutes,
-            ).broadcast(outage.id, OUTAGE_UPDATE, "seed-vpn-update", outage.revision, author=people.get("anna"))
+            _confirm_outage(session, outage, people)
         return True
+
+
+def _confirm_outage(session, outage, people) -> None:
+    """As a specialist would: confirm the outage and write to everyone affected."""
+    settings = get_settings()
+    IncidentService(
+        IncidentRepository(session), threshold=settings.incident_similarity_threshold,
+        min_cluster_size=settings.incident_min_cluster_size, window_minutes=settings.incident_window_minutes,
+    ).broadcast(outage.id, OUTAGE_UPDATE, "seed-vpn-update", outage.revision, author=people.get("anna"))
 
 
 # Company documents the demo stand answers from; the admin could upload the same files by hand.
