@@ -146,10 +146,11 @@
   }
 }
 
-/* Wide screens show the employee's requests in the side rail, which already offers
-   both links; repeating them in the header only added noise. */
+/* Wide screens show the employee's requests in the side rail, which already offers «Новое
+   обращение» and «Мои обращения»; the header keeps only the sections the rail does not have
+   («Решить самому», «Помощь коллег», «Коллеги») — hiding the whole nav made them unreachable. */
 @media (min-width: 901px) {
-  .app-header-nav-employee {
-    visibility: hidden;
+  .app-header-link-rail {
+    display: none;
   }
 }

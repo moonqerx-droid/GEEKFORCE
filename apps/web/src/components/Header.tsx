@@ -7,10 +7,11 @@ import { ROLE_LABEL, homePathFor } from "../lib/labels";
 import { Avatar } from "./primitives";
 import "./Header.css";
 
-const NAV: Record<UserRole, { to: string; label: string; end?: boolean }[]> = {
+// `inRail`: on wide screens the employee's side rail already has this link, so the header skips it.
+const NAV: Record<UserRole, { to: string; label: string; end?: boolean; inRail?: boolean }[]> = {
   employee: [
-    { to: "/employee?new=1", label: "Новое обращение", end: true },
-    { to: "/employee/history", label: "Мои обращения" },
+    { to: "/employee?new=1", label: "Новое обращение", end: true, inRail: true },
+    { to: "/employee/history", label: "Мои обращения", inRail: true },
     { to: "/employee/help", label: "Решить самому" },
     { to: "/employee/peers", label: "Помощь коллег" },
     { to: "/employee/colleagues", label: "Коллеги" },
@@ -58,7 +59,8 @@ export function Header({ role, name, onLogout }: HeaderProps) {
       <nav className={`app-header-nav app-header-nav-${role}`} aria-label="Разделы">
         {NAV[role].map((item) => (
           <NavLink key={item.to} to={item.to} end={item.end}
-            className={({ isActive }) => (isActive ? "active" : undefined)}>
+            className={({ isActive }) => [isActive ? "active" : "", item.inRail ? "app-header-link-rail" : ""]
+              .filter(Boolean).join(" ") || undefined}>
             {item.label}
           </NavLink>
         ))}
