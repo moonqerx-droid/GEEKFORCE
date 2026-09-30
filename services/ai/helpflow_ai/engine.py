@@ -73,6 +73,7 @@ _PROTECTED_PLAYBOOKS = {"credentials_request", "mass_incident", "security_incide
 SUBJECT_SERVICE_PLAYBOOKS = {"slow_performance", "peripherals", "app_not_starting"}
 # How facts read in the specialist's card: short labels and plain values, never codes.
 FACT_LABELS = {
+    "error_code": "Код ошибки",
     "error_text": "Что на экране",
     "other_device_works": "С другого устройства работает",
     "since_when": "Когда началось",
@@ -189,6 +190,12 @@ class TriageEngine:
         pending = self._pending_question(context)
         if pending is not None:
             new_facts[pending.fact] = rules.parse_answer(pending, message)
+            if pending.fact == "error_text" and "error_code" not in context.known_facts:
+                # «691» on its own answers «какую ошибку показывает VPN?»
+                codes = rules.extract_error_codes(message) or rules.extract_error_codes(f"ошибка {message.strip()}")
+                found = self.kb.find_error_code(codes, context.playbook_id)
+                if found is not None or codes:
+                    new_facts["error_code"] = found[0] if found else codes[0]
         return new_facts
 
     def citations_for(self, source_ids: list[str]) -> list[Citation]:
@@ -383,6 +390,10 @@ class TriageEngine:
                 focused = found.text if found else None
             if company is not None:
                 last = context.completed_steps[-1] if context.completed_steps else None
+                shown = any(r.step_id == f"knowledge.{company.id}" for r in context.completed_steps)
+                if shown and (last is None or last.step_id != f"knowledge.{company.id}"):
+                    company = None  # the document was already given; the error-code steps go on
+            if company is not None:
                 if last is not None and last.step_id == f"knowledge.{company.id}":
                     if last.outcome == StepOutcome.HELPED and not context.verification_failed:
                         return Decision(
@@ -398,10 +409,13 @@ class TriageEngine:
                             )],
                         )
                     playbook = self.kb.get(context.playbook_id or "unknown")
-                    return self._escalate(
-                        playbook,
-                        "ответ по корпоративному документу не решил вопрос",
-                    ).model_copy(update={"playbook_id": playbook.id})
+                    if self._work_on_code(playbook, context) is None:
+                        return self._escalate(
+                            playbook,
+                            "ответ по корпоративному документу не решил вопрос",
+                        ).model_copy(update={"playbook_id": playbook.id})
+                    company = None  # the company's answer did not help: the code's own steps next
+            if company is not None:
                 decision = _company_knowledge_decision(company, focused)
                 if (
                     self.llm is not None
@@ -535,6 +549,9 @@ class TriageEngine:
             note = (f"Готового решения для такой проблемы у меня нет (тема: {subject}), поэтому "
                     "не буду мучить вас лишними вопросами.")
             return decision.model_copy(update={"message": f"{note} {decision.message}"})
+        by_code = self._work_on_code(playbook, context)
+        if by_code is not None:
+            return by_code
         question = self.next_question(playbook, context)
         if question is not None:
             return Decision(action=DecisionAction.ASK, message=question.text, question=question,
@@ -579,6 +596,35 @@ class TriageEngine:
             return self._escalate(playbook, "для этого случая нет шагов, которые сотрудник может сделать сам",
                                   context.known_facts)
         return self._escalate(playbook, f"выполнено шагов: {tried}, проблема не решена", context.known_facts)
+
+    def _work_on_code(self, playbook: Playbook, context: ConversationContext) -> Decision | None:
+        """A known error code says what is wrong: explain it once and go through its steps,
+        without the scenario's generic questions. None when there is no such code."""
+        code = context.known_facts.get("error_code")
+        entry = self.kb.error_code(code) if code else None
+        if entry is None or entry.playbook != playbook.id:
+            return None
+        if not entry.decides_scenario and self.next_question(playbook, context) is not None:
+            return None  # a generic code (HTTP 403) does not say what is wrong: ask first
+        tried = any(r.step_id.startswith(entry.step_prefix) for r in context.completed_steps)
+        # A company document already explained the code and gave its quick way round.
+        documented = any(r.step_id.startswith("knowledge.document:") for r in context.completed_steps)
+        step = next((s for s in _open_steps(playbook, context)
+                     if s.id.startswith(entry.step_prefix) and not (documented and s.workaround)), None)
+        explanation = "" if tried or documented else (
+            f"Ошибка {code}: {_lower_first(entry.title)}. {entry.meaning}")
+        if step is not None and step.requires_admin:
+            decision = self._escalate(playbook, f"код ошибки {code}, нужны права администратора: {step.title}",
+                                      context.known_facts)
+            note = (f"Следующий шаг — «{step.title}» — делает специалист: для него нужны права "
+                    "администратора, самому это делать не нужно.")
+            return decision.model_copy(update={"message": " ".join(
+                part for part in (explanation, note, decision.message) if part)})
+        if step is not None:
+            return _step_decision(step, explanation, f"шаг по коду ошибки {code}")
+        if tried and entry.escalate_after_steps:
+            return self._escalate(playbook, f"шаги по коду ошибки {code} не помогли", context.known_facts)
+        return None
 
     def _render_decision(self, decision: Decision, context: ConversationContext) -> Decision:
         playbook = self.kb.get(decision.playbook_id or context.playbook_id)
@@ -807,6 +853,10 @@ class TriageEngine:
             question = self.answer_policy.is_information_question(text)
             classification = self._with_meaning(text, classification,
                                                 minimum=SEMANTIC_QUESTION_MIN if question else SEMANTIC_MIN)
+        known_code = self.kb.find_error_code(
+            rules.extract_error_codes(text), ctx.playbook_id if keep_playbook else classification.playbook_id)
+        if not keep_playbook and known_code is not None:
+            classification = _by_code(classification, known_code[1])
         playbook = self.kb.get(ctx.playbook_id if keep_playbook else classification.playbook_id)
         urgency, reason = rules.detect_urgency(text, playbook)
         if keep_playbook:
@@ -830,8 +880,12 @@ class TriageEngine:
         if subject:
             service = subject
             stated.setdefault("service_name", subject)
+        if known_code is not None:
+            stated["error_code"] = known_code[0]  # the code the knowledge base can explain
         additional = [issue for issue in plan if issue.playbook_id != playbook.id]
         summary = _summary(playbook, service, symptoms, text)
+        if stated.get("error_code") and playbook.id != "unknown":
+            summary += f" — ошибка {stated['error_code']}"
         if additional:
             summary += ". Ещё: " + "; ".join(i.evidence or i.title for i in additional)
         return Analysis(
@@ -938,6 +992,9 @@ class TriageEngine:
                 f"последний шаг «{self._step_title(last.step_id)}» — {verdict}")
 
     def _fact_value(self, fact: str, value: str) -> str:
+        if fact == "error_code":
+            entry = self.kb.error_code(value)
+            return f"{value}: {entry.title}" if entry else value
         return self._option_labels.get(fact, {}).get(value) or VALUE_WORDS.get(value, value)
 
     def _template_summary(self, card: EscalationCard, ctx: ConversationContext, playbook: Playbook) -> str:
@@ -1332,3 +1389,21 @@ _PLAIN_REASONS = (
 def _plain_reason(reason: str) -> str:
     """The hand-off reason for a person: «шаги не помогли», not a step counter."""
     return next((plain for pattern, plain in _PLAIN_REASONS if pattern.match(reason)), reason)
+
+
+def _by_code(found: rules.Classification, entry) -> rules.Classification:
+    """A known code decides the scenario («пишет ошибка 809» is VPN), except over safety rules
+    or when the code is a generic one (HTTP 403) and the words already chose a scenario."""
+    if found.playbook_id == entry.playbook or found.playbook_id in rules.PRIORITY_PLAYBOOKS:
+        return found
+    if entry.decides_scenario or found.playbook_id == "unknown":
+        return rules.Classification(entry.playbook, max(found.confidence, 0.85))
+    return found
+
+
+def _lower_first(text: str) -> str:
+    """«Сеть не пропускает VPN» → «сеть …», but «VPN …», «Outlook …», «Windows …» stay as written."""
+    first = text.split(" ", 1)[0]
+    if not first or first.isascii() or any(ch.isupper() for ch in first[1:]):
+        return text
+    return text[:1].lower() + text[1:]

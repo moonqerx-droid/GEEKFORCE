@@ -210,8 +210,11 @@
   tags: [диалог]
 
 - id: vpn-cannot-do-step
-  say: ["не подключается vpn, пишет ошибка 720", "да", "@cannot"]
+  # Код 720 известен: сразу шаг по коду; «не получается» → следующий шаг делает администратор.
+  say: ["не подключается vpn, пишет ошибка 720", "@cannot"]
   playbook: vpn_connection
+  end: escalated
+  expect_text: ["делает специалист"]
   tags: [диалог]
 
 # --- контрольная группа: добавлена без подстройки движка ------------------------
@@ -2852,3 +2855,103 @@
   say: ["кофемашина на кухне сломалась"]
   playbook: unknown
   tags: [контроль-7]
+
+
+# --- Коды ошибок: помощник объясняет код и ведёт по его шагам ----------------------
+
+- id: code-vpn-809
+  # Сначала инструкция компании про 809, затем — следующий шаг по коду, без повторов.
+  say: ["проблема с впном, пишет ошибка 809", "@not_helped"]
+  playbook: vpn_connection
+  end: step
+  max_questions: 0
+  expect_text: ["Перезагрузите домашний роутер"]
+  forbid_text: ["Без VPN интернет работает"]
+  expect_fact: {error_code: "809"}
+  tags: [диалог, коды]
+
+- id: code-vpn-809-no-word-vpn
+  say: ["пишет ошибка 809 и рабочие сайты не открываются"]
+  playbook: vpn_connection
+  max_questions: 0
+  tags: [диалог, коды]
+
+- id: code-vpn-809-all-steps
+  say: ["впн не подключается, ошибка 809", "@not_helped", "@not_helped"]
+  playbook: vpn_connection
+  end: escalated
+  expect_text: ["делает специалист"]
+  forbid_text: ["Без VPN интернет работает"]
+  tags: [диалог, коды]
+
+- id: code-vpn-691-in-answer
+  say: ["впн не подключается", "691"]
+  playbook: vpn_connection
+  end: step
+  expect_text: ["Ошибка 691", "логин"]
+  expect_fact: {error_code: "691"}
+  tags: [диалог, коды]
+
+- id: code-vpn-812-admin-only
+  say: ["впн пишет ошибка 812"]
+  playbook: vpn_connection
+  end: escalated
+  max_questions: 0
+  expect_text: ["Ошибка 812"]
+  tags: [диалог, коды]
+
+- id: code-outlook-hex
+  say: ["аутлук выдаёт ошибку 0x800ccc0e, письма не приходят"]
+  playbook: email_outlook
+  end: step
+  max_questions: 0
+  expect_text: ["Ошибка 0x800CCC0E"]
+  tags: [диалог, коды]
+
+- id: code-outlook-profile-to-specialist
+  say: ["outlook пишет 0x8004010F", "@not_helped"]
+  playbook: email_outlook
+  end: escalated
+  tags: [диалог, коды]
+
+- id: code-printer-709
+  say: ["не могу сделать принтер по умолчанию, ошибка 0x00000709"]
+  playbook: printer
+  end: step
+  max_questions: 0
+  expect_text: ["Ошибка 0x00000709"]
+  tags: [диалог, коды]
+
+- id: code-install-1603
+  say: ["программа не ставится, ошибка 1603"]
+  playbook: app_not_starting
+  end: step
+  max_questions: 0
+  expect_text: ["Ошибка 1603"]
+  tags: [диалог, коды]
+
+- id: code-chrome-dns
+  say: ["в браузере DNS_PROBE_FINISHED_NXDOMAIN на любом сайте"]
+  playbook: network_wifi
+  end: step
+  max_questions: 0
+  tags: [диалог, коды]
+
+- id: code-teams-login
+  say: ["тимс не входит, код ошибки caa20002"]
+  playbook: video_calls
+  end: step
+  expect_text: ["Ошибка 0xCAA20002"]
+  tags: [диалог, коды]
+
+- id: code-generic-403-asks-first
+  say: ["нет доступа к папке отдела, ошибка 403"]
+  playbook: access_rights
+  forbid_text: ["Ошибка 403: нет прав"]
+  tags: [диалог, коды]
+
+- id: code-unknown-keeps-flow
+  say: ["впн не подключается, ошибка 12345"]
+  playbook: vpn_connection
+  expect_fact: {error_code: "12345"}
+  tags: [диалог, коды]
