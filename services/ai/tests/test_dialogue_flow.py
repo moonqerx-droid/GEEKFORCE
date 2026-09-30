@@ -47,7 +47,9 @@ def test_case_example_full_path_to_specialist(simulate, engine):
     assert card.known_facts["other_device_works"] == "yes"
     assert card.known_facts["error_text"] == "просто крутится загрузка и ничего"
     assert card.questions_and_answers[0]["answer"] == "просто крутится загрузка и ничего"
-    assert len(card.performed_steps) >= 3
+    # Urgent (a meeting in 20 minutes): two quick tries, then a specialist — not the whole list.
+    assert len(card.performed_steps) == 2
+    assert "срочн" in card.escalation_reason
     assert "не решена" in card.current_result
 
 

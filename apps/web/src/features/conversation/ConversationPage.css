@@ -297,3 +297,14 @@
   font-weight: 700;
   white-space: nowrap;
 }
+
+/* «Срочно»: the one red action — straight to a specialist, top of the queue. */
+.chat-action-urgent {
+  border-color: color-mix(in srgb, var(--color-danger) 45%, var(--color-border));
+  color: var(--color-danger);
+}
+
+.chat-action-urgent:hover:not(:disabled) {
+  border-color: var(--color-danger);
+  background: color-mix(in srgb, var(--color-danger) 8%, var(--color-surface));
+}

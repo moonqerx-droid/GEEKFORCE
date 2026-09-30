@@ -49,6 +49,7 @@ logger = logging.getLogger(__name__)
 
 MAX_QUESTIONS = 3
 MAX_QUESTIONS_URGENT = 1
+URGENT_MAX_FAILED_STEPS = 2
 MAX_RENDERED_MESSAGE_LENGTH = 1200
 URGENT_LEVELS = (Urgency.HIGH, Urgency.CRITICAL)
 # Fact holding a problem the employee added mid-dialogue.
@@ -580,6 +581,13 @@ class TriageEngine:
                     "нет подтверждённого источника для безопасного ответа",
                 )
         if context.urgency in URGENT_LEVELS:
+            own = {s.id for s in playbook.steps}
+            failed = [r for r in context.completed_steps
+                      if r.step_id in own and r.outcome != StepOutcome.HELPED]
+            if len(failed) >= URGENT_MAX_FAILED_STEPS:
+                # No time for the whole diagnosis: two quick tries, then a person right away.
+                return self._escalate(playbook, f"срочное обращение: {len(failed)} шага не помогли — сразу к специалисту",
+                                      context.known_facts)
             workaround = next((s for s in _open_steps(playbook, context) if s.workaround), None)
             if workaround is not None:
                 return _step_decision(workaround, URGENT_WORKAROUND_INTRO,

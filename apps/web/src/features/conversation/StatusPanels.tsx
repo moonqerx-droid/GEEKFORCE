@@ -2,6 +2,10 @@ import { useState } from "react";
 import { Button } from "../../components/Button";
 import type { Conversation } from "../../api/types";
 import { formatMinutes, teamForEmployee } from "../../lib/labels";
+
+function formatClock(iso: string): string {
+  return new Date(iso).toLocaleTimeString("ru-RU", { hour: "2-digit", minute: "2-digit" });
+}
 import "./StatusPanels.css";
 
 export function VerifyingPanel({ busy, onAnswer }: { busy: boolean; onAnswer: (text: string) => void }) {
@@ -35,7 +39,10 @@ export function WaitingPanel({ conversation }: { conversation: Conversation }) {
         <strong id="waiting-title">Передали специалисту</strong>
         {" "}{teamForEmployee(card?.recommended_team)} уже видят карточку:
         пересказывать ничего не нужно, ответ придёт сюда. Можно дописать детали или приложить скриншот.
-        <span className="ribbon-eta">{RESPONSE_TARGET[conversation.urgency]}</span>
+        <span className="ribbon-eta">
+          {RESPONSE_TARGET[conversation.urgency]}
+          {conversation.reply_due_at ? ` Ответ специалиста до ${formatClock(conversation.reply_due_at)}.` : ""}
+        </span>
       </p>
     </section>
   );

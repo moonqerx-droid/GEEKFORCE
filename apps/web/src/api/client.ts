@@ -159,6 +159,16 @@ export const api = {
     );
   },
 
+  /** «Срочно»: straight to a specialist, top of the queue. */
+  markUrgent(id: string, signal?: AbortSignal): Promise<Conversation> {
+    return request(
+      `/api/conversations/${id}/urgent`,
+      { method: "POST" },
+      signal,
+      MUTATION_TIMEOUT_MS,
+    );
+  },
+
   escalate(id: string, signal?: AbortSignal): Promise<Conversation> {
     return request(
       `/api/conversations/${id}/escalate`,

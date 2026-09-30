@@ -18,6 +18,7 @@ from app.schemas.conversation import StepOutcome
 from app.services.dialogue import DialogueConflict, DialogueService
 from app.services.incidents import IncidentService
 from app.services.company_knowledge import company_knowledge_chunks
+from app.services.sla import TARGET_MINUTES
 
 
 logger = logging.getLogger(__name__)
@@ -550,6 +551,39 @@ class TriageDialogueService(DialogueService):
         latest = self.incident_service.latest_update_text(match.incident_id)
         return f"{text} Последнее обновление: {latest}" if latest else text
 
+    URGENT_REASON = "сотрудник отметил обращение как срочное"
+
+    def mark_urgent(self, conversation_id):
+        """«Срочно»: at once to a specialist, to the top of the queue, with a promise of when
+        they answer. Already with a specialist: the request only rises in the queue."""
+        conversation = self.get_conversation(conversation_id)
+        if conversation.status == "RESOLVED":
+            raise DialogueConflict("resolved conversation cannot be marked urgent")
+        if not any(m.role == "user" and m.content.strip() for m in conversation.messages):
+            raise DialogueConflict("describe the problem before marking it urgent")
+        try:
+            if conversation.urgency != "critical":
+                conversation.urgency = "high"
+                conversation.urgency_reason = self.URGENT_REASON
+            promise = f"специалист ответит в течение {_within(TARGET_MINUTES[conversation.urgency])}"
+            if conversation.status in {"ESCALATED", "IN_PROGRESS"}:
+                card = dict(conversation.escalation_card or {})
+                if card and card.get("urgency") != "critical":
+                    card.update(urgency="high", urgency_reason=self.URGENT_REASON)
+                    conversation.escalation_card = card
+                self._message(conversation, "assistant",
+                              f"Отметил как срочное — обращение поднялось наверх очереди, {promise}.",
+                              answer_kind="handoff")
+            else:
+                team = self.engine.kb.get(conversation.playbook_id).escalation_team
+                self._escalate(conversation, self.URGENT_REASON, message=(
+                    f"Отметил как срочное и сразу передал {voice.to_whom(team)}: {promise}. "
+                    "Всё, что мы выяснили, уже в заявке — повторять ничего не придётся."))
+            return self._commit(conversation)
+        except Exception:
+            self.repository.session.rollback()
+            raise
+
     def escalate(self, conversation_id):
         conversation = self.get_conversation(conversation_id)
         if conversation.status == "RESOLVED":
@@ -562,3 +596,12 @@ class TriageDialogueService(DialogueService):
         except Exception:
             self.repository.session.rollback()
             raise
+
+
+def _within(minutes: int) -> str:
+    """«15 минут», «часа», «4 часов» — how soon, as it reads after «в течение»."""
+    if minutes == 60:
+        return "часа"
+    if minutes % 60 == 0:
+        return f"{minutes // 60} часов"  # «4 часов»: the genitive after «в течение»
+    return f"{minutes} минут"

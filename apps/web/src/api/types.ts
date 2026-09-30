@@ -87,6 +87,9 @@ export interface Conversation {
   escalated_at?: string | null;
   assigned_at?: string | null;
   first_operator_reply_at?: string | null;
+  /** While a specialist has not answered: the promised first-reply time (SLA). */
+  reply_due_at?: string | null;
+  reply_target_minutes?: number | null;
   resolved_at?: string | null;
   resolved_by?: "assistant" | "operator" | null;
   rating?: number | null;

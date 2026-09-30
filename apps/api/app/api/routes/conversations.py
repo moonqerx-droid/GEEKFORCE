@@ -142,6 +142,23 @@ def escalate(
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
 
 
+@router.post("/{conversation_id}/urgent", response_model=ConversationRead)
+def mark_urgent(
+    conversation_id: str,
+    service: DialogueDependency,
+    db: Annotated[Session, Depends(get_db)],
+    user: Annotated[User, Depends(require_employee)],
+) -> ConversationRead:
+    """«Срочно»: straight to a specialist, top of the queue, with the time they will answer by."""
+    ensure_owned(db, conversation_id, user)
+    try:
+        return serialize(service.mark_urgent(conversation_id), service)
+    except ConversationNotFound as exc:
+        raise not_found() from exc
+    except DialogueConflict as exc:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
+
+
 @router.post("/{conversation_id}/rating", response_model=ConversationRead)
 def rate_conversation(
     conversation_id: str,

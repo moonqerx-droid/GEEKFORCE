@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timezone
 from enum import StrEnum
 from typing import Literal
 
@@ -153,6 +153,9 @@ class ConversationRead(BaseModel):
     resolved_by: str | None = None
     rating: int | None = None
     rating_comment: str | None = None
+    # While a specialist has not answered yet: the promised first-reply time (SLA).
+    reply_target_minutes: int | None = None
+    reply_due_at: datetime | None = None
 
     @classmethod
     def from_model(cls, model, quick_replies: list[str] | None = None, similar=None) -> "ConversationRead":
@@ -167,6 +170,13 @@ class ConversationRead(BaseModel):
             )
         if data.answer_kind is None:
             data.answer_kind = _infer_answer_kind(model)
+        if model.status in ("ESCALATED", "IN_PROGRESS"):
+            from app.services.sla import sla_for
+
+            promise = sla_for(model, datetime.now(timezone.utc))
+            if promise is not None and promise.replied_at is None:
+                data.reply_target_minutes = promise.target_minutes
+                data.reply_due_at = promise.due_at
         return data
 
 

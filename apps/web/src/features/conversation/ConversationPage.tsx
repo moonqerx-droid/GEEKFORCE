@@ -1,6 +1,6 @@
 import { Link } from "react-router-dom";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { PanelRight, UserRoundCheck } from "lucide-react";
+import { Flame, PanelRight, UserRoundCheck } from "lucide-react";
 import type { Conversation, Message } from "../../api/types";
 import { Spinner, ErrorState, Badge } from "../../components/primitives";
 import { CasePassport } from "../../components/CasePassport";
@@ -79,6 +79,8 @@ export function ConversationPage({ onActivity }: { onActivity?: (conversation: C
   const live = c?.status === "ESCALATED" || c?.status === "IN_PROGRESS";
   const showComposer = !c || c.status in COMPOSER_PLACEHOLDER;
   const canCallSpecialist = c && !live && c.status !== "RESOLVED" && c.messages.length > 0;
+  const urgent = c?.urgency === "high" || c?.urgency === "critical";
+  const canHurry = c && c.status !== "RESOLVED" && c.messages.length > 0 && !urgent;
 
   return (
     <div className={`chat-page ${cardOpen ? "chat-page-card-open" : ""}`}>
@@ -89,11 +91,19 @@ export function ConversationPage({ onActivity }: { onActivity?: (conversation: C
               <h1 className="chat-title">{titleOf(c)}</h1>
               <p className="chat-meta">
                 <Badge tone={STATUS_TONE[c.status]}>{STATUS_LABEL[c.status]}</Badge>
+                {urgent ? <Badge tone="danger">Срочное</Badge> : null}
                 <span>с {formatDateTime(c.created_at)}</span>
                 {c.assignee_name ? <span className="chat-meta-person">ведёт {c.assignee_name}</span> : null}
               </p>
             </div>
             <div className="chat-head-actions">
+              {canHurry ? (
+                <button type="button" className="chat-action chat-action-urgent" disabled={conv.sending}
+                  onClick={conv.markUrgent} title="Сразу к специалисту, наверх очереди">
+                  <Flame size={17} aria-hidden="true" />
+                  <span>Срочно</span>
+                </button>
+              ) : null}
               {canCallSpecialist ? (
                 <button type="button" className="chat-action" disabled={conv.sending} onClick={conv.escalateNow}>
                   <UserRoundCheck size={17} aria-hidden="true" />

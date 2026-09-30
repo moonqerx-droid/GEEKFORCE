@@ -29,6 +29,8 @@ export interface ConversationState {
   sendMessage: (content: string, files?: File[]) => Promise<void>;
   sendStepResult: (outcome: StepOutcome) => Promise<void>;
   escalateNow: () => Promise<void>;
+  /** «Срочно»: to a specialist at once, top of the queue. */
+  markUrgent: () => Promise<void>;
   retryFailedMessage: (id: number) => Promise<void>;
   rate: (rating: number, comment?: string) => Promise<void>;
   dismissNotice: () => void;
@@ -340,13 +342,13 @@ export function useConversation(): ConversationState {
     [conversation, reloadAfterConflict],
   );
 
-  const escalateNow = useCallback(async () => {
+  const handOver = useCallback(async (urgent: boolean) => {
     if (!conversation || mutationRef.current) return;
     mutationRef.current = true;
     setSending(true);
     setError(null);
     try {
-      const updated = await api.escalate(conversation.id);
+      const updated = urgent ? await api.markUrgent(conversation.id) : await api.escalate(conversation.id);
       setConversation(updated);
     } catch (err) {
       if (err instanceof ConflictError) {
@@ -359,6 +361,8 @@ export function useConversation(): ConversationState {
       setSending(false);
     }
   }, [conversation, reloadAfterConflict]);
+  const escalateNow = useCallback(() => handOver(false), [handOver]);
+  const markUrgent = useCallback(() => handOver(true), [handOver]);
 
   const dismissNotice = useCallback(() => setNotice(null), []);
 
@@ -410,6 +414,7 @@ export function useConversation(): ConversationState {
     sendMessage,
     sendStepResult,
     escalateNow,
+    markUrgent,
     retryFailedMessage,
     rate,
     dismissNotice,
