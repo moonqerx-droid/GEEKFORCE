@@ -557,8 +557,8 @@ class TriageDialogueService(DialogueService):
     URGENT_REASON = "сотрудник отметил обращение как срочное"
 
     def mark_urgent(self, conversation_id):
-        """«Срочно»: at once to a specialist, to the top of the queue, with a promise of when
-        they answer. Already with a specialist: the request only rises in the queue."""
+        """«Срочно»: at once to a specialist, marked urgent, with a promise of when
+        they answer. Already with a specialist: it only gets the mark and the shorter deadline."""
         conversation = self.get_conversation(conversation_id)
         if conversation.status == "RESOLVED":
             raise DialogueConflict("resolved conversation cannot be marked urgent")
@@ -575,7 +575,7 @@ class TriageDialogueService(DialogueService):
                     card.update(urgency="high", urgency_reason=self.URGENT_REASON)
                     conversation.escalation_card = card
                 self._message(conversation, "assistant",
-                              f"Отметил как срочное — обращение поднялось наверх очереди, {promise}.",
+                              f"Отметил как срочное — специалист видит пометку «Срочно» и срок: {promise}.",
                               answer_kind="handoff")
             else:
                 team = self.engine.kb.get(conversation.playbook_id).escalation_team

@@ -149,7 +149,7 @@ def mark_urgent(
     db: Annotated[Session, Depends(get_db)],
     user: Annotated[User, Depends(require_employee)],
 ) -> ConversationRead:
-    """«Срочно»: straight to a specialist, top of the queue, with the time they will answer by."""
+    """«Срочно»: straight to a specialist, marked urgent, with the time they will answer by."""
     ensure_owned(db, conversation_id, user)
     try:
         return serialize(service.mark_urgent(conversation_id), service)

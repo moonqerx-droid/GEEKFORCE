@@ -169,7 +169,7 @@ export const api = {
     );
   },
 
-  /** «Срочно»: straight to a specialist, top of the queue. */
+  /** «Срочно»: straight to a specialist, marked urgent. */
   markUrgent(id: string, signal?: AbortSignal): Promise<Conversation> {
     return request(
       `/api/conversations/${id}/urgent`,

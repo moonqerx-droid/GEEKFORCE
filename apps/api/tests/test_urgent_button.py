@@ -50,7 +50,7 @@ def test_already_with_a_specialist_just_rises(client):
 
     assert state["status"] == "ESCALATED"
     assert state["urgency"] == "high"
-    assert "наверх очереди" in last_reply(state)
+    assert "пометку «Срочно»" in last_reply(state)
 
 
 def test_critical_stays_critical(client):

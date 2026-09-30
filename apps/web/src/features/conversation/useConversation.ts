@@ -29,7 +29,7 @@ export interface ConversationState {
   sendMessage: (content: string, files?: File[]) => Promise<void>;
   sendStepResult: (outcome: StepOutcome) => Promise<void>;
   escalateNow: () => Promise<void>;
-  /** «Срочно»: to a specialist at once, top of the queue. */
+  /** «Срочно»: to a specialist at once, marked urgent. */
   markUrgent: () => Promise<void>;
   retryFailedMessage: (id: number) => Promise<void>;
   rate: (rating: number, comment?: string) => Promise<void>;

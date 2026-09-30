@@ -100,7 +100,7 @@ export function ConversationPage({ onActivity }: { onActivity?: (conversation: C
             <div className="chat-head-actions">
               {canHurry ? (
                 <button type="button" className="chat-action chat-action-urgent" disabled={conv.sending}
-                  onClick={conv.markUrgent} title="Сразу к специалисту, наверх очереди">
+                  onClick={conv.markUrgent} title="Сразу к специалисту, с пометкой «Срочно» и сроком ответа">
                   <Flame size={17} aria-hidden="true" />
                   <span>Срочно</span>
                 </button>
