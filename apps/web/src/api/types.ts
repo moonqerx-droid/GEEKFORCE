@@ -402,3 +402,24 @@ export interface AdminConversation {
   match: string | null;
   messages: number;
 }
+
+/** «Решить самому» (GET /api/self-help): what an employee can do alone, no request needed. */
+export interface SelfHelpStep {
+  id: string;
+  title: string;
+  instruction: string;
+}
+
+export interface SelfHelp {
+  query: string;
+  code: { code: string; title: string; meaning: string; steps: SelfHelpStep[] } | null;
+  guide: { playbook_id: string; title: string; steps: SelfHelpStep[] } | null;
+  document: { source_id: string; title: string; text: string } | null;
+  specialist_only: boolean;
+  notice: string | null;
+}
+
+export interface SelfHelpPopular {
+  codes: { code: string; title: string }[];
+  topics: { title: string; query: string }[];
+}

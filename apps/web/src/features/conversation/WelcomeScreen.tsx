@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { Link } from "react-router-dom";
 import { api } from "../../api/client";
 import type { KnownIssue } from "../../api/types";
 import { formatTime } from "../../lib/labels";
@@ -78,6 +79,10 @@ export function WelcomeScreen({
           <span>Покажу, с какими проблемами помогаю и на какие вопросы о правилах компании отвечаю.</span>
         </p>
       ) : null}
+      <p className="welcome-self-help">
+        <Link to="/employee/help" className="welcome-self-help-link">Решить самому</Link>
+        <span>коды ошибок, инструкции и статус сервисов — без обращения, за минуту.</span>
+      </p>
       <ul className="welcome-promises">
         {PROMISES.map(([title, text]) => (
           <li key={title}><strong>{title}</strong><span>{text}</span></li>

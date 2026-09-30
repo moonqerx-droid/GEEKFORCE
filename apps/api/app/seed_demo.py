@@ -31,6 +31,9 @@ from app.repositories.conversations import ConversationRepository
 from app.services.admin import _aware
 from app.services.knowledge import KnowledgeService, KnowledgeUploadRefused
 from app.services.attachments import AttachmentService
+from app.core.config import get_settings
+from app.repositories.incidents import IncidentRepository
+from app.services.incidents import IncidentService
 from app.services.operator import OperatorService
 from app.services.triage import TriageDialogueService
 
@@ -189,6 +192,10 @@ OUTAGE = [
 ]
 
 
+OUTAGE_UPDATE = ("Сбой VPN подтверждён: на шлюзе истёк сертификат, инженеры его уже меняют. "
+                 "Почта и Teams работают без VPN. Ориентировочно починим в течение часа — напишем сюда.")
+
+
 def seed_incident(seed_value: int = 7, session_factory=SessionLocal) -> bool:
     """Make sure Incident Radar has an open VPN outage to show. Safe to re-run."""
     rng = random.Random(seed_value)
@@ -211,6 +218,17 @@ def seed_incident(seed_value: int = 7, session_factory=SessionLocal) -> bool:
             result = _play(dialogue, conversation.id, text, solve=False, rng=rng)
             _shift(repository.get(result.id), now - timedelta(minutes=minutes_ago))
             session.commit()
+        # A specialist confirms it and writes to everyone affected, as on a real day: employees
+        # see «VPN: известный сбой, уже чиним» and «У меня то же самое» before they write.
+        outage = session.scalar(select(Incident).where(
+            Incident.status.in_(("CANDIDATE", "ACTIVE")), Incident.service == "vpn",
+        ))
+        if outage is not None:
+            settings = get_settings()
+            IncidentService(
+                IncidentRepository(session), threshold=settings.incident_similarity_threshold,
+                min_cluster_size=settings.incident_min_cluster_size, window_minutes=settings.incident_window_minutes,
+            ).broadcast(outage.id, OUTAGE_UPDATE, "seed-vpn-update", outage.revision, author=people.get("anna"))
         return True
 
 

@@ -44,6 +44,9 @@ def test_seed_shows_a_fresh_vpn_outage(factory):
         assert utc_now() - oldest <= timedelta(minutes=30)
         # Some joined on their first message, without any troubleshooting.
         assert any(not member.steps for member in members)
+        # Confirmed by a specialist with an update: employees see it before they write.
+        assert incident.status == "ACTIVE"
+        assert incident.updates and "VPN" in incident.updates[-1].message
 
 
 def test_seed_is_idempotent(factory):

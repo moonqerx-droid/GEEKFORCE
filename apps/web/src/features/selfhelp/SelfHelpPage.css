@@ -1,0 +1,141 @@
+.help {
+  display: grid;
+  gap: var(--space-5);
+  max-width: 860px;
+  margin: 0 auto;
+  padding: var(--space-6);
+}
+
+.help-head h1 {
+  font-size: var(--font-size-xl);
+}
+
+.help-head p {
+  margin-top: var(--space-2);
+  color: var(--color-text-muted);
+}
+
+.help-search {
+  display: flex;
+  gap: var(--space-2);
+}
+
+.help-search input {
+  flex: 1;
+  min-width: 0;
+  padding: 11px 16px;
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-pill);
+  background: var(--color-surface);
+  font: inherit;
+}
+
+.help-search input:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+
+.help-popular {
+  display: grid;
+  gap: var(--space-2);
+}
+
+.help-popular-title {
+  color: var(--color-text-faint);
+  font-size: var(--font-size-xs);
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.help-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.help-chip {
+  padding: 6px 14px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-pill);
+  background: var(--color-surface);
+  font: inherit;
+  font-size: var(--font-size-sm);
+  cursor: pointer;
+}
+
+.help-chip span {
+  color: var(--color-text-muted);
+}
+
+.help-chip:hover {
+  border-color: var(--color-border-strong);
+  background: var(--paper);
+}
+
+.help-card {
+  display: grid;
+  gap: var(--space-3);
+  padding: var(--space-5);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  background: var(--color-surface);
+}
+
+.help-card h2 {
+  font-size: var(--font-size-md);
+}
+
+.help-card-document {
+  border-color: color-mix(in srgb, var(--blue) 35%, var(--color-border));
+  background: var(--blue-wash);
+}
+
+.help-card-danger {
+  border-color: var(--color-danger);
+  background: var(--color-danger-bg);
+}
+
+.help-meaning {
+  color: var(--color-text-muted);
+}
+
+.help-steps {
+  display: grid;
+  gap: var(--space-3);
+  margin: 0;
+  padding-left: var(--space-5);
+}
+
+.help-step label {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.help-step-text {
+  margin-top: 2px;
+  color: var(--color-text-muted);
+  font-size: var(--font-size-sm);
+}
+
+.help-step-done .help-step-title {
+  color: var(--color-text-faint);
+  text-decoration: line-through;
+}
+
+.help-empty,
+.help-alert {
+  color: var(--color-text-muted);
+}
+
+.help-foot {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-3);
+  color: var(--color-text-muted);
+  font-size: var(--font-size-sm);
+}

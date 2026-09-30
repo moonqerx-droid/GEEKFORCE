@@ -40,6 +40,11 @@ from .schemas import (
     Question,
     QuestionKind,
     RetrievedFragment,
+    SelfHelp,
+    SelfHelpCode,
+    SelfHelpDocument,
+    SelfHelpGuide,
+    SelfHelpStep,
     Step,
     StepOutcome,
     Urgency,
@@ -153,6 +158,47 @@ class TriageEngine:
         if self.llm is not None and self.llm.supports_analysis:
             analysis = self._merge_llm(analysis, message, ctx)
         return self._finalize(analysis, ctx)
+
+    def self_help(self, query: str) -> SelfHelp:
+        """«Решить самому»: the code's meaning and steps, the scenario's own steps and the company
+        document that answers — whatever the employee can do alone, without opening a request."""
+        query = " ".join(query.split())[:300]
+        result = SelfHelp(query=query)
+        if not query:
+            return result
+        codes = rules.extract_error_codes(query)
+        if not codes and _BARE_CODE_RE.fullmatch(query):
+            codes = rules.extract_error_codes(f"ошибка {query}")  # «809», «0x800ccc0e» on their own
+        found = self.kb.find_error_code(codes)
+        analysis = self.analyze(query)
+        playbook = self.kb.get(found[1].playbook if found else analysis.recommended_playbook)
+        if playbook.id in _PROTECTED_PLAYBOOKS or playbook.escalate_immediately:
+            return result.model_copy(update={
+                "specialist_only": True,
+                "notice": " ".join(part for part in (
+                    playbook.safety_notice,
+                    "С этим самому разбираться не нужно — создайте обращение, оно сразу уйдёт специалисту.",
+                ) if part),
+            })
+        if found is not None:
+            code, entry = found
+            result.code = SelfHelpCode(code=code, title=entry.title, meaning=entry.meaning, steps=[
+                SelfHelpStep(id=step.id, title=step.title, instruction=step.instruction)
+                for step in entry.steps if not step.requires_admin
+            ])
+        if playbook.id != "unknown":
+            context = ConversationContext(original_request=query, playbook_id=playbook.id,
+                                          known_facts=analysis.known_facts)
+            steps = [step for step in _open_steps(playbook, context)
+                     if not step.requires_admin and not step.id.startswith("code.")]
+            result.guide = SelfHelpGuide(playbook_id=playbook.id, title=playbook.title, steps=[
+                SelfHelpStep(id=step.id, title=step.title, instruction=step.instruction) for step in steps
+            ])
+        best = self._best_document(query)
+        if best is not None:
+            chunk, text = best
+            result.document = SelfHelpDocument(source_id=chunk.id, title=chunk.title, text=text)
+        return result
 
     def problem_count(self, context: ConversationContext) -> int:
         """How many problems this dialogue handles (one request may hold several)."""
@@ -1100,6 +1146,10 @@ ROOT_CAUSE_INTROS = {
 
 def _check_fact(playbook_id: str) -> str:
     return f"issue_resolved.{playbook_id}"
+
+
+# A code typed on its own in the self-help search: «809», «0x800ccc0e», «dns_probe_finished_nxdomain».
+_BARE_CODE_RE = re.compile(r"(?:0x)?[0-9a-f]{3,8}|[a-z]+(?:_[a-z]+)+|\d{2,6}", re.IGNORECASE)
 
 
 _ORDINALS = ["к первой", "ко второй", "к третьей", "к четвёртой", "к пятой"]

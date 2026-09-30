@@ -38,7 +38,8 @@ function titleOf(conversation: Conversation): string {
 export function ConversationPage({ onActivity }: { onActivity?: (conversation: Conversation | null) => void }) {
   const conv = useConversation();
   const { user } = useAuth();
-  const [draft, setDraft] = useState("");
+  // «Не помогло — создать обращение» from «Решить самому» arrives with the text filled in.
+  const [draft, setDraft] = useState(() => new URLSearchParams(window.location.search).get("draft") ?? "");
   const [cardOpen, setCardOpen] = useState(false);
   const chatRef = useRef<HTMLElement>(null);
   const scrollRef = useRef<HTMLDivElement>(null);

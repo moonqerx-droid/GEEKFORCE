@@ -320,3 +320,40 @@ class EscalationCard(BaseModel):
     source: str = "rules"
     # Every problem from the request with its status; the first one is the main one.
     issues: list[DetectedIssue] = Field(default_factory=list)
+
+
+class SelfHelpStep(BaseModel):
+    id: str
+    title: str
+    instruction: str
+
+
+class SelfHelpCode(BaseModel):
+    code: str
+    title: str
+    meaning: str
+    steps: list[SelfHelpStep] = Field(default_factory=list)
+
+
+class SelfHelpGuide(BaseModel):
+    playbook_id: str
+    title: str
+    steps: list[SelfHelpStep] = Field(default_factory=list)
+
+
+class SelfHelpDocument(BaseModel):
+    source_id: str
+    title: str
+    text: str
+
+
+class SelfHelp(BaseModel):
+    """«Решить самому»: what an employee can do alone for a code or a problem, no request needed."""
+
+    query: str
+    code: SelfHelpCode | None = None
+    guide: SelfHelpGuide | None = None
+    document: SelfHelpDocument | None = None
+    # Security, a mass outage, someone else's password: no self-help, straight to a person.
+    specialist_only: bool = False
+    notice: str | None = None

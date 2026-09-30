@@ -20,6 +20,7 @@ from app.api.routes.attachments import router as attachments_router
 from app.api.routes.profile import router as profile_router
 from app.api.routes.knowledge_admin import router as knowledge_admin_router
 from app.api.routes.known_issues import router as known_issues_router
+from app.api.routes.self_help import router as self_help_router
 from app.db.base import Base
 from app.db.session import SessionLocal, engine
 from app.core.config import get_settings
@@ -85,6 +86,7 @@ app.include_router(attachments_router)
 app.include_router(profile_router)
 app.include_router(knowledge_admin_router)
 app.include_router(known_issues_router)
+app.include_router(self_help_router)
 
 
 def asset_versions(*names: str) -> dict[str, str]:

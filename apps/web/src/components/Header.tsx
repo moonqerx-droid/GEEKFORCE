@@ -11,6 +11,7 @@ const NAV: Record<UserRole, { to: string; label: string; end?: boolean }[]> = {
   employee: [
     { to: "/employee?new=1", label: "Новое обращение", end: true },
     { to: "/employee/history", label: "Мои обращения" },
+    { to: "/employee/help", label: "Решить самому" },
   ],
   operator: [{ to: "/operator", label: "Обращения" }],
   admin: [

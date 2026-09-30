@@ -1,0 +1,80 @@
+.service-status {
+  display: grid;
+  gap: var(--space-3);
+  padding: var(--space-4) var(--space-5);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  background: var(--color-surface);
+}
+
+.service-status-title {
+  font-size: var(--font-size-md);
+}
+
+.service-status-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: var(--space-2) var(--space-5);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.service-row {
+  display: grid;
+  grid-template-columns: 10px auto 1fr;
+  align-items: baseline;
+  gap: var(--space-2);
+  font-size: var(--font-size-sm);
+}
+
+.service-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--color-success);
+  transform: translateY(-1px);
+}
+
+.service-name {
+  font-weight: 600;
+}
+
+.service-state {
+  color: var(--color-text-muted);
+}
+
+.service-row-down {
+  grid-column: 1 / -1;
+}
+
+.service-row-down .service-dot {
+  background: var(--color-danger);
+}
+
+.service-row-down .service-state {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--space-2);
+  color: var(--color-danger);
+}
+
+.service-update {
+  color: var(--color-text-muted);
+}
+
+.service-join {
+  padding: 3px 12px;
+  border: 1px solid var(--color-danger);
+  border-radius: var(--radius-pill);
+  background: transparent;
+  color: var(--color-danger);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.service-join:hover {
+  background: var(--color-danger-bg);
+}

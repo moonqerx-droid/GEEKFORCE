@@ -1,31 +1,33 @@
 import { ApiError, ConflictError, NetworkError, NotFoundError, ValidationError } from "./errors";
 import type {
-  KnownIssue,
   AdminConversation,
-  KnowledgeDocument,
-  KnowledgeDocumentDetail,
+  AdminUser,
+  AdminUserUpdate,
   Attachment,
+  AuthUser,
+  ChangePasswordPayload,
   Conversation,
   Incident,
   IncidentBroadcastResult,
+  KnowledgeDocument,
+  KnowledgeDocumentDetail,
+  KnownIssue,
+  LoginPayload,
   MessageCreatePayload,
-  OperatorTicket,
-  AdminUser,
-  AdminUserUpdate,
-  AuthUser,
-  ChangePasswordPayload,
+  Metrics,
   NewOperatorPayload,
+  OperatorRegistrationPayload,
+  OperatorTicket,
   PersonalMetrics,
   Profile,
   ProfileUpdate,
-  SpecialistMetrics,
-  TemporaryCredential,
-  LoginPayload,
-  Metrics,
-  TicketScope,
-  OperatorRegistrationPayload,
   RegistrationPayload,
+  SelfHelp,
+  SelfHelpPopular,
+  SpecialistMetrics,
   StepResultPayload,
+  TemporaryCredential,
+  TicketScope,
 } from "./types";
 
 const BASE_URL = import.meta.env.VITE_API_BASE_URL ?? "";
@@ -119,6 +121,14 @@ export const api = {
 
   createConversation(signal?: AbortSignal): Promise<Conversation> {
     return request("/api/conversations", { method: "POST" }, signal);
+  },
+
+  selfHelp(query: string, signal?: AbortSignal): Promise<SelfHelp> {
+    return request(`/api/self-help?q=${encodeURIComponent(query)}`, {}, signal);
+  },
+
+  selfHelpPopular(signal?: AbortSignal): Promise<SelfHelpPopular> {
+    return request("/api/self-help/popular", {}, signal);
   },
 
   knownIssues(signal?: AbortSignal): Promise<KnownIssue[]> {
