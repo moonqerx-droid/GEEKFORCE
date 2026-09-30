@@ -6,7 +6,9 @@ import type {
   Attachment,
   AuthUser,
   ChangePasswordPayload,
+  Colleague,
   Conversation,
+  DirectMessage,
   Incident,
   IncidentBroadcastResult,
   KnowledgeDocument,
@@ -18,6 +20,7 @@ import type {
   NewOperatorPayload,
   OperatorRegistrationPayload,
   OperatorTicket,
+  PeerHelpRequest,
   PersonalMetrics,
   Profile,
   ProfileUpdate,
@@ -129,6 +132,47 @@ export const api = {
 
   selfHelpPopular(signal?: AbortSignal): Promise<SelfHelpPopular> {
     return request("/api/self-help/popular", {}, signal);
+  },
+
+  peerHelpFeed(signal?: AbortSignal): Promise<PeerHelpRequest[]> {
+    return request("/api/peer-help", {}, signal);
+  },
+
+  /** My request's entry in «Помощь коллег», or null if I have not asked colleagues. */
+  conversationPeerHelp(conversationId: string, signal?: AbortSignal): Promise<PeerHelpRequest | null> {
+    return request(`/api/conversations/${conversationId}/peer-help`, {}, signal);
+  },
+
+  publishPeerHelp(conversationId: string): Promise<PeerHelpRequest> {
+    return request(`/api/conversations/${conversationId}/peer-help`, { method: "POST" });
+  },
+
+  peerHelp(id: string, signal?: AbortSignal): Promise<PeerHelpRequest> {
+    return request(`/api/peer-help/${id}`, {}, signal);
+  },
+
+  claimPeerHelp(id: string): Promise<PeerHelpRequest> {
+    return request(`/api/peer-help/${id}/claim`, { method: "POST" });
+  },
+
+  sendPeerHelpMessage(id: string, content: string): Promise<PeerHelpRequest> {
+    return request(`/api/peer-help/${id}/messages`, { method: "POST", body: JSON.stringify({ content }) });
+  },
+
+  resolvePeerHelp(id: string): Promise<PeerHelpRequest> {
+    return request(`/api/peer-help/${id}/resolve`, { method: "POST" });
+  },
+
+  colleagues(signal?: AbortSignal): Promise<Colleague[]> {
+    return request("/api/colleagues", {}, signal);
+  },
+
+  directMessages(colleagueId: string, signal?: AbortSignal): Promise<DirectMessage[]> {
+    return request(`/api/colleagues/${colleagueId}/messages`, {}, signal);
+  },
+
+  sendDirectMessage(colleagueId: string, content: string): Promise<DirectMessage> {
+    return request(`/api/colleagues/${colleagueId}/messages`, { method: "POST", body: JSON.stringify({ content }) });
   },
 
   knownIssues(signal?: AbortSignal): Promise<KnownIssue[]> {

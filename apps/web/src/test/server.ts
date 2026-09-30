@@ -10,6 +10,9 @@ export const handlers = [
   http.get("*/api/conversations", () => HttpResponse.json([])),
   http.get("*/api/known-issues", () => HttpResponse.json([])),
   http.get("*/api/self-help/popular", () => HttpResponse.json({ codes: [], topics: [] })),
+  http.get("*/api/conversations/:id/peer-help", () => HttpResponse.json(null)),
+  http.get("*/api/peer-help", () => HttpResponse.json([])),
+  http.get("*/api/colleagues", () => HttpResponse.json([])),
 
   http.get("*/api/conversations/:id", ({ params }) =>
     HttpResponse.json(makeConversation({ id: params.id as string })),

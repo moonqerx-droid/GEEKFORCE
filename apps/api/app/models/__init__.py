@@ -5,6 +5,7 @@ from app.models.audit import AdminAuditEvent
 from app.models.incident import Incident, IncidentUpdate
 from app.models.knowledge import KnowledgeChunk, KnowledgeDocument
 from app.models.learned_step import LearnedStep
+from app.models.peer_help import DirectMessage, PeerHelpMessage, PeerHelpRequest
 from app.models.reply_template import ReplyTemplate
 
 __all__ = [
@@ -12,6 +13,7 @@ __all__ = [
     "AuthSession",
     "AdminAuditEvent",
     "Conversation",
+    "DirectMessage",
     "EmailToken",
     "Incident",
     "IncidentUpdate",
@@ -20,6 +22,8 @@ __all__ = [
     "LearnedStep",
     "Message",
     "OperatorInvite",
+    "PeerHelpMessage",
+    "PeerHelpRequest",
     "ReplyTemplate",
     "TroubleshootingStep",
     "User",

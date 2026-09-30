@@ -27,6 +27,8 @@ class User(Base):
     last_login_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     must_change_password: Mapped[bool] = mapped_column(Boolean, default=False, server_default="0")
     revision: Mapped[int] = mapped_column(Integer, default=1, server_default="1")
+    # Сколько раз совет этого сотрудника решил проблему коллеги («Помощь коллег»).
+    helped_count: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
 
     sessions: Mapped[list[AuthSession]] = relationship(back_populates="user", cascade="all, delete-orphan")
     email_tokens: Mapped[list[EmailToken]] = relationship(back_populates="user", cascade="all, delete-orphan")

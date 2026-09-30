@@ -35,7 +35,7 @@ def test_initial_migration_adopts_pre_alembic_database(tmp_path):
 
     assert inspect(engine).has_table("alembic_version")
     with engine.connect() as connection:
-        assert connection.scalar(text("SELECT version_num FROM alembic_version")) == "20260930_0014"
+        assert connection.scalar(text("SELECT version_num FROM alembic_version")) == "20261001_0015"
         assert connection.scalar(text("SELECT id FROM conversations WHERE id='preserved'")) == "preserved"
     inspector = inspect(engine)
     assert {"users", "auth_sessions", "email_tokens", "operator_invites"}.issubset(
@@ -227,3 +227,21 @@ def test_learned_steps_migration_roundtrip(tmp_path):
 
     command.downgrade(config, "20260928_0013")
     assert "learned_steps" not in inspect(engine).get_table_names()
+
+
+def test_peer_help_migration_roundtrip(tmp_path):
+    database_url = f"sqlite:///{tmp_path / 'peer.db'}"
+    config = Config("alembic.ini")
+    config.set_main_option("sqlalchemy.url", database_url)
+    command.upgrade(config, "20260930_0014")
+    engine = create_engine(database_url)
+
+    command.upgrade(config, "head")
+    inspector = inspect(engine)
+    assert {"peer_help_requests", "peer_help_messages", "direct_messages"} <= set(inspector.get_table_names())
+    assert "helped_count" in {column["name"] for column in inspector.get_columns("users")}
+
+    command.downgrade(config, "20260930_0014")
+    inspector = inspect(engine)
+    assert "peer_help_requests" not in inspector.get_table_names()
+    assert "helped_count" not in {column["name"] for column in inspector.get_columns("users")}

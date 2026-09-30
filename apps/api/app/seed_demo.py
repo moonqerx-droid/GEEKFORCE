@@ -398,6 +398,40 @@ def seed_showcase(session_factory=SessionLocal) -> bool:
         return True
 
 
+# «Помощь коллег»: вежливые просьбы от сотрудников, которые ждут специалиста.
+PEER_HELP = [
+    ("elena", "VPN подключается, но корпоративный портал не открывается. Подскажите, кто сталкивался?"),
+    ("dmitry", "После обновления Outlook перестал показывать новые письма, помогите, пожалуйста"),
+    ("olga", "CRM в браузере постоянно возвращает на страницу входа, может, кто-то знает, что делать?"),
+]
+
+
+def seed_peer_help(session_factory=SessionLocal) -> bool:
+    """Лента «Помощь коллег» не пустая с первого запуска: три просьбы от демо-сотрудников."""
+    from app.models.peer_help import PeerHelpRequest
+    from app.services.peer_help import PeerHelpService
+
+    with session_factory() as session:
+        if session.scalar(select(PeerHelpRequest)) is not None:
+            return False
+        people = {user.email.split("@")[0]: user for user in session.scalars(
+            select(User).where(User.email.like(f"%@{DOMAIN}"))
+        ).all()}
+        if not all(key in people for key, _ in PEER_HELP):
+            return False
+        repository = ConversationRepository(session)
+        dialogue = TriageDialogueService(repository, TriageEngine(KnowledgeBase.load(), None))
+        peers = PeerHelpService(session)
+        for key, text in PEER_HELP:
+            conversation = dialogue.create_conversation()
+            conversation.owner_id = people[key].id
+            session.commit()
+            dialogue.handle_message(conversation.id, text)
+            dialogue.escalate(conversation.id)
+            peers.publish(conversation.id, people[key])
+        return True
+
+
 def seed_templates(session_factory=SessionLocal) -> bool:
     """A few ready-made replies so "Шаблоны" is not empty on first run."""
     with session_factory() as session:
@@ -416,10 +450,11 @@ def reset_history(session_factory=SessionLocal) -> int:
     from app.models.attachment import Attachment
     from app.models.conversation import Message, TroubleshootingStep
     from app.models.incident import IncidentUpdate
+    from app.models.peer_help import PeerHelpMessage, PeerHelpRequest
 
     with session_factory() as session:
         removed = session.query(Conversation).count()
-        for model in (Attachment, TroubleshootingStep, Message, Conversation, IncidentUpdate, Incident):
+        for model in (PeerHelpMessage, PeerHelpRequest, Attachment, TroubleshootingStep, Message, Conversation, IncidentUpdate, Incident):
             session.query(model).delete(synchronize_session=False)
         session.commit()
     return removed
@@ -437,6 +472,7 @@ def main() -> None:
         print(f"Загружено документов компании: {documents} (раздел «База знаний»).")
     showcase = seed_showcase()
     templates = seed_templates()
+    peer_help = seed_peer_help()
     if not created:
         print(f"Демо-данные уже есть. Вход: admin@{DOMAIN} / {PASSWORD}")
         if outage:
@@ -445,6 +481,8 @@ def main() -> None:
             print("Добавлены обращения со скриншотами для специалиста и одно решённое с оценкой.")
         if templates:
             print("Добавлены шаблоны ответов.")
+        if peer_help:
+            print("Добавлены просьбы в ленту «Помощь коллег».")
         return
     print("Демо-данные созданы. Пароль всех аккаунтов:", PASSWORD)
     print(f"  Админ:     admin@{DOMAIN}")

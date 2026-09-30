@@ -12,6 +12,7 @@ import { MessageThread } from "./MessageThread";
 import { stepMarkers } from "./steps";
 import { StepCard } from "./StepCard";
 import { useTabNotice } from "../../lib/useTabNotice";
+import { ConversationPeerHelp } from "../peer-help/ConversationPeerHelp";
 
 const NO_MESSAGES: Message[] = [];
 import { QuickReplies } from "./QuickReplies";
@@ -192,6 +193,7 @@ export function ConversationPage({ onActivity }: { onActivity?: (conversation: C
             {conv.error ? <div className="chat-alert" role="alert">{conv.error}</div> : null}
             {c && live && c.incident_id ? <OutagePanel conversation={c} /> : null}
             {c?.status === "ESCALATED" && !c.incident_id ? <WaitingPanel conversation={c} /> : null}
+            {c && !c.incident_id ? <ConversationPeerHelp conversation={c} onResolved={() => void conv.refresh()} /> : null}
             {showComposer ? (
               <Composer
                 busy={conv.sending}

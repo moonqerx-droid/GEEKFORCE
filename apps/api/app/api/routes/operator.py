@@ -2,7 +2,7 @@ from typing import Annotated, Literal
 
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
 from pydantic import BaseModel
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, object_session
 
 from app.core.config import get_settings
 from app.db.session import get_db
@@ -26,6 +26,8 @@ from app.models.auth import User
 from app.services.dialogue import ConversationNotFound, DialogueConflict
 from app.services.operator import OperatorService
 from app.services.reply_draft import draft_reply
+from app.schemas.peer_help import PeerHelpRead
+from app.services.peer_help import PeerHelpService
 
 router = APIRouter(prefix="/api/operator", tags=["operator"])
 
@@ -41,6 +43,7 @@ ServiceDependency = Annotated[OperatorService, Depends(get_operator_service)]
 
 def to_ticket(conversation) -> OperatorTicketWithSla:
     serialized = ConversationRead.from_model(conversation)
+    peer_help = PeerHelpService(object_session(conversation)).for_conversation(conversation.id)
     original_request = next(
         (message.content for message in conversation.messages if message.role == "user"), "",
     )
@@ -51,6 +54,7 @@ def to_ticket(conversation) -> OperatorTicketWithSla:
         owner_name=conversation.owner_name,
         owner_department=conversation.owner_department,
         sla=SlaRead(**sla.__dict__) if sla else None,
+        peer_help=PeerHelpRead.from_model(peer_help) if peer_help else None,
     )
 
 

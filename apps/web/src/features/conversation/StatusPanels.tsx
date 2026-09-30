@@ -81,6 +81,7 @@ export function ResolvedPanel({
   const [comment, setComment] = useState("");
   const [busy, setBusy] = useState(false);
   const byOperator = conversation.resolved_by === "operator";
+  const byColleague = conversation.resolved_by === "colleague";
   const took = minutesBetween(conversation.created_at, conversation.resolved_at);
   const rated = conversation.rating ?? null;
 
@@ -95,7 +96,9 @@ export function ResolvedPanel({
     <section className="panel panel-resolved" aria-labelledby="resolved-title">
       <h2 id="resolved-title" className="panel-title">Готово, проблема решена</h2>
       <p className="panel-text">
-        {byOperator && conversation.assignee_name ? `Решено со специалистом: ${conversation.assignee_name}` : "Справились вместе с помощником, без ожидания специалиста"}
+        {byColleague ? "Помог совет коллеги — спасибо за взаимопомощь"
+          : byOperator && conversation.assignee_name ? `Решено со специалистом: ${conversation.assignee_name}`
+          : "Справились вместе с помощником, без ожидания специалиста"}
         {took != null ? `. Заняло ${formatMinutes(took)}.` : "."}
       </p>
 

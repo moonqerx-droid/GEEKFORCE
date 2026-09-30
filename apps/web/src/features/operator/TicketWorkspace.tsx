@@ -1,3 +1,4 @@
+import { PeerHelpNote } from "./PeerHelpNote";
 import { useRef, useState } from "react";
 import type { OperatorTicket } from "../../api/types";
 import { Button } from "../../components/Button";
@@ -101,6 +102,7 @@ export function TicketWorkspace({
       {takenByOther && open ? (
         <div className="workspace-note" role="status">Обращение ведёт {ticket.assignee_name}. Вы можете читать переписку.</div>
       ) : null}
+      {ticket.peer_help && ticket.peer_help.status !== "CANCELLED" ? <PeerHelpNote item={ticket.peer_help} /> : null}
 
       <div className="workspace-thread">
         <MessageThread messages={ticket.messages} viewer="operator" employeeName={ticket.owner_name} steps={stepMarkers(ticket)} />

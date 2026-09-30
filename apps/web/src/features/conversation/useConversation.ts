@@ -36,6 +36,8 @@ export interface ConversationState {
   dismissNotice: () => void;
   /** Continue in the earlier open request about the same problem; this one is removed. */
   mergeIntoSimilar: () => Promise<void>;
+  /** Reload after something outside this chat changed it (a colleague's advice closed it). */
+  refresh: () => Promise<void>;
 }
 
 /** While a specialist owns the conversation, their replies arrive by polling. */
@@ -423,7 +425,17 @@ export function useConversation(): ConversationState {
     }
   }, [conversation]);
 
+  const refresh = useCallback(async () => {
+    if (!conversation) return;
+    try {
+      setConversation(await api.getConversation(conversation.id));
+    } catch (err) {
+      setError(describeError(err));
+    }
+  }, [conversation]);
+
   return {
+    refresh,
     mergeIntoSimilar,
     phase,
     conversation,

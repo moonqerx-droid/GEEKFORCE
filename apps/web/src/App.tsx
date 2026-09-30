@@ -1,4 +1,6 @@
 import { SelfHelpPage } from "./features/selfhelp/SelfHelpPage";
+import { PeerHelpPage } from "./features/peer-help/PeerHelpPage";
+import { ColleaguesPage } from "./features/peer-help/ColleaguesPage";
 import { Navigate, Route, Routes } from "react-router-dom";
 import { AppShell } from "./components/AppShell";
 import { useAuth } from "./features/auth/AuthProvider";
@@ -49,6 +51,8 @@ export default function App() {
       <Route path="/employee" element={<RequireEmployee><EmployeePage /></RequireEmployee>} />
       <Route path="/employee/history" element={<RequireEmployee><EmployeeHistoryPage /></RequireEmployee>} />
       <Route path="/employee/help" element={<RequireEmployee><SelfHelpPage /></RequireEmployee>} />
+      <Route path="/employee/peers" element={<RequireEmployee><PeerHelpPage /></RequireEmployee>} />
+      <Route path="/employee/colleagues" element={<RequireEmployee><ColleaguesPage /></RequireEmployee>} />
       <Route path="/operator" element={<RequireOperator><OperatorPageRoute /></RequireOperator>} />
       <Route path="/admin" element={<RequireAdmin><AdminDashboard /></RequireAdmin>} />
       <Route path="/admin/team" element={<RequireAdmin><AdminTeam /></RequireAdmin>} />

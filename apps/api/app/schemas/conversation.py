@@ -202,6 +202,8 @@ class OperatorTicket(ConversationRead):
     original_request: str
     owner_name: str | None = None
     owner_department: str | None = None
+    # «Помощь коллег»: кто помогает сотруднику и их переписка — только для чтения.
+    peer_help: "PeerHelpRead | None" = None
 
 
 def _infer_answer_kind(model):
@@ -260,3 +262,8 @@ def _step_titles() -> dict[str, str]:
         return {step.id: step.title for playbook in KnowledgeBase.load().playbooks for step in playbook.steps}
     except Exception:  # noqa: BLE001 — titles are a nicety; the step text is still there
         return {}
+
+
+from app.schemas.peer_help import PeerHelpRead  # noqa: E402 -- avoids a circular import
+
+OperatorTicket.model_rebuild()

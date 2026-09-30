@@ -259,3 +259,34 @@ def test_a_rerun_confirms_an_outage_left_as_a_candidate(factory):
         [incident] = open_incidents(session)
         assert incident.status == "ACTIVE"
         assert incident.updates
+
+
+def test_peer_help_feed_has_polite_examples_from_real_people(factory):
+    from app.models.peer_help import PeerHelpRequest
+    from app.seed_demo import seed_peer_help
+
+    seed(total=12, session_factory=factory)
+    assert seed_peer_help(session_factory=factory) is True
+    assert seed_peer_help(session_factory=factory) is False
+
+    with factory() as session:
+        items = session.scalars(select(PeerHelpRequest)).all()
+        assert len(items) == 3
+        for item in items:
+            conversation = session.get(Conversation, item.conversation_id)
+            assert item.status == "OPEN"
+            assert conversation.owner_id == item.author_id
+            assert conversation.status == "ESCALATED"
+            assert conversation.playbook_id != "security_incident"
+
+
+def test_reset_history_also_clears_the_peer_help_feed(factory):
+    from app.models.peer_help import PeerHelpRequest
+    from app.seed_demo import reset_history, seed_peer_help
+
+    seed(total=12, session_factory=factory)
+    seed_peer_help(session_factory=factory)
+    reset_history(session_factory=factory)
+
+    with factory() as session:
+        assert session.scalars(select(PeerHelpRequest)).all() == []

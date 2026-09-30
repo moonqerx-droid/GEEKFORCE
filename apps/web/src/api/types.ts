@@ -95,7 +95,7 @@ export interface Conversation {
   reply_due_at?: string | null;
   reply_target_minutes?: number | null;
   resolved_at?: string | null;
-  resolved_by?: "assistant" | "operator" | null;
+  resolved_by?: "assistant" | "operator" | "colleague" | null;
   rating?: number | null;
   rating_comment?: string | null;
 }
@@ -104,6 +104,8 @@ export interface OperatorTicket extends Conversation {
   original_request: string;
   owner_name?: string | null;
   owner_department?: Department | null;
+  /** «Помощь коллег»: who helps the employee and their chat, read-only for the specialist. */
+  peer_help?: PeerHelpRequest | null;
 }
 
 export type TicketScope = "queue" | "mine" | "resolved";
@@ -426,4 +428,42 @@ export interface SelfHelp {
 export interface SelfHelpPopular {
   codes: { code: string; title: string }[];
   topics: { title: string; query: string }[];
+}
+
+/** A fellow employee in «Помощь коллег» and «Коллеги». */
+export interface Colleague {
+  id: string;
+  name: string;
+  department: Department;
+  helped_count: number;
+}
+
+export interface PeerHelpMessage {
+  id: number;
+  sender: Colleague;
+  content: string;
+  created_at: string;
+}
+
+export type PeerHelpStatus = "OPEN" | "HELPING" | "RESOLVED" | "CANCELLED";
+
+export interface PeerHelpRequest {
+  id: string;
+  conversation_id: string;
+  title: string;
+  area: string;
+  status: PeerHelpStatus;
+  author: Colleague;
+  helper: Colleague | null;
+  messages: PeerHelpMessage[];
+  created_at: string;
+  updated_at: string;
+}
+
+export interface DirectMessage {
+  id: number;
+  sender: Colleague;
+  recipient: Colleague;
+  content: string;
+  created_at: string;
 }
