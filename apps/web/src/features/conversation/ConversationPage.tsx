@@ -1,4 +1,3 @@
-import { Link } from "react-router-dom";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Flame, PanelRight, UserRoundCheck } from "lucide-react";
 import type { Conversation, Message } from "../../api/types";
@@ -41,6 +40,8 @@ export function ConversationPage({ onActivity }: { onActivity?: (conversation: C
   // «Не помогло — создать обращение» from «Решить самому» arrives with the text filled in.
   const [draft, setDraft] = useState(() => new URLSearchParams(window.location.search).get("draft") ?? "");
   const [cardOpen, setCardOpen] = useState(false);
+  // «Это другое»: the hint about a similar open request is hidden for this request only.
+  const [dismissedSimilar, setDismissedSimilar] = useState<string | null>(null);
   const chatRef = useRef<HTMLElement>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const steps = useMemo(() => stepMarkers(conv.conversation), [conv.conversation]);
@@ -128,13 +129,19 @@ export function ConversationPage({ onActivity }: { onActivity?: (conversation: C
               </div>
             ) : null}
 
-            {c?.similar_open ? (
+            {c?.similar_open && dismissedSimilar !== c.id ? (
               <aside className="similar-open" role="note" aria-label="Похожее открытое обращение">
                 <p>
                   У вас уже есть открытое обращение «{c.similar_open.summary ?? "без названия"}». Если это то же
-                  самое, продолжите там — не придётся объяснять заново.
+                  самое, продолжите там: ваше сообщение перенесём, а это обращение закроем — не придётся объяснять заново.
                 </p>
-                <Link to={`/employee?conversation=${c.similar_open.id}`}>Открыть его</Link>
+                <span className="similar-open-actions">
+                  <button type="button" className="similar-open-go" disabled={conv.sending}
+                    onClick={() => void conv.mergeIntoSimilar()}>Продолжить там</button>
+                  <button type="button" className="similar-open-stay" onClick={() => setDismissedSimilar(c.id)}>
+                    Это другое
+                  </button>
+                </span>
               </aside>
             ) : null}
 
@@ -154,6 +161,10 @@ export function ConversationPage({ onActivity }: { onActivity?: (conversation: C
                 thinkingLabel={live ? "Отправляем специалисту" : c ? "Помощник думает" : "Помощник разбирается в ситуации"}
                 steps={steps}
               />
+            ) : null}
+
+            {c?.status === "CLARIFYING" && c.question_reason && !conv.sending && conv.pendingMessage == null ? (
+              <p className="question-reason"><span>Почему спрашиваю:</span> {c.question_reason}</p>
             ) : null}
 
             {c?.status === "CLARIFYING" && c.quick_replies?.length && !conv.sending && conv.pendingMessage == null ? (

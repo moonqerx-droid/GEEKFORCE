@@ -79,6 +79,8 @@ export interface Conversation {
   citations?: Citation[];
   /** One-tap answers to the question the assistant just asked; empty when it needs free text. */
   quick_replies?: string[];
+  /** «Почему я спрашиваю»: how the answer to the question on screen changes the next step. */
+  question_reason?: string | null;
   /** The employee's other open request about the same problem, when this one repeats it. */
   similar_open?: { id: string; summary: string | null } | null;
   rag_source_ids: string[];

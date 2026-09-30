@@ -3,6 +3,7 @@
 #   sh deploy/setup-server.sh helpflow.example.ru          # domain: HTTPS from Let's Encrypt
 #   sh deploy/setup-server.sh 203.0.113.10                 # IP only: plain HTTP
 #   sh deploy/setup-server.sh helpflow.example.ru --demo   # demo stand for the jury
+#   sh deploy/setup-server.sh helpflow.example.ru --demo --fresh   # the same, with a clean history
 # --demo adds demo accounts with the PUBLIC password DemoPass123 (including the support lead)
 # and one-click logins: anyone with the address can sign in as admin. Only for a demo.
 # Without --demo no accounts are created: set ADMIN_EMAIL and ADMIN_PASSWORD in .env.
@@ -12,7 +13,13 @@ set -eu
 
 ADDRESS="${1:?Укажите домен или IP сервера: sh deploy/setup-server.sh helpflow.example.ru [--demo]}"
 DEMO=false
-[ "${2:-}" = "--demo" ] && DEMO=true
+FRESH=false
+for flag in "$@"; do
+  case "$flag" in
+    --demo) DEMO=true ;;
+    --fresh) FRESH=true ;;  # with --demo: forget every request and replay the demo history
+  esac
+done
 COMPOSE="docker compose -f docker-compose.yml -f docker-compose.prod.yml"
 
 if ! command -v docker >/dev/null 2>&1; then
@@ -58,7 +65,11 @@ done
 echo
 
 if [ "$DEMO" = true ]; then
-  $COMPOSE exec -T api python -m app.seed_demo
+  if [ "$FRESH" = true ]; then
+    $COMPOSE exec -T api python -m app.seed_demo --reset-history
+  else
+    $COMPOSE exec -T api python -m app.seed_demo
+  fi
   echo
   echo "Готово: $URL"
   echo "ВНИМАНИЕ: демо-режим. Пароль всех аккаунтов DemoPass123 известен всем, включая руководителя."

@@ -545,3 +545,22 @@
   color: var(--color-danger);
   font-size: var(--font-size-sm);
 }
+
+/* «Обучение на закрытых обращениях»: a specialist's resolution → a step for the next employee. */
+.learn-subtitle {
+  margin-top: var(--space-4);
+  font-size: var(--font-size-sm);
+  color: var(--ink-soft);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.learn-request,
+.learn-source {
+  color: var(--ink-soft);
+  font-size: var(--font-size-xs);
+}
+
+.learn-edit {
+  margin-top: var(--space-2);
+}

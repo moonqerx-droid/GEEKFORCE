@@ -55,6 +55,10 @@ EMPLOYEES = [
 
 # (first message, weight). Mixed tone on purpose: emotional, vague, urgent, calm.
 REQUESTS = [
+    # Questions about the company rules, answered from the demo documents with a quote.
+    ("Сколько дней отпуска мне положено?", 2),
+    ("Какие суточные в командировке за рубежом?", 1),
+    ("Как заказать пропуск для гостя?", 1),
     ("Не подключается VPN из дома, пишет ошибку подключения", 6),
     ("VPN постоянно отваливается каждые 10 минут, невозможно работать", 3),
     ("Outlook не получает новые письма со вчерашнего дня", 5),
@@ -76,12 +80,26 @@ OPERATOR_REPLIES = [
     "Здравствуйте! Нашёл причину: на сервере зависла ваша сессия. Сбросил её — попробуйте ещё раз.",
 ]
 EMPLOYEE_FOLLOWUPS = ["Спасибо, жду", "Попробовал — теперь всё работает!", "Да, заработало, спасибо"]
-RESOLUTIONS = [
-    "Сброшена зависшая сессия, вход восстановлен",
-    "Выдан доступ к ресурсу по согласованию с руководителем",
-    "Переустановлен профиль почты, синхронизация восстановлена",
-    "Обновлены сертификаты VPN-клиента",
-]
+# What specialists wrote when closing, per scenario: the reply draft and «Обучение на закрытых
+# обращениях» quote these, so a VPN fix must never be offered for a phishing report.
+RESOLUTIONS = {
+    "vpn_connection": ["Обновлены сертификаты VPN-клиента", "Переустановлен VPN-клиент, профиль «Офис» пересоздан"],
+    "email_outlook": ["Переустановлен профиль почты, синхронизация восстановлена",
+                      "Очищен переполненный почтовый ящик, письма снова приходят"],
+    "password_login": ["Учётная запись разблокирована, пароль сброшен по звонку сотрудника",
+                       "Удалён старый пароль из диспетчера учётных данных Windows"],
+    "crm_login_device_specific": ["Сброшена зависшая сессия CRM, вход восстановлен",
+                                  "Очищены куки CRM в браузере ноутбука, вход восстановлен"],
+    "access_rights": ["Выдан доступ к ресурсу по согласованию с руководителем"],
+    "security_incident": ["Пароль сброшен, все сессии завершены, компьютер проверен антивирусом — заражения нет"],
+    "printer": ["Очищена зависшая очередь печати на принт-сервере"],
+    "network_wifi": ["Ноутбук переподключён к корпоративной сети Wi-Fi, обновлён сертификат сети"],
+    "video_calls": ["В настройках звука Windows выбрана гарнитура как устройство по умолчанию"],
+    "slow_performance": ["Отключены программы в автозагрузке, установлены обновления Windows"],
+    "app_not_starting": ["Программа переустановлена из каталога компании"],
+    "onec_login": ["Освобождены зависшие сеансы 1С на сервере лицензий"],
+}
+GENERIC_RESOLUTION = "Проблема устранена специалистом удалённо"
 
 
 def _user(session, key, first, last, role, department="it"):
@@ -127,13 +145,23 @@ def _shift(conversation: Conversation, start) -> None:
 
 
 def seed(total: int = 60, seed_value: int = 42, session_factory=SessionLocal) -> bool:
+    """People, then the demo documents, then two weeks of history. Returns False when there is
+    already a history; after `reset_history` the same people get a new one."""
     rng = random.Random(seed_value)
     with session_factory() as session:
-        if session.scalar(select(User).where(User.email == f"admin@{DOMAIN}")):
+        if session.scalar(select(Conversation.id).limit(1)) is not None:
             return False
-        staff = {key: _user(session, key, first, last, role) for key, first, last, role in STAFF}
-        employees = [_user(session, key, first, last, "employee", dept) for key, first, last, dept in EMPLOYEES]
+        existing = {user.email: user for user in session.scalars(select(User).where(User.email.like(f"%@{DOMAIN}")))}
+
+        def person(key, first, last, role, department="it"):
+            return existing.get(f"{key}@{DOMAIN}") or _user(session, key, first, last, role, department)
+
+        staff = {key: person(key, first, last, role) for key, first, last, role in STAFF}
+        employees = [person(key, first, last, "employee", dept) for key, first, last, dept in EMPLOYEES]
         session.commit()
+        # Documents first: the history is played through the same assistant the jury talks to,
+        # so «Сколько дней отпуска?» there gets the same «28 дней», not «в документах нет».
+        seed_documents(session_factory=session_factory)
         operators = [staff["anna"], staff["oleg"]]
 
         engine = TriageEngine(KnowledgeBase.load(), None)
@@ -156,7 +184,8 @@ def seed(total: int = 60, seed_value: int = 42, session_factory=SessionLocal) ->
                 specialist.assign(result.id, operator)
                 specialist.reply(result.id, operator, rng.choice(OPERATOR_REPLIES))
                 dialogue.handle_message(result.id, rng.choice(EMPLOYEE_FOLLOWUPS))
-                specialist.resolve(result.id, operator, rng.choice(RESOLUTIONS))
+                resolutions = RESOLUTIONS.get(result.playbook_id) or [GENERIC_RESOLUTION]
+                specialist.resolve(result.id, operator, rng.choice(resolutions))
             elif result.status == "ESCALATED" and index == total - 1:
                 specialist.assign(result.id, operators[1])
                 specialist.reply(result.id, operators[1], OPERATOR_REPLIES[1])
@@ -370,7 +399,26 @@ def seed_templates(session_factory=SessionLocal) -> bool:
         return True
 
 
+def reset_history(session_factory=SessionLocal) -> int:
+    """Before a demo: forget every request and outage (people, documents and templates stay),
+    so the history is played again by the assistant as it is now."""
+    from app.models.attachment import Attachment
+    from app.models.conversation import Message, TroubleshootingStep
+    from app.models.incident import IncidentUpdate
+
+    with session_factory() as session:
+        removed = session.query(Conversation).count()
+        for model in (Attachment, TroubleshootingStep, Message, Conversation, IncidentUpdate, Incident):
+            session.query(model).delete(synchronize_session=False)
+        session.commit()
+    return removed
+
+
 def main() -> None:
+    import sys
+
+    if "--reset-history" in sys.argv:
+        print(f"Удалено обращений: {reset_history()}. Проигрываю историю заново…")
     created = seed()
     outage = seed_incident()
     documents = seed_documents()

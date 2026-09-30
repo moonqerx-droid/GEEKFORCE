@@ -53,6 +53,11 @@ export const operatorApi = {
     return request(`/api/operator/templates/${id}`, { method: "DELETE" });
   },
 
+  /** A first reply written from the card and from what helped colleagues; the specialist edits it. */
+  replyDraft(ticketId: string): Promise<{ text: string; based_on: string | null }> {
+    return request(`/api/operator/tickets/${ticketId}/draft`);
+  },
+
   slaSummary(days: number, signal?: AbortSignal): Promise<SlaSummary> {
     return request(`/api/operator/sla?days=${days}`, {}, signal);
   },

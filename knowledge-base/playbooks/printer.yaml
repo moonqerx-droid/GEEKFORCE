@@ -41,6 +41,7 @@ questions:
   # Needed only when we do not know yet what is wrong: the steps depend on it.
   - fact: error_text
     text: Что показывает принтер на экране или компьютер, когда вы печатаете? Можно своими словами.
+    why: "Замятие, пустой лоток и ошибка очереди печати — это разные шаги."
     kind: text
     only_without_symptoms: true
 steps:

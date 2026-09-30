@@ -13,6 +13,7 @@ import {
 import { FileText, Paperclip, SendHorizontal, X } from "lucide-react";
 import { ACCEPT, acceptFiles, formatSize, releasePreview, type PickedFile } from "../../lib/files";
 import "./Composer.css";
+import { pasteKeys } from "../../lib/platform";
 
 /**
  * The message box. With `allowFiles` it also takes screenshots and documents: via the
@@ -31,7 +32,7 @@ export function Composer({
   size = "regular",
   dropTarget,
   autoFocus = false,
-  hint = "Скриншот ошибки часто ускоряет решение: прикрепите его, перетащите сюда или вставьте через ⌘V / Ctrl+V.",
+  hint = `Скриншот ошибки часто ускоряет решение: прикрепите его, перетащите сюда или вставьте через ${pasteKeys()}.`,
 }: {
   hint?: string;
   busy: boolean;

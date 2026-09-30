@@ -6,9 +6,10 @@ import { MessageThread } from "../conversation/MessageThread";
 import { Composer } from "../conversation/Composer";
 import { stepMarkers } from "../conversation/steps";
 import { formatDateTime } from "../../lib/labels";
-import { fillTemplate, slaOf } from "./operatorApi";
+import { fillTemplate, operatorApi, slaOf } from "./operatorApi";
 import { formatDuration, slaView } from "./sla";
 import { TemplatePicker } from "./TemplatePicker";
+import { pasteKeys } from "../../lib/platform";
 
 export function TicketWorkspace({
   ticket,
@@ -39,6 +40,8 @@ export function TicketWorkspace({
   onResolve: (summary: string) => Promise<unknown>;
 }) {
   const [draft, setDraft] = useState("");
+  const [drafting, setDrafting] = useState(false);
+  const [draftNote, setDraftNote] = useState("");
   const threadRef = useRef<HTMLElement>(null);
   const [resolving, setResolving] = useState(false);
   const [summary, setSummary] = useState("");
@@ -140,11 +143,29 @@ export function TicketWorkspace({
         </form>
       ) : canWrite ? (
         <>
-        <TemplatePicker onPick={(template) => {
-          const text = fillTemplate(template.body, ticket.owner_name);
-          setDraft((current) => (current.trim() ? `${current.trimEnd()}\n\n${text}` : text));
-          window.requestAnimationFrame(() => threadRef.current?.querySelector<HTMLTextAreaElement>("textarea")?.focus());
-        }} />
+        <div className="workspace-tools">
+          <button type="button" className="workspace-draft" disabled={drafting}
+            title="Помощник пишет ответ по карточке и по тому, что помогло коллегам. Проверьте и отправьте."
+            onClick={() => {
+              setDrafting(true);
+              setDraftNote("");
+              void operatorApi.replyDraft(ticket.id).then((result) => {
+                setDraft((current) => (current.trim() ? `${current.trimEnd()}\n\n${result.text}` : result.text));
+                setDraftNote(result.based_on
+                  ? "Черновик готов: в нём решение из похожего закрытого обращения. Проверьте и отправьте."
+                  : "Черновик готов по карточке обращения. Проверьте и отправьте.");
+                window.requestAnimationFrame(() => threadRef.current?.querySelector<HTMLTextAreaElement>("textarea")?.focus());
+              }).catch(() => setDraftNote("Не получилось подготовить черновик — напишите ответ сами.")).finally(() => setDrafting(false));
+            }}>
+            {drafting ? "Готовлю…" : "Черновик ответа"}
+          </button>
+          <TemplatePicker onPick={(template) => {
+            const text = fillTemplate(template.body, ticket.owner_name);
+            setDraft((current) => (current.trim() ? `${current.trimEnd()}\n\n${text}` : text));
+            window.requestAnimationFrame(() => threadRef.current?.querySelector<HTMLTextAreaElement>("textarea")?.focus());
+          }} />
+        </div>
+        {draftNote ? <p className="workspace-draft-note" role="status">{draftNote}</p> : null}
         <Composer
           busy={busy}
           value={draft}
@@ -154,7 +175,7 @@ export function TicketWorkspace({
           placeholder="Ответить сотруднику…"
           allowFiles
           dropTarget={threadRef}
-          hint="Можно приложить скриншот с подсказкой, куда нажать: перетащите файл или вставьте через ⌘V / Ctrl+V."
+          hint={`Можно приложить скриншот с подсказкой, куда нажать: перетащите файл или вставьте через ${pasteKeys()}.`}
           onSend={async (content, files) => { await onReply(content, files); }}
         />
         </>

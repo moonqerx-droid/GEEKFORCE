@@ -43,11 +43,13 @@ questions:
   # Steps differ by symptom, so without one we ask what exactly is wrong.
   - fact: call_problem
     text: Что именно не так со звонком — вас не слышно, вы не слышите собеседников, не работает камера или программа не запускается?
+    why: "Звук, камера и запуск программы чинятся разными шагами."
     kind: text
     only_without_symptoms: true
   # Only the audio steps depend on the headset.
   - fact: headset
     text: Вы используете наушники или гарнитуру?
+    why: "Если есть гарнитура, чаще всего звук уходит не в неё — это проверим первым."
     kind: yes_no
     when_symptoms: [собеседники не слышат, не слышно собеседников, звонок прерывается]
 steps:

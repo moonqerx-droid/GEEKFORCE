@@ -1,4 +1,4 @@
-from datetime import timedelta
+from datetime import timedelta, timezone
 from html import escape
 import secrets
 from urllib.parse import quote
@@ -87,6 +87,18 @@ class AuthService:
             raise EmailDeliveryFailed(user) from exc
         return user
 
+    # «Отправить ещё раз» cannot flood a mailbox: one email a minute, five an hour, per address.
+    EMAIL_COOLDOWN = timedelta(seconds=60)
+    EMAIL_HOURLY_LIMIT = 5
+
+    def _may_send(self, user: User, purpose: str) -> bool:
+        now = utc_now()
+        sent = [moment if moment.tzinfo else moment.replace(tzinfo=timezone.utc)
+                for moment in self.repository.email_token_times(user.id, purpose, now - timedelta(hours=1))]
+        if sent and now - max(sent) < self.EMAIL_COOLDOWN:
+            return False
+        return len(sent) < self.EMAIL_HOURLY_LIMIT
+
     def _send_action(self, user: User, purpose: str) -> None:
         self.repository.invalidate_email_tokens(user.id, purpose)
         raw_token = f"{secrets.randbelow(1_000_000):06d}" if purpose == "verify_email" else new_token()
@@ -121,7 +133,8 @@ class AuthService:
 
     def resend_verification(self, email: str) -> None:
         user = self.repository.get_user_by_email(email)
-        if user and user.email_verified_at is None:
+        # Too soon is skipped silently: the answer must not tell whether the address is registered.
+        if user and user.email_verified_at is None and self._may_send(user, "verify_email"):
             self._send_action(user, "verify_email")
 
     def verify_email(self, email: str, raw_token: str) -> User:
@@ -142,7 +155,7 @@ class AuthService:
 
     def request_password_reset(self, email: str) -> None:
         user = self.repository.get_user_by_email(email)
-        if user and user.is_active:
+        if user and user.is_active and self._may_send(user, "reset_password"):
             self._send_action(user, "reset_password")
 
     def reset_password(self, payload: ResetPasswordRequest) -> None:

@@ -34,6 +34,8 @@ export interface ConversationState {
   retryFailedMessage: (id: number) => Promise<void>;
   rate: (rating: number, comment?: string) => Promise<void>;
   dismissNotice: () => void;
+  /** Continue in the earlier open request about the same problem; this one is removed. */
+  mergeIntoSimilar: () => Promise<void>;
 }
 
 /** While a specialist owns the conversation, their replies arrive by polling. */
@@ -399,7 +401,30 @@ export function useConversation(): ConversationState {
     }
   }, [conversation]);
 
+  const mergeIntoSimilar = useCallback(async () => {
+    if (!conversation?.similar_open || mutationRef.current) return;
+    mutationRef.current = true;
+    setSending(true);
+    try {
+      const target = await api.mergeIntoSimilar(conversation.id);
+      createdRef.current = null;
+      storeId(target.id);
+      try {
+        window.history.replaceState(window.history.state, "", `${window.location.pathname}?conversation=${target.id}`);
+      } catch {
+        // History API unavailable — the stored id still opens the right request on reload.
+      }
+      setConversation(target);
+    } catch (err) {
+      setError(describeError(err));
+    } finally {
+      mutationRef.current = false;
+      setSending(false);
+    }
+  }, [conversation]);
+
   return {
+    mergeIntoSimilar,
     phase,
     conversation,
     error,

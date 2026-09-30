@@ -62,7 +62,22 @@ def error(status_code: int, code: str, message: str) -> HTTPException:
     return HTTPException(status_code=status_code, detail={"code": code, "message": message})
 
 
-@router.post("/register", response_model=CurrentUser, status_code=status.HTTP_201_CREATED)
+# Seconds the page asks to wait before «Отправить ещё раз»; the service enforces the same cooldown.
+EMAIL_RETRY_AFTER = 60
+
+
+def limit_email_requests(request: Request) -> None:
+    """Emails cost a mailbox and the sender's reputation: at most ten requests per ten minutes
+    from one address. Per IP, so the refusal says nothing about whether an account exists."""
+    client_host = request.client.host if request.client else "unknown"
+    try:
+        _rate_limiter.check("email", client_host, limit=10, window=timedelta(minutes=10))
+    except RateLimitExceeded as exc:
+        raise error(429, "email_rate_limited", "Слишком много писем за короткое время. Попробуйте через 10 минут") from exc
+
+
+@router.post("/register", response_model=CurrentUser, status_code=status.HTTP_201_CREATED,
+             dependencies=[Depends(limit_email_requests)])
 def register(payload: EmployeeRegister, service: AuthServiceDependency):
     try:
         return service.register_employee(payload)
@@ -146,19 +161,21 @@ def verify_email(payload: VerifyEmailRequest, service: AuthServiceDependency):
         raise error(400, "invalid_or_expired_code", "Код недействителен или истёк") from exc
 
 
-@router.post("/resend-verification", status_code=status.HTTP_202_ACCEPTED)
+@router.post("/resend-verification", status_code=status.HTTP_202_ACCEPTED,
+             dependencies=[Depends(limit_email_requests)])
 def resend(payload: ForgotPasswordRequest, service: AuthServiceDependency):
     service.resend_verification(payload.email)
-    return {"code": "verification_requested"}
+    return {"code": "verification_requested", "retry_after": EMAIL_RETRY_AFTER}
 
 
-@router.post("/forgot-password", status_code=status.HTTP_202_ACCEPTED)
+@router.post("/forgot-password", status_code=status.HTTP_202_ACCEPTED,
+             dependencies=[Depends(limit_email_requests)])
 def forgot_password(payload: ForgotPasswordRequest, service: AuthServiceDependency):
     try:
         service.request_password_reset(payload.email)
     except Exception:
         pass
-    return {"code": "password_reset_requested"}
+    return {"code": "password_reset_requested", "retry_after": EMAIL_RETRY_AFTER}
 
 
 @router.post("/reset-password", status_code=status.HTTP_204_NO_CONTENT)

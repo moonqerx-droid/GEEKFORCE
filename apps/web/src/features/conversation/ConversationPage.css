@@ -292,13 +292,46 @@
   flex: 1 1 280px;
 }
 
-.similar-open a {
-  color: var(--sea);
+.similar-open-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.similar-open-go,
+.similar-open-stay {
+  padding: 6px 14px;
+  border-radius: var(--radius-pill);
   font-weight: 700;
   white-space: nowrap;
 }
 
-/* «Срочно»: the one red action — straight to a specialist, top of the queue. */
+.similar-open-go {
+  border: 0;
+  background: var(--sea);
+  color: #fff;
+}
+
+.similar-open-stay {
+  border: 1px solid var(--color-border-strong);
+  background: var(--color-surface);
+  color: var(--ink);
+}
+
+/* «Почему спрашиваю»: every question earns its place — the answer changes the next step. */
+.question-reason {
+  max-width: 560px;
+  margin: calc(var(--space-2) * -1) 0 0 44px;
+  color: var(--ink-soft);
+  font-size: var(--font-size-sm);
+}
+
+.question-reason span {
+  color: var(--ink);
+  font-weight: 600;
+}
+
+/* «Срочно»: the one red action — straight to a specialist, marked urgent. */
 .chat-action-urgent {
   border-color: color-mix(in srgb, var(--color-danger) 45%, var(--color-border));
   color: var(--color-danger);

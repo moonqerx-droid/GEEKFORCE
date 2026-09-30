@@ -10,6 +10,7 @@ questions:
   # right scenario; a free-text answer is re-read like a new description.
   - fact: problem_area
     text: Пока не ясно, что случилось. На что это похоже?
+    why: "Один ответ — и я выберу нужный сценарий, вместо того чтобы расспрашивать обо всём."
     kind: choice
     offer_dont_know: false
     options:
@@ -31,6 +32,7 @@ questions:
   # Only after «Другое»: one open question, then a specialist gets the whole story.
   - fact: details
     text: Опишите, пожалуйста, что вы делаете и что видите на экране. Дальше подключу специалиста — он получит всю историю.
+    why: "Специалист получит ваше описание целиком и не будет переспрашивать."
     kind: text
     when_facts: {problem_area: [other]}
 verify_question: После этого всё работает как нужно?

@@ -1,10 +1,11 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { api, ConflictError } from "../../api/client";
+import { api, ApiError, ConflictError } from "../../api/client";
 import type { RegistrationPayload } from "../../api/types";
 import { AuthLayout } from "./AuthLayout";
 import { Field } from "./Field";
 import { validateRegistration, type RegistrationErrors } from "./validation";
+import { startCooldown } from "../../lib/cooldown";
 
 const initial: RegistrationPayload = { first_name: "", last_name: "", email: "", department: "", password: "", password_confirmation: "", accepted_terms: false };
 
@@ -22,12 +23,16 @@ export function RegisterPage() {
       setBusy(true); setMessage("");
       try {
         await api.register(value);
+        // The first code has just gone out: «Отправить новый код» waits a minute, like the server.
+        startCooldown(`verify:${value.email.trim().toLowerCase()}`, 60);
         setMessage("Аккаунт создан. Код подтверждения отправлен на email.");
         navigate(`/verify-email?email=${encodeURIComponent(value.email)}`);
       }
       catch (error) {
         if (error instanceof ConflictError) {
           navigate(`/verify-email?email=${encodeURIComponent(value.email)}`);
+        } else if (error instanceof ApiError && error.status === 429) {
+          setMessage("Слишком много писем за короткое время. Попробуйте через 10 минут.");
         } else {
           setMessage("Не удалось завершить регистрацию. Проверьте данные или повторите позже.");
         }
