@@ -2,6 +2,9 @@
 # ":80" serves plain HTTP on the server's IP.
 {$SITE_ADDRESS::80} {
 	encode gzip
+	# www.example.ru → example.ru: one address, one set of cookies, one allowed origin.
+	@www header_regexp www Host ^www\.(.+)$
+	redir @www https://{re.www.1}{uri} permanent
 	@backend path /api/* /health /docs /openapi.json
 	handle @backend {
 		reverse_proxy api:8000

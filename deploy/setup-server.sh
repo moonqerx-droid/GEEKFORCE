@@ -6,7 +6,8 @@
 # --demo adds demo accounts with the PUBLIC password DemoPass123 (including the support lead)
 # and one-click logins: anyone with the address can sign in as admin. Only for a demo.
 # Without --demo no accounts are created: set ADMIN_EMAIL and ADMIN_PASSWORD in .env.
-# Safe to re-run: keeps the existing .env and database, rebuilds, re-seeds only what is missing.
+# Safe to re-run: keeps the database and its password, rebuilds, re-seeds only what is missing.
+# The domain needs an A record for the bare name and for www pointing to this server first.
 set -eu
 
 ADDRESS="${1:?Укажите домен или IP сервера: sh deploy/setup-server.sh helpflow.example.ru [--demo]}"
@@ -19,26 +20,31 @@ if ! command -v docker >/dev/null 2>&1; then
   curl -fsSL https://get.docker.com | sh
 fi
 
+ADDRESS="${ADDRESS#www.}"  # the site lives on the bare domain; www redirects to it
 case "$ADDRESS" in
-  *[a-zA-Z]*) SITE="$ADDRESS"; URL="https://$ADDRESS"; SECURE=true ;;
+  *[a-zA-Z]*) SITE="$ADDRESS, www.$ADDRESS"; URL="https://$ADDRESS"; SECURE=true ;;
   *) SITE=":80"; URL="http://$ADDRESS"; SECURE=false ;;
 esac
 
 if [ ! -f .env ]; then
   DB_PASSWORD=$(head -c 24 /dev/urandom | od -An -tx1 | tr -d ' \n')
   cat > .env <<ENV
-PUBLIC_URL=$URL
-SITE_ADDRESS=$SITE
-COOKIE_SECURE=$SECURE
 AI_PROVIDER=rules
 POSTGRES_PASSWORD=$DB_PASSWORD
 DATABASE_URL=postgresql+psycopg://helpflow:$DB_PASSWORD@db:5432/helpflow
 ENV
   echo "Создан .env (пароль базы сгенерирован)."
 fi
-# The mode follows the latest run: --demo turns demo logins on, a run without it turns them off.
-grep -v '^SHOW_DEMO_LOGINS=' .env > .env.tmp && mv .env.tmp .env
-echo "SHOW_DEMO_LOGINS=$DEMO" >> .env
+# The address and the mode follow the latest run: moving from an IP to a domain is one more run,
+# and --demo turns demo logins on while a run without it turns them off.
+grep -v -e '^PUBLIC_URL=' -e '^SITE_ADDRESS=' -e '^COOKIE_SECURE=' -e '^SHOW_DEMO_LOGINS=' .env > .env.tmp
+mv .env.tmp .env
+cat >> .env <<ENV
+PUBLIC_URL=$URL
+SITE_ADDRESS=$SITE
+COOKIE_SECURE=$SECURE
+SHOW_DEMO_LOGINS=$DEMO
+ENV
 
 $COMPOSE up -d --build
 
